@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+
+{% block title %}{{ titulo_form }} | ClockIn{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>📄 {{ titulo_form }}</h2>
+    <p>Completa los datos del permiso o licencia.</p>
+</div>
+
+<div class="card form-card">
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        {% if form.errors %}
+            <div class="alert-box error-box-strong">
+                Revisa los campos marcados. Hay datos pendientes o inválidos.
+            </div>
+        {% endif %}
+
+        <div class="form-grid">
+            <div class="form-field">
+                <label for="{{ form.funcionario.id_for_label }}">Funcionario</label>
+                {{ form.funcionario }}
+                {{ form.funcionario.errors }}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.tipo.id_for_label }}">Tipo</label>
+                {{ form.tipo }}
+                {{ form.tipo.errors }}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.fecha_desde.id_for_label }}">Fecha desde</label>
+                {{ form.fecha_desde }}
+                {{ form.fecha_desde.errors }}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.fecha_hasta.id_for_label }}">Fecha hasta</label>
+                {{ form.fecha_hasta }}
+                {{ form.fecha_hasta.errors }}
+            </div>
+
+            <div class="form-field full-width">
+                <label for="{{ form.motivo.id_for_label }}">Motivo</label>
+                {{ form.motivo }}
+                {{ form.motivo.errors }}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.adjunto.id_for_label }}">Adjunto</label>
+                {{ form.adjunto }}
+                {{ form.adjunto.errors }}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.estado.id_for_label }}">Estado</label>
+                {{ form.estado }}
+                {{ form.estado.errors }}
+            </div>
+
+            <div class="form-field full-width">
+                <label for="{{ form.observacion.id_for_label }}">Observación</label>
+                {{ form.observacion }}
+                {{ form.observacion.errors }}
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <a href="{% url 'permisos_lista' %}" class="btn-secondary">Volver</a>
+            <button type="submit" class="btn-primary btn-link">{{ boton_texto }}</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

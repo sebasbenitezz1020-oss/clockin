@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}Turnos | ClockIn{% endblock %}
+
+{% block content %}
+<div class="page-header page-header-flex">
+    <div>
+        <h2>🕓 Turnos</h2>
+        <p>Gestión de horarios y configuraciones de turnos.</p>
+    </div>
+    <a href="{% url 'turno_nuevo' %}" class="btn-primary btn-link">+ Nuevo turno</a>
+</div>
+
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert-box success-box">{{ message }}</div>
+    {% endfor %}
+{% endif %}
+
+<div class="card mb-20">
+    <form method="get" class="search-bar">
+        <input
+            type="text"
+            name="q"
+            value="{{ q }}"
+            placeholder="Buscar turno por nombre..."
+            class="form-control"
+        >
+        <button type="submit" class="btn-primary btn-search">Buscar</button>
+    </form>
+</div>
+
+<div class="card">
+    <div class="table-wrap">
+        <table class="table-dark">
+            <thead>
+                <tr>
+                    <th>Nombre</th>
+                    <th>Entrada</th>
+                    <th>Salida</th>
+                    <th>Almuerzo</th>
+                    <th>Inicio almuerzo</th>
+                    <th>Fin almuerzo</th>
+                    <th>Tolerancia</th>
+                    <th>Estado</th>
+                    <th style="width: 180px;">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for t in turnos %}
+                    <tr>
+                        <td>{{ t.nombre }}</td>
+                        <td>{{ t.hora_entrada|time:"H:i" }}</td>
+                        <td>{{ t.hora_salida|time:"H:i" }}</td>
+                        <td>{% if t.usa_almuerzo %}Sí{% else %}No{% endif %}</td>
+                        <td>{{ t.hora_inicio_almuerzo|time:"H:i"|default:"-" }}</td>
+                        <td>{{ t.hora_fin_almuerzo|time:"H:i"|default:"-" }}</td>
+                        <td>{{ t.tolerancia_minutos }} min</td>
+                        <td>
+                            {% if t.activo %}
+                                <span class="badge-success">Activo</span>
+                            {% else %}
+                                <span class="badge-danger">Inactivo</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="actions-inline">
+                                <a href="{% url 'turno_editar' t.pk %}" class="btn-table">Editar</a>
+                                <a href="{% url 'turno_toggle_activo' t.pk %}" class="btn-table btn-table-danger">
+                                    {% if t.activo %}Inactivar{% else %}Activar{% endif %}
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="9" class="empty-row">No hay turnos registrados todavía.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+
+{% block title %}Historial | ClockIn{% endblock %}
+
+{% block content %}
+<div class="page-header page-header-flex">
+    <div>
+        <h2>🕘 Historial de acciones</h2>
+        <p>Registro de movimientos administrativos realizados en el sistema.</p>
+    </div>
+</div>
+
+<div class="card mb-20">
+    <form method="get" class="search-bar">
+        <input
+            type="text"
+            name="q"
+            value="{{ q }}"
+            placeholder="Buscar por módulo, acción, usuario o descripción..."
+            class="form-control"
+        >
+        <button type="submit" class="btn-primary btn-search">Buscar</button>
+    </form>
+</div>
+
+<div class="card">
+    <div class="table-wrap">
+        <table class="table-dark">
+            <thead>
+                <tr>
+                    <th>Fecha y hora</th>
+                    <th>Usuario</th>
+                    <th>Módulo</th>
+                    <th>Acción</th>
+                    <th>Descripción</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in historial %}
+                    <tr>
+                        <td>{{ item.creado_en|date:"d/m/Y H:i:s" }}</td>
+                        <td>
+                            {% if item.usuario %}
+                                {{ item.usuario.get_full_name|default:item.usuario.username }}
+                            {% else %}
+                                Sistema
+                            {% endif %}
+                        </td>
+                        <td>{{ item.modulo }}</td>
+                        <td>{{ item.accion }}</td>
+                        <td>{{ item.descripcion }}</td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="5" class="empty-row">Todavía no hay acciones registradas.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

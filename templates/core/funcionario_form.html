@@ -1,0 +1,157 @@
+{% extends "base.html" %}
+
+{% block title %}{{ titulo_form }} | ClockIn{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>📝 {{ titulo_form }}</h2>
+    <p>Completa la información principal del funcionario.</p>
+</div>
+
+<div class="card form-card">
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        {% if form.errors %}
+            <div class="alert-box error-box-strong">
+                Revisa los campos marcados. Hay datos pendientes o inválidos.
+            </div>
+        {% endif %}
+
+        <div class="form-grid">
+            <div class="form-field">
+                <label for="{{ form.nombre.id_for_label }}">Nombre</label>
+                {{ form.nombre }}
+                {{ form.nombre.errors }}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.apellido.id_for_label }}">Apellido</label>
+                {{ form.apellido }}
+                {{ form.apellido.errors }}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.cedula.id_for_label }}">Cédula</label>
+                {{ form.cedula }}
+                {{ form.cedula.errors }}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.turno.id_for_label }}">Turno</label>
+                {{ form.turno }}
+                {{ form.turno.errors }}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.empresa.id_for_label }}">Empresa</label>
+                {{ form.empresa }}
+                {{ form.empresa.errors }}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.sucursal_rel.id_for_label }}">Sucursal</label>
+                {{ form.sucursal_rel }}
+                {{ form.sucursal_rel.errors }}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.cargo.id_for_label }}">Cargo</label>
+                {{ form.cargo }}
+                {{ form.cargo.errors }}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.sector.id_for_label }}">Sector</label>
+                {{ form.sector }}
+                {{ form.sector.errors }}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.fecha_ingreso.id_for_label }}">Fecha de ingreso</label>
+                {{ form.fecha_ingreso }}
+                {{ form.fecha_ingreso.errors }}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.salario_base.id_for_label }}">Salario base</label>
+                {{ form.salario_base }}
+                {{ form.salario_base.errors }}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.bono.id_for_label }}">Bono</label>
+                {{ form.bono }}
+                {{ form.bono.errors }}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.foto.id_for_label }}">Foto</label>
+                {{ form.foto }}
+                {{ form.foto.errors }}
+            </div>
+        </div>
+
+        <div class="checks-row">
+            <label class="check-item">
+                {{ form.ips }} <span>Aporta IPS</span>
+            </label>
+
+            <label class="check-item">
+                {{ form.activo }} <span>Funcionario activo</span>
+            </label>
+        </div>
+
+        <div class="form-actions">
+            <a href="{% url 'funcionarios_lista' %}" class="btn-secondary">Volver</a>
+            <button type="submit" class="btn-primary btn-link">{{ boton_texto }}</button>
+        </div>
+    </form>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const empresaSelect = document.getElementById("id_empresa");
+    const sucursalSelect = document.getElementById("id_sucursal_rel");
+
+    if (!empresaSelect || !sucursalSelect) return;
+
+    const initialSucursal = sucursalSelect.value;
+
+    async function cargarSucursales(empresaId, sucursalSeleccionada = "") {
+        sucursalSelect.innerHTML = '<option value="">Seleccionar sucursal</option>';
+
+        if (!empresaId) {
+            return;
+        }
+
+        try {
+            const response = await fetch("{% url 'obtener_sucursales_por_empresa' %}?empresa_id=" + empresaId);
+            const data = await response.json();
+
+            data.sucursales.forEach(function (sucursal) {
+                const option = document.createElement("option");
+                option.value = sucursal.id;
+                option.textContent = sucursal.nombre;
+
+                if (String(sucursal.id) === String(sucursalSeleccionada)) {
+                    option.selected = true;
+                }
+
+                sucursalSelect.appendChild(option);
+            });
+        } catch (error) {
+            console.error("Error cargando sucursales:", error);
+        }
+    }
+
+    empresaSelect.addEventListener("change", function () {
+        cargarSucursales(this.value, "");
+    });
+
+    if (empresaSelect.value) {
+        cargarSucursales(empresaSelect.value, initialSucursal);
+    }
+});
+</script>
+{% endblock %}

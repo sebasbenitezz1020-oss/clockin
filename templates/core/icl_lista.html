@@ -1,0 +1,147 @@
+{% extends "base.html" %}
+
+{% block title %}ICL | ClockIn{% endblock %}
+
+{% block content %}
+<div class="page-header page-header-flex">
+    <div>
+        <h2>📈 ICL — Índice de Cumplimiento Laboral</h2>
+        <p>Resumen mensual mejorado con ausencias justificadas y bono proyectado.</p>
+    </div>
+</div>
+
+<div class="card mb-20">
+    <form method="get" class="search-bar">
+        <select name="mes" class="form-control">
+            {% for num, nombre in meses %}
+                <option value="{{ num }}" {% if mes == num %}selected{% endif %}>{{ nombre }}</option>
+            {% endfor %}
+        </select>
+
+        <select name="anio" class="form-control">
+            {% for y in anios %}
+                <option value="{{ y }}" {% if anio == y %}selected{% endif %}>{{ y }}</option>
+            {% endfor %}
+        </select>
+
+        <button type="submit" class="btn-primary btn-search">Calcular</button>
+    </form>
+</div>
+
+<div class="cards-grid dashboard-cards-3 mb-20">
+    <div class="card stat-card">
+        <span class="stat-label">Mes evaluado</span>
+        <strong class="stat-number-small">{{ mes }}/{{ anio }}</strong>
+    </div>
+    <div class="card stat-card">
+        <span class="stat-label">Días laborales estimados</span>
+        <strong class="stat-number-small">{{ total_dias_laborales_estimados }}</strong>
+    </div>
+    <div class="card stat-card">
+        <span class="stat-label">Funcionarios evaluados</span>
+        <strong class="stat-number-small">{{ resultados|length }}</strong>
+    </div>
+</div>
+
+<div class="dashboard-grid-2 mb-20">
+    <div class="card">
+        <div class="section-head">
+            <h3>🏆 Top 5 ICL</h3>
+            <span class="section-subtitle">Mayor cumplimiento</span>
+        </div>
+
+        <div class="mini-list">
+            {% for item in top_5 %}
+                <div class="mini-list-item">
+                    <div>
+                        <strong>{{ item.funcionario.nombre_completo }}</strong>
+                        <p>CI: {{ item.funcionario.cedula }}</p>
+                        <p>Bono proyectado: Gs. {{ item.bono_proyectado }}</p>
+                    </div>
+                    <span class="badge-success">{{ item.icl }}%</span>
+                </div>
+            {% empty %}
+                <div class="empty-state-box">Sin datos.</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="section-head">
+            <h3>📉 Peores 5 ICL</h3>
+            <span class="section-subtitle">Menor cumplimiento</span>
+        </div>
+
+        <div class="mini-list">
+            {% for item in peores_5 %}
+                <div class="mini-list-item">
+                    <div>
+                        <strong>{{ item.funcionario.nombre_completo }}</strong>
+                        <p>CI: {{ item.funcionario.cedula }}</p>
+                        <p>Bono proyectado: Gs. {{ item.bono_proyectado }}</p>
+                    </div>
+                    <span class="badge-danger">{{ item.icl }}%</span>
+                </div>
+            {% empty %}
+                <div class="empty-state-box">Sin datos.</div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="section-head">
+        <h3>📋 Detalle general</h3>
+        <span class="section-subtitle">Cálculo mensual mejorado por funcionario</span>
+    </div>
+
+    <div class="table-wrap">
+        <table class="table-dark">
+            <thead>
+                <tr>
+                    <th>Funcionario</th>
+                    <th>Cédula</th>
+                    <th>Asistencias</th>
+                    <th>Atrasos</th>
+                    <th>Aus. estimadas</th>
+                    <th>Permisos</th>
+                    <th>Vacaciones</th>
+                    <th>Aus. no justificadas</th>
+                    <th>ICL</th>
+                    <th>Bono base</th>
+                    <th>Bono proyectado</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in resultados %}
+                    <tr>
+                        <td>{{ item.funcionario.nombre_completo }}</td>
+                        <td>{{ item.funcionario.cedula }}</td>
+                        <td>{{ item.asistencias }}</td>
+                        <td>{{ item.atrasos }}</td>
+                        <td>{{ item.ausencias_estimadas }}</td>
+                        <td>{{ item.permisos_aprobados }}</td>
+                        <td>{{ item.vacaciones_aprobadas }}</td>
+                        <td>{{ item.ausencias_no_justificadas }}</td>
+                        <td>
+                            {% if item.icl >= 80 %}
+                                <span class="badge-success">{{ item.icl }}%</span>
+                            {% elif item.icl >= 50 %}
+                                <span class="badge-warning">{{ item.icl }}%</span>
+                            {% else %}
+                                <span class="badge-danger">{{ item.icl }}%</span>
+                            {% endif %}
+                        </td>
+                        <td>Gs. {{ item.bono_base }}</td>
+                        <td><strong>Gs. {{ item.bono_proyectado }}</strong></td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="11" class="empty-row">No hay funcionarios para calcular ICL.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

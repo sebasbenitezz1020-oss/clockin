@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+
+{% block title %}Permisos / Licencias | ClockIn{% endblock %}
+
+{% block content %}
+<div class="page-header page-header-flex">
+    <div>
+        <h2>📄 Permisos / Licencias</h2>
+        <p>Gestión de permisos, reposos y licencias del personal.</p>
+    </div>
+    <a href="{% url 'permiso_nuevo' %}" class="btn-primary btn-link">+ Nuevo permiso</a>
+</div>
+
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert-box success-box">{{ message }}</div>
+    {% endfor %}
+{% endif %}
+
+<div class="card mb-20">
+    <form method="get" class="search-bar">
+        <input
+            type="text"
+            name="q"
+            value="{{ q }}"
+            placeholder="Buscar por funcionario, cédula, tipo o estado..."
+            class="form-control"
+        >
+        <button type="submit" class="btn-primary btn-search">Buscar</button>
+    </form>
+</div>
+
+<div class="card">
+    <div class="table-wrap">
+        <table class="table-dark">
+            <thead>
+                <tr>
+                    <th>Funcionario</th>
+                    <th>Tipo</th>
+                    <th>Desde</th>
+                    <th>Hasta</th>
+                    <th>Días</th>
+                    <th>Estado</th>
+                    <th>Adjunto</th>
+                    <th style="width: 120px;">Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for p in permisos %}
+                    <tr>
+                        <td>{{ p.funcionario.nombre_completo }}<br><small>CI: {{ p.funcionario.cedula }}</small></td>
+                        <td>{{ p.get_tipo_display }}</td>
+                        <td>{{ p.fecha_desde|date:"d/m/Y" }}</td>
+                        <td>{{ p.fecha_hasta|date:"d/m/Y" }}</td>
+                        <td>{{ p.dias }}</td>
+                        <td>
+                            {% if p.estado == "aprobado" %}
+                                <span class="badge-success">Aprobado</span>
+                            {% elif p.estado == "pendiente" %}
+                                <span class="badge-warning">Pendiente</span>
+                            {% else %}
+                                <span class="badge-danger">{{ p.get_estado_display }}</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if p.adjunto %}
+                                <a href="{{ p.adjunto.url }}" target="_blank" class="btn-table">Ver</a>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                        <td>
+                            <a href="{% url 'permiso_editar' p.pk %}" class="btn-table">Editar</a>
+                        </td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="8" class="empty-row">No hay permisos o licencias registrados todavía.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

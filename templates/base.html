@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}ClockIn{% endblock %}</title>
+    <link rel="stylesheet" href="/static/css/styles.css">
+</head>
+<body>
+
+<button id="menu-toggle">☰</button>
+
+<div class="layout">
+    <aside class="sidebar" id="sidebar">
+        <div class="brand">
+            <h1>🕒 ClockIn</h1>
+            <p>Sistema Web</p>
+        </div>
+
+        {% if request.user.is_authenticated %}
+        <nav class="menu">
+            <a href="{% url 'dashboard' %}">📊 Dashboard</a>
+            <a href="{% url 'empresas_lista' %}">🏢 Empresas</a>
+            <a href="{% url 'sucursales_lista' %}">🏬 Sucursales</a>
+            <a href="{% url 'funcionarios_lista' %}">👥 Funcionarios</a>
+            <a href="{% url 'turnos_lista' %}">🕓 Turnos</a>
+            <a href="{% url 'asistencia_marcar' %}">⏱️ Asistencia</a>
+            <a href="{% url 'biometrico_inicio' %}">📸 Biométrico</a>
+            <a href="{% url 'permisos_lista' %}">📄 Permisos / Licencias</a>
+            <a href="{% url 'vacaciones_lista' %}">🏖️ Vacaciones</a>
+            <a href="{% url 'icl_lista' %}">📈 ICL</a>
+            <a href="{% url 'reportes' %}">📑 Reportes</a>
+            <a href="{% url 'historial_lista' %}">🕘 Historial</a>
+            <a href="/admin/">⚙️ Admin</a>
+
+            <form method="post" action="{% url 'logout' %}">
+                {% csrf_token %}
+                <button type="submit" class="logout-btn">🚪 Cerrar sesión</button>
+            </form>
+        </nav>
+        {% endif %}
+    </aside>
+
+    <main class="content">
+        <header class="topbar">
+            {% if request.user.is_authenticated %}
+                <div>
+                    <strong>{{ request.user.get_full_name|default:request.user.username }}</strong>
+                    <span class="role-badge">{{ request.user.get_rol_display }}</span>
+                </div>
+            {% endif %}
+        </header>
+
+        <section class="page">
+            {% block content %}{% endblock %}
+        </section>
+    </main>
+</div>
+
+<script>
+const toggle = document.getElementById("menu-toggle");
+const sidebar = document.getElementById("sidebar");
+
+if (toggle && sidebar) {
+    toggle.addEventListener("click", () => {
+        sidebar.classList.toggle("active");
+    });
+}
+</script>
+
+</body>
+</html>

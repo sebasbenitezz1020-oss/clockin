@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+
+{% block title %}Asistencia | ClockIn{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>⏱️ Asistencia</h2>
+    <p>Registro de entrada y salida de funcionarios.</p>
+</div>
+
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert-box {% if message.tags == 'success' %}success-box{% elif message.tags == 'error' %}error-box-strong{% else %}warning-box{% endif %}">
+            {{ message }}
+        </div>
+    {% endfor %}
+{% endif %}
+
+<div class="card form-card mb-20">
+    <form method="post">
+        {% csrf_token %}
+        <div class="form-grid form-grid-1">
+            <div class="form-field">
+                <label for="{{ form.cedula.id_for_label }}">Cédula del funcionario</label>
+                {{ form.cedula }}
+                {{ form.cedula.errors }}
+            </div>
+        </div>
+
+        <div class="form-actions">
+            <button type="submit" class="btn-primary btn-link">Registrar marcación</button>
+        </div>
+    </form>
+</div>
+
+{% if resultado %}
+<div class="card mb-20">
+    <h3 class="section-title">
+        {% if resultado.tipo == "entrada" %}
+            ✅ Entrada registrada
+        {% else %}
+            🚪 Salida registrada
+        {% endif %}
+    </h3>
+
+    <div class="result-grid">
+        <div class="result-box">
+            <span class="result-label">Funcionario</span>
+            <strong>{{ resultado.funcionario.nombre_completo }}</strong>
+        </div>
+        <div class="result-box">
+            <span class="result-label">Cédula</span>
+            <strong>{{ resultado.funcionario.cedula }}</strong>
+        </div>
+        <div class="result-box">
+            <span class="result-label">Turno</span>
+            <strong>{{ resultado.turno }}</strong>
+        </div>
+        <div class="result-box">
+            <span class="result-label">Hora</span>
+            <strong>{{ resultado.hora|date:"H:i:s" }}</strong>
+        </div>
+        <div class="result-box">
+            <span class="result-label">Atraso</span>
+            <strong>{{ resultado.atraso }} min</strong>
+        </div>
+        <div class="result-box">
+            <span class="result-label">Estado</span>
+            <strong>
+                {% if resultado.llego_tarde %}
+                    Llegó tarde
+                {% else %}
+                    En horario
+                {% endif %}
+            </strong>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="card">
+    <div class="page-header mb-20">
+        <h3>📋 Marcaciones de hoy — {{ hoy|date:"d/m/Y" }}</h3>
+    </div>
+
+    <div class="table-wrap">
+        <table class="table-dark">
+            <thead>
+                <tr>
+                    <th>Cédula</th>
+                    <th>Funcionario</th>
+                    <th>Turno</th>
+                    <th>Entrada</th>
+                    <th>Salida</th>
+                    <th>Atraso</th>
+                    <th>Estado</th>
+                    <th>Observación</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for a in asistencias_hoy %}
+                    <tr>
+                        <td>{{ a.funcionario.cedula }}</td>
+                        <td>{{ a.funcionario.nombre_completo }}</td>
+                        <td>{{ a.funcionario.turno.nombre|default:"-" }}</td>
+                        <td>{% if a.hora_entrada %}{{ a.hora_entrada|date:"H:i:s" }}{% else %}-{% endif %}</td>
+                        <td>{% if a.hora_salida %}{{ a.hora_salida|date:"H:i:s" }}{% else %}-{% endif %}</td>
+                        <td>{{ a.minutos_atraso }} min</td>
+                        <td>
+                            {% if a.llego_tarde %}
+                                <span class="badge-danger">Tarde</span>
+                            {% else %}
+                                <span class="badge-success">En horario</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ a.observacion|default:"-" }}</td>
+                    </tr>
+                {% empty %}
+                    <tr>
+                        <td colspan="8" class="empty-row">Aún no hay marcaciones registradas hoy.</td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

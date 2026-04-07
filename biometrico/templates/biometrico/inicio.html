@@ -1,0 +1,471 @@
+{% extends "base.html" %}
+
+{% block title %}Biométrico{% endblock %}
+
+{% block content %}
+<style>
+    .bio-page {
+        padding: 28px 0;
+    }
+
+    .bio-hero {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 18px;
+        flex-wrap: wrap;
+        margin-bottom: 24px;
+        padding: 26px 28px;
+        border-radius: 28px;
+        background:
+            radial-gradient(circle at top left, rgba(56, 189, 248, 0.12), transparent 28%),
+            radial-gradient(circle at top right, rgba(34, 197, 94, 0.10), transparent 25%),
+            linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
+        border: 1px solid rgba(255,255,255,.06);
+        box-shadow: 0 18px 44px rgba(0,0,0,.24);
+    }
+
+    .bio-hero-text h2 {
+        margin: 0;
+        color: #ffffff;
+        font-size: 34px;
+        font-weight: 800;
+        letter-spacing: .2px;
+    }
+
+    .bio-hero-text p {
+        margin: 10px 0 0;
+        color: #9fb0c3;
+        font-size: 15px;
+        line-height: 1.6;
+        max-width: 760px;
+    }
+
+    .bio-hero-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 16px;
+        border-radius: 999px;
+        background: rgba(56,189,248,.12);
+        color: #7dd3fc;
+        border: 1px solid rgba(56,189,248,.20);
+        font-weight: 700;
+        white-space: nowrap;
+    }
+
+    .bio-stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 18px;
+        margin-bottom: 24px;
+    }
+
+    .bio-stat-card {
+        position: relative;
+        overflow: hidden;
+        padding: 24px;
+        border-radius: 24px;
+        background: linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
+        border: 1px solid rgba(255,255,255,.06);
+        box-shadow: 0 12px 36px rgba(0,0,0,.20);
+    }
+
+    .bio-stat-card::after {
+        content: "";
+        position: absolute;
+        top: -30px;
+        right: -30px;
+        width: 110px;
+        height: 110px;
+        border-radius: 50%;
+        background: rgba(255,255,255,.03);
+    }
+
+    .bio-stat-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 18px;
+    }
+
+    .bio-stat-title {
+        color: #9fb0c3;
+        font-size: 14px;
+        font-weight: 600;
+    }
+
+    .bio-stat-icon {
+        font-size: 26px;
+        opacity: .9;
+    }
+
+    .bio-stat-value {
+        color: #ffffff;
+        font-size: 42px;
+        font-weight: 800;
+        line-height: 1;
+        margin-bottom: 8px;
+    }
+
+    .bio-stat-sub {
+        color: #7f90a4;
+        font-size: 13px;
+    }
+
+    .bio-stat-card.total .bio-stat-icon { color: #7dd3fc; }
+    .bio-stat-card.ok .bio-stat-icon { color: #86efac; }
+    .bio-stat-card.pending .bio-stat-icon { color: #fcd34d; }
+
+    .bio-main-grid {
+        display: grid;
+        grid-template-columns: 1.1fr .9fr;
+        gap: 20px;
+    }
+
+    .bio-card {
+        background: linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
+        border: 1px solid rgba(255,255,255,.06);
+        border-radius: 26px;
+        box-shadow: 0 12px 36px rgba(0,0,0,.20);
+        overflow: hidden;
+    }
+
+    .bio-card-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 14px;
+        padding: 22px 24px 14px;
+    }
+
+    .bio-card-header h3 {
+        margin: 0;
+        color: #fff;
+        font-size: 22px;
+        font-weight: 800;
+    }
+
+    .bio-card-header span {
+        color: #93a4b7;
+        font-size: 13px;
+    }
+
+    .bio-card-body {
+        padding: 0 24px 24px;
+    }
+
+    .bio-card-desc {
+        color: #97a7b9;
+        line-height: 1.6;
+        margin: 0 0 18px;
+    }
+
+    .bio-action-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 14px;
+    }
+
+    .bio-action-box {
+        display: block;
+        text-decoration: none;
+        border-radius: 20px;
+        padding: 18px;
+        background: rgba(255,255,255,.03);
+        border: 1px solid rgba(255,255,255,.05);
+        transition: .2s ease;
+    }
+
+    .bio-action-box:hover {
+        transform: translateY(-2px);
+        text-decoration: none;
+        background: rgba(59,130,246,.08);
+        border-color: rgba(59,130,246,.18);
+    }
+
+    .bio-action-icon {
+        font-size: 28px;
+        margin-bottom: 12px;
+    }
+
+    .bio-action-title {
+        color: #fff;
+        font-weight: 800;
+        font-size: 16px;
+        margin-bottom: 6px;
+    }
+
+    .bio-action-text {
+        color: #95a5b8;
+        font-size: 13px;
+        line-height: 1.5;
+    }
+
+    .bio-pending-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .bio-pending-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 14px;
+        padding: 14px 16px;
+        border-radius: 18px;
+        background: rgba(255,255,255,.03);
+        border: 1px solid rgba(255,255,255,.05);
+    }
+
+    .bio-pending-name {
+        color: #fff;
+        font-weight: 700;
+        margin-bottom: 4px;
+    }
+
+    .bio-pending-meta {
+        color: #94a3b8;
+        font-size: 13px;
+        line-height: 1.5;
+    }
+
+    .bio-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+        border-radius: 14px;
+        padding: 11px 14px;
+        text-decoration: none;
+        font-size: 13px;
+        font-weight: 700;
+        border: 1px solid transparent;
+        transition: .2s ease;
+        white-space: nowrap;
+    }
+
+    .bio-btn:hover {
+        text-decoration: none;
+        transform: translateY(-1px);
+    }
+
+    .bio-btn-primary {
+        background: linear-gradient(135deg, #2563eb, #3b82f6);
+        color: #fff;
+    }
+
+    .bio-btn-secondary {
+        background: rgba(56,189,248,.12);
+        color: #7dd3fc;
+        border-color: rgba(56,189,248,.22);
+    }
+
+    .bio-btn-muted {
+        background: rgba(148,163,184,.12);
+        color: #d6e0ea;
+        border-color: rgba(148,163,184,.18);
+    }
+
+    .bio-empty {
+        padding: 16px 0 4px;
+        color: #94a3b8;
+        line-height: 1.6;
+    }
+
+    .bio-footer-note {
+        margin-top: 18px;
+        padding: 14px 16px;
+        border-radius: 16px;
+        background: rgba(245,158,11,.10);
+        border: 1px solid rgba(245,158,11,.18);
+        color: #fcd34d;
+        font-size: 13px;
+        line-height: 1.6;
+    }
+
+    @media (max-width: 980px) {
+        .bio-stats {
+            grid-template-columns: 1fr;
+        }
+
+        .bio-main-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 640px) {
+        .bio-page {
+            padding: 18px 0;
+        }
+
+        .bio-hero {
+            padding: 20px 18px;
+            border-radius: 22px;
+        }
+
+        .bio-hero-text h2 {
+            font-size: 28px;
+        }
+
+        .bio-card-header,
+        .bio-card-body {
+            padding-left: 18px;
+            padding-right: 18px;
+        }
+
+        .bio-action-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .bio-pending-item {
+            flex-direction: column;
+            align-items: flex-start;
+        }
+
+        .bio-btn {
+            width: 100%;
+        }
+    }
+</style>
+
+<div class="container-fluid bio-page">
+    <div class="bio-hero">
+        <div class="bio-hero-text">
+            <h2>📸 Módulo Biométrico</h2>
+            <p>
+                Administre el lector facial de ClockIn, controle qué funcionarios ya tienen rostro cargado
+                y acceda rápidamente al lector biométrico para marcación de entrada o salida.
+            </p>
+        </div>
+        <div class="bio-hero-badge">
+            🔐 Reconocimiento facial activo
+        </div>
+    </div>
+
+    <div class="bio-stats">
+        <div class="bio-stat-card total">
+            <div class="bio-stat-top">
+                <div class="bio-stat-title">Funcionarios activos</div>
+                <div class="bio-stat-icon">👥</div>
+            </div>
+            <div class="bio-stat-value">{{ total_funcionarios }}</div>
+            <div class="bio-stat-sub">Base general de funcionarios habilitados</div>
+        </div>
+
+        <div class="bio-stat-card ok">
+            <div class="bio-stat-top">
+                <div class="bio-stat-title">Con rostro registrado</div>
+                <div class="bio-stat-icon">✅</div>
+            </div>
+            <div class="bio-stat-value">{{ con_rostro }}</div>
+            <div class="bio-stat-sub">Listos para usar el lector biométrico</div>
+        </div>
+
+        <div class="bio-stat-card pending">
+            <div class="bio-stat-top">
+                <div class="bio-stat-title">Pendientes de rostro</div>
+                <div class="bio-stat-icon">⏳</div>
+            </div>
+            <div class="bio-stat-value">{{ pendientes }}</div>
+            <div class="bio-stat-sub">Funcionarios que aún deben registrar su rostro</div>
+        </div>
+    </div>
+
+    <div class="bio-main-grid">
+        <div class="bio-card">
+            <div class="bio-card-header">
+                <h3>Panel de acciones rápidas</h3>
+                <span>Accesos principales del módulo</span>
+            </div>
+            <div class="bio-card-body">
+                <p class="bio-card-desc">
+                    Desde aquí puedes abrir el lector facial, cargar rostros pendientes o volver a la lista general
+                    de funcionarios para administrar sus datos.
+                </p>
+
+                <div class="bio-action-grid">
+                    <a href="{% url 'biometrico_kiosko' %}" class="bio-action-box">
+                        <div class="bio-action-icon">🚀</div>
+                        <div class="bio-action-title">Abrir lector biométrico</div>
+                        <div class="bio-action-text">
+                            Pantalla lista para usar en notebook, PC o tablet como punto de marcación.
+                        </div>
+                    </a>
+
+                    <a href="{% url 'funcionarios_lista' %}" class="bio-action-box">
+                        <div class="bio-action-icon">👥</div>
+                        <div class="bio-action-title">Ir a funcionarios</div>
+                        <div class="bio-action-text">
+                            Accede al listado completo y gestiona datos, turnos y rostros registrados.
+                        </div>
+                    </a>
+
+                    <a href="{% url 'biometrico_kiosko' %}" class="bio-action-box">
+                        <div class="bio-action-icon">🟢</div>
+                        <div class="bio-action-title">Marcar entrada / salida</div>
+                        <div class="bio-action-text">
+                            Usa el kiosko biométrico con selección manual de entrada o salida.
+                        </div>
+                    </a>
+
+                    <a href="{% url 'funcionarios_lista' %}" class="bio-action-box">
+                        <div class="bio-action-icon">📸</div>
+                        <div class="bio-action-title">Actualizar rostros</div>
+                        <div class="bio-action-text">
+                            Revisa quiénes necesitan registrar o actualizar su rostro facial.
+                        </div>
+                    </a>
+                </div>
+
+                <div class="bio-footer-note">
+                    Consejo: para una tablet fija, abre directamente el lector biométrico y déjalo en pantalla completa.
+                </div>
+            </div>
+        </div>
+
+        <div class="bio-card">
+            <div class="bio-card-header">
+                <h3>Funcionarios pendientes</h3>
+                <span>Primeros 10 pendientes</span>
+            </div>
+            <div class="bio-card-body">
+                <p class="bio-card-desc">
+                    Estos funcionarios todavía no tienen el rostro cargado y no podrán usar el lector facial hasta registrarse.
+                </p>
+
+                {% if funcionarios_pendientes %}
+                    <div class="bio-pending-list">
+                        {% for funcionario in funcionarios_pendientes %}
+                            <div class="bio-pending-item">
+                                <div>
+                                    <div class="bio-pending-name">{{ funcionario.nombre_completo }}</div>
+                                    <div class="bio-pending-meta">
+                                        CI: {{ funcionario.cedula }}
+                                        {% if funcionario.turno %}
+                                            | {{ funcionario.turno.nombre }}
+                                        {% endif %}
+                                        {% if funcionario.sucursal %}
+                                            | {{ funcionario.sucursal }}
+                                        {% endif %}
+                                    </div>
+                                </div>
+
+                                <a href="{% url 'registrar_rostro' funcionario.id %}" class="bio-btn bio-btn-secondary">
+                                    📸 Registrar rostro
+                                </a>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% else %}
+                    <div class="bio-empty">
+                        ✅ Todos los funcionarios activos ya tienen rostro registrado.
+                    </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

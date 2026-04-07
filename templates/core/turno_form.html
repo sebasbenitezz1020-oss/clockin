@@ -1,0 +1,75 @@
+{% extends "base.html" %}
+
+{% block title %}{{ titulo_form }} | ClockIn{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>🕓 {{ titulo_form }}</h2>
+    <p>Completa la configuración del turno.</p>
+</div>
+
+<div class="card form-card">
+    <form method="post">
+        {% csrf_token %}
+
+        {% if form.errors %}
+            <div class="alert-box error-box-strong">
+                Revisa los campos marcados. Hay datos pendientes o inválidos.
+            </div>
+        {% endif %}
+
+        <div class="form-grid">
+            <div class="form-field">
+                <label for="{{ form.nombre.id_for_label }}">Nombre</label>
+                {{ form.nombre }}
+                {{ form.nombre.errors }}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.hora_entrada.id_for_label }}">Hora de entrada</label>
+                {{ form.hora_entrada }}
+                {{ form.hora_entrada.errors }}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.hora_salida.id_for_label }}">Hora de salida</label>
+                {{ form.hora_salida }}
+                {{ form.hora_salida.errors }}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.tolerancia_minutos.id_for_label }}">Tolerancia en minutos</label>
+                {{ form.tolerancia_minutos }}
+                {{ form.tolerancia_minutos.errors }}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.hora_inicio_almuerzo.id_for_label }}">Inicio almuerzo</label>
+                {{ form.hora_inicio_almuerzo }}
+                {{ form.hora_inicio_almuerzo.errors }}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.hora_fin_almuerzo.id_for_label }}">Fin almuerzo</label>
+                {{ form.hora_fin_almuerzo }}
+                {{ form.hora_fin_almuerzo.errors }}
+            </div>
+        </div>
+
+        <div class="checks-row">
+            <label class="check-item">
+                {{ form.usa_almuerzo }} <span>Usa almuerzo</span>
+            </label>
+
+            <label class="check-item">
+                {{ form.activo }} <span>Turno activo</span>
+            </label>
+        </div>
+
+        <div class="form-actions">
+            <a href="{% url 'turnos_lista' %}" class="btn-secondary">Volver</a>
+            <button type="submit" class="btn-primary btn-link">{{ boton_texto }}</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

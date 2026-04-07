@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Empresas{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>🏢 Empresas</h2>
+    <p>Administra las empresas del sistema.</p>
+</div>
+
+<div class="card form-card">
+    <div class="form-actions" style="margin-bottom: 16px;">
+        <form method="get" style="display:flex; gap:10px; width:100%;">
+            <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Buscar empresa o RUC">
+            <button type="submit" class="btn-primary btn-link">Buscar</button>
+            <a href="{% url 'empresa_nueva' %}" class="btn-secondary">+ Nueva empresa</a>
+        </form>
+    </div>
+
+    <div class="table-wrap">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Empresa</th>
+                    <th>RUC</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for empresa in empresas %}
+                <tr>
+                    <td>{{ empresa.nombre }}</td>
+                    <td>{{ empresa.ruc|default:"-" }}</td>
+                    <td>
+                        {% if empresa.activo %}
+                            Activa
+                        {% else %}
+                            Inactiva
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{% url 'empresa_editar' empresa.id %}" class="btn-secondary">Editar</a>
+                        <a href="{% url 'empresa_toggle_activo' empresa.id %}" class="btn-secondary">
+                            {% if empresa.activo %}Inactivar{% else %}Activar{% endif %}
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="4">No hay empresas registradas.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

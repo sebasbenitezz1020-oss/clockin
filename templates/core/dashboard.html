@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+
+{% block title %}Dashboard | ClockIn{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>📊 Dashboard General</h2>
+    <p>Resumen en tiempo real de ClockIn Web — {{ hoy|date:"d/m/Y" }}</p>
+</div>
+
+<div class="cards-grid dashboard-cards-5">
+    <div class="card stat-card">
+        <span class="stat-label">Funcionarios activos</span>
+        <strong class="stat-number">{{ total_funcionarios }}</strong>
+    </div>
+
+    <div class="card stat-card">
+        <span class="stat-label">Presentes hoy</span>
+        <strong class="stat-number">{{ presentes_hoy }}</strong>
+    </div>
+
+    <div class="card stat-card">
+        <span class="stat-label">Llegadas tarde</span>
+        <strong class="stat-number">{{ llegadas_tarde_hoy }}</strong>
+    </div>
+
+    <div class="card stat-card">
+        <span class="stat-label">Salidas registradas</span>
+        <strong class="stat-number">{{ salidas_hoy }}</strong>
+    </div>
+
+    <div class="card stat-card">
+        <span class="stat-label">Pendientes</span>
+        <strong class="stat-number">{{ pendientes_hoy }}</strong>
+    </div>
+</div>
+
+<div class="dashboard-grid-2 mt-20">
+    <div class="card">
+        <div class="section-head">
+            <h3>⏱️ Últimas marcaciones</h3>
+            <span class="section-subtitle">Movimientos del día</span>
+        </div>
+
+        <div class="table-wrap">
+            <table class="table-dark">
+                <thead>
+                    <tr>
+                        <th>Funcionario</th>
+                        <th>Turno</th>
+                        <th>Entrada</th>
+                        <th>Salida</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for a in ultimas_marcaciones %}
+                        <tr>
+                            <td>{{ a.funcionario.nombre_completo }}</td>
+                            <td>{{ a.funcionario.turno.nombre|default:"-" }}</td>
+                            <td>{% if a.hora_entrada %}{{ a.hora_entrada|date:"H:i:s" }}{% else %}-{% endif %}</td>
+                            <td>{% if a.hora_salida %}{{ a.hora_salida|date:"H:i:s" }}{% else %}-{% endif %}</td>
+                            <td>
+                                {% if a.llego_tarde %}
+                                    <span class="badge-danger">Tarde</span>
+                                {% else %}
+                                    <span class="badge-success">En horario</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="5" class="empty-row">Aún no hay marcaciones registradas hoy.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="section-head">
+            <h3>👥 Funcionarios recientes</h3>
+            <span class="section-subtitle">Últimos cargados</span>
+        </div>
+
+        <div class="mini-list">
+            {% for f in funcionarios_recientes %}
+                <div class="mini-list-item">
+                    <div>
+                        <strong>{{ f.nombre_completo }}</strong>
+                        <p>
+                            CI: {{ f.cedula }}
+                            {% if f.turno %}• {{ f.turno.nombre }}{% endif %}
+                        </p>
+                    </div>
+                    <span class="{% if f.activo %}badge-success{% else %}badge-danger{% endif %}">
+                        {% if f.activo %}Activo{% else %}Inactivo{% endif %}
+                    </span>
+                </div>
+            {% empty %}
+                <div class="empty-state-box">
+                    No hay funcionarios registrados todavía.
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+<div class="card mt-20">
+    <div class="section-head">
+        <h3>🚀 Estado actual del proyecto</h3>
+        <span class="section-subtitle">Base operativa</span>
+    </div>
+    <p>
+        ClockIn Web ya cuenta con módulos funcionales de Funcionarios, Turnos y Asistencia.
+        El siguiente paso podrá enfocarse en lector facial, permisos, vacaciones, ICL y reportes.
+    </p>
+</div>
+{% endblock %}

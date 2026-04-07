@@ -1,0 +1,450 @@
+{% extends "base.html" %}
+
+{% block title %}Funcionarios{% endblock %}
+
+{% block content %}
+<style>
+    .funcionarios-page {
+        padding: 24px 0;
+    }
+
+    .funcionarios-hero {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+        margin-bottom: 20px;
+    }
+
+    .funcionarios-title h2 {
+        margin: 0;
+        font-size: 32px;
+        font-weight: 800;
+        color: #ffffff;
+    }
+
+    .funcionarios-title p {
+        margin: 6px 0 0;
+        color: #9ca3af;
+        font-size: 15px;
+    }
+
+    .funcionarios-card {
+        background: linear-gradient(180deg, rgba(19, 24, 34, 0.98), rgba(14, 18, 27, 0.98));
+        border: 1px solid rgba(255,255,255,0.06);
+        border-radius: 24px;
+        box-shadow: 0 12px 36px rgba(0, 0, 0, 0.28);
+        overflow: hidden;
+    }
+
+    .funcionarios-toolbar {
+        padding: 18px;
+        border-bottom: 1px solid rgba(255,255,255,0.05);
+        background: rgba(255,255,255,0.02);
+    }
+
+    .funcionarios-search {
+        display: grid;
+        grid-template-columns: 1.3fr 1fr 1fr 180px;
+        gap: 12px;
+    }
+
+    .funcionarios-search input,
+    .funcionarios-search select {
+        width: 100%;
+        border: 1px solid rgba(255,255,255,0.08);
+        background: #0f1722;
+        color: #ffffff;
+        border-radius: 14px;
+        padding: 14px 16px;
+        font-size: 15px;
+        outline: none;
+    }
+
+    .funcionarios-search input::placeholder {
+        color: #7c8798;
+    }
+
+    .btn-func-primary {
+        border: none;
+        border-radius: 16px;
+        padding: 13px 18px;
+        font-weight: 700;
+        background: linear-gradient(135deg, #2563eb, #3b82f6);
+        color: white;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+    }
+
+    .btn-func-primary:hover {
+        color: white;
+        text-decoration: none;
+    }
+
+    .btn-search {
+        border: none;
+        border-radius: 14px;
+        background: #1d4ed8;
+        color: white;
+        font-weight: 700;
+        padding: 12px 16px;
+    }
+
+    .funcionarios-table-wrap {
+        padding: 8px 14px 16px;
+        overflow-x: auto;
+    }
+
+    .funcionarios-table {
+        width: 100%;
+        min-width: 1320px;
+        border-collapse: separate;
+        border-spacing: 0 10px;
+    }
+
+    .funcionarios-table thead th {
+        color: #cdd6e1;
+        font-size: 13px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        padding: 0 14px 6px;
+        white-space: nowrap;
+    }
+
+    .funcionarios-table tbody tr {
+        background: rgba(255,255,255,0.02);
+        transition: 0.2s ease;
+    }
+
+    .funcionarios-table tbody tr:hover {
+        background: rgba(59,130,246,0.08);
+    }
+
+    .funcionarios-table tbody td {
+        padding: 16px 14px;
+        vertical-align: middle;
+        color: #f3f4f6;
+        border-top: 1px solid rgba(255,255,255,0.04);
+        border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+
+    .funcionarios-table tbody td:first-child {
+        border-left: 1px solid rgba(255,255,255,0.04);
+        border-top-left-radius: 18px;
+        border-bottom-left-radius: 18px;
+    }
+
+    .funcionarios-table tbody td:last-child {
+        border-right: 1px solid rgba(255,255,255,0.04);
+        border-top-right-radius: 18px;
+        border-bottom-right-radius: 18px;
+    }
+
+    .funcionario-nombre {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .funcionario-nombre strong {
+        font-size: 16px;
+        color: #ffffff;
+        line-height: 1.2;
+    }
+
+    .funcionario-sub {
+        font-size: 13px;
+        color: #8f9bad;
+    }
+
+    .dato-secundario {
+        color: #d1d5db;
+        font-weight: 600;
+    }
+
+    .badge-soft {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 7px 12px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+        white-space: nowrap;
+        border: 1px solid transparent;
+    }
+
+    .badge-rostro-ok {
+        background: rgba(34,197,94,0.12);
+        color: #86efac;
+        border-color: rgba(34,197,94,0.25);
+    }
+
+    .badge-rostro-pend {
+        background: rgba(148,163,184,0.12);
+        color: #cbd5e1;
+        border-color: rgba(148,163,184,0.18);
+    }
+
+    .badge-activo {
+        background: rgba(34,197,94,0.12);
+        color: #86efac;
+        border-color: rgba(34,197,94,0.25);
+    }
+
+    .badge-inactivo {
+        background: rgba(239,68,68,0.12);
+        color: #fca5a5;
+        border-color: rgba(239,68,68,0.25);
+    }
+
+    .acciones-box {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+    }
+
+    .btn-accion {
+        border: none;
+        border-radius: 12px;
+        padding: 9px 12px;
+        font-size: 13px;
+        font-weight: 700;
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 6px;
+        white-space: nowrap;
+    }
+
+    .btn-editar {
+        background: rgba(59,130,246,0.15);
+        color: #93c5fd;
+        border: 1px solid rgba(59,130,246,0.25);
+    }
+
+    .btn-rostro {
+        background: rgba(56,189,248,0.14);
+        color: #7dd3fc;
+        border: 1px solid rgba(56,189,248,0.26);
+    }
+
+    .btn-estado {
+        background: rgba(168,85,247,0.14);
+        color: #d8b4fe;
+        border: 1px solid rgba(168,85,247,0.22);
+    }
+
+    .tabla-vacia {
+        text-align: center;
+        padding: 30px 20px !important;
+        color: #94a3b8 !important;
+    }
+
+    @media (max-width: 900px) {
+        .funcionarios-search {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<div class="container-fluid funcionarios-page">
+    <div class="funcionarios-hero">
+        <div class="funcionarios-title">
+            <h2>👥 Funcionarios</h2>
+            <p>Gestión general de funcionarios, empresas, sucursales y biométrico</p>
+        </div>
+
+        <a href="{% url 'funcionario_nuevo' %}" class="btn-func-primary">
+            ➕ Nuevo funcionario
+        </a>
+    </div>
+
+    <div class="funcionarios-card">
+        <div class="funcionarios-toolbar">
+            <form method="get" class="funcionarios-search">
+                <input
+                    type="text"
+                    name="q"
+                    value="{{ q }}"
+                    placeholder="Buscar por nombre, apellido, cédula, cargo, sector, empresa o sucursal"
+                >
+
+                <select name="empresa" id="filtro_empresa">
+                    <option value="">Todas las empresas</option>
+                    {% for empresa in empresas %}
+                        <option value="{{ empresa.id }}" {% if empresa_id == empresa.id|stringformat:"s" %}selected{% endif %}>
+                            {{ empresa.nombre }}
+                        </option>
+                    {% endfor %}
+                </select>
+
+                <select name="sucursal" id="filtro_sucursal">
+                    <option value="">Todas las sucursales</option>
+                    {% for sucursal in sucursales %}
+                        <option
+                            value="{{ sucursal.id }}"
+                            data-empresa="{{ sucursal.empresa_id }}"
+                            {% if sucursal_id == sucursal.id|stringformat:"s" %}selected{% endif %}
+                        >
+                            {{ sucursal.nombre }}
+                        </option>
+                    {% endfor %}
+                </select>
+
+                <button type="submit" class="btn-search">Filtrar</button>
+            </form>
+        </div>
+
+        <div class="funcionarios-table-wrap">
+            <table class="funcionarios-table">
+                <thead>
+                    <tr>
+                        <th>Funcionario</th>
+                        <th>Cédula</th>
+                        <th>Empresa</th>
+                        <th>Sucursal</th>
+                        <th>Cargo</th>
+                        <th>Sector</th>
+                        <th>Turno</th>
+                        <th>Rostro</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for funcionario in funcionarios %}
+                    <tr>
+                        <td>
+                            <div class="funcionario-nombre">
+                                <strong>{{ funcionario.nombre }} {{ funcionario.apellido }}</strong>
+                                <span class="funcionario-sub">
+                                    {% if funcionario.ips %}
+                                        IPS: Sí
+                                    {% else %}
+                                        IPS: No
+                                    {% endif %}
+                                </span>
+                            </div>
+                        </td>
+
+                        <td class="dato-secundario">{{ funcionario.cedula }}</td>
+                        <td>{{ funcionario.empresa_mostrar }}</td>
+                        <td>{{ funcionario.sucursal_mostrar }}</td>
+                        <td>{{ funcionario.cargo|default:"-" }}</td>
+                        <td>{{ funcionario.sector|default:"-" }}</td>
+
+                        <td>
+                            {% if funcionario.turno %}
+                                <span class="dato-secundario">{{ funcionario.turno.nombre }}</span>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {% if funcionario.face_encoding %}
+                                <span class="badge-soft badge-rostro-ok">✅ Registrado</span>
+                            {% else %}
+                                <span class="badge-soft badge-rostro-pend">⏳ Pendiente</span>
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {% if funcionario.activo %}
+                                <span class="badge-soft badge-activo">Activo</span>
+                            {% else %}
+                                <span class="badge-soft badge-inactivo">Inactivo</span>
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            <div class="acciones-box">
+                                <a href="{% url 'funcionario_editar' funcionario.id %}" class="btn-accion btn-editar">
+                                    ✏️ Editar
+                                </a>
+
+                                <a href="{% url 'registrar_rostro' funcionario.id %}" class="btn-accion btn-rostro">
+                                    {% if funcionario.face_encoding %}
+                                        📸 Actualizar rostro
+                                    {% else %}
+                                        📸 Registrar rostro
+                                    {% endif %}
+                                </a>
+
+                                <a href="{% url 'funcionario_toggle_activo' funcionario.id %}" class="btn-accion btn-estado">
+                                    {% if funcionario.activo %}
+                                        ⛔ Inactivar
+                                    {% else %}
+                                        ✅ Activar
+                                    {% endif %}
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="10" class="tabla-vacia">
+                            No se encontraron funcionarios.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const empresaSelect = document.getElementById("filtro_empresa");
+    const sucursalSelect = document.getElementById("filtro_sucursal");
+    if (!empresaSelect || !sucursalSelect) return;
+
+    const opciones = Array.from(sucursalSelect.querySelectorAll("option")).map(opt => ({
+        value: opt.value,
+        text: opt.textContent,
+        empresa: opt.getAttribute("data-empresa")
+    }));
+
+    function filtrarSucursales() {
+        const empresaId = empresaSelect.value;
+        const valorActual = sucursalSelect.value;
+
+        sucursalSelect.innerHTML = "";
+
+        const base = document.createElement("option");
+        base.value = "";
+        base.textContent = "Todas las sucursales";
+        sucursalSelect.appendChild(base);
+
+        opciones.forEach(opt => {
+            if (!opt.value) return;
+            if (!empresaId || opt.empresa === empresaId) {
+                const option = document.createElement("option");
+                option.value = opt.value;
+                option.textContent = opt.text;
+                option.setAttribute("data-empresa", opt.empresa || "");
+                if (opt.value === valorActual) {
+                    option.selected = true;
+                }
+                sucursalSelect.appendChild(option);
+            }
+        });
+    }
+
+    empresaSelect.addEventListener("change", function () {
+        sucursalSelect.value = "";
+        filtrarSucursales();
+    });
+
+    filtrarSucursales();
+});
+</script>
+{% endblock %}

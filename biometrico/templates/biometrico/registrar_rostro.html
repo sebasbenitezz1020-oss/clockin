@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Registrar rostro</title>
+    <style>
+        body {
+            background: #11151c;
+            color: white;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            margin: 0;
+            padding: 30px;
+        }
+
+        video {
+            width: 90%;
+            max-width: 520px;
+            border-radius: 18px;
+            border: 3px solid #2a2f3a;
+            background: black;
+        }
+
+        button {
+            margin-top: 20px;
+            padding: 12px 24px;
+            font-size: 16px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+        }
+
+        #mensaje {
+            margin-top: 20px;
+            font-size: 20px;
+            min-height: 30px;
+        }
+    </style>
+</head>
+<body>
+    <h2>Registrar rostro</h2>
+    <p>{{ funcionario }}</p>
+
+    <video id="video" autoplay playsinline></video>
+    <canvas id="canvas" style="display:none;"></canvas>
+
+    <br>
+    <button onclick="capturar()">Guardar rostro</button>
+
+    <div id="mensaje"></div>
+
+    <script>
+        const video = document.getElementById("video");
+        const canvas = document.getElementById("canvas");
+        const mensaje = document.getElementById("mensaje");
+
+        navigator.mediaDevices.getUserMedia({ video: true })
+            .then(stream => {
+                video.srcObject = stream;
+            })
+            .catch(error => {
+                mensaje.innerHTML = "❌ No se pudo abrir la cámara: " + error;
+            });
+
+        function capturar() {
+            if (!video.videoWidth || !video.videoHeight) {
+                mensaje.innerHTML = "❌ La cámara aún no está lista";
+                return;
+            }
+
+            const ctx = canvas.getContext("2d");
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            const data = canvas.toDataURL("image/jpeg", 0.9);
+
+            fetch("", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                },
+                body: new URLSearchParams({ imagen: data })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.ok) {
+                    mensaje.innerHTML = "✅ " + data.mensaje;
+                } else {
+                    mensaje.innerHTML = "❌ " + (data.error || "Error al guardar rostro");
+                }
+            })
+            .catch(error => {
+                mensaje.innerHTML = "❌ Error: " + error;
+            });
+        }
+    </script>
+</body>
+</html>

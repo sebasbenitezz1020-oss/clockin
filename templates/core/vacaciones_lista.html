@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+
+{% block title %}Vacaciones | ClockIn{% endblock %}
+
+{% block content %}
+<div class="page-header page-header-flex">
+    <div>
+        <h2>🏖️ Vacaciones / Antigüedad</h2>
+        <p>Gestión de vacaciones, antigüedad y saldo disponible del personal.</p>
+    </div>
+    <a href="{% url 'vacacion_nueva' %}" class="btn-primary btn-link">+ Nueva vacación</a>
+</div>
+
+{% if messages %}
+    {% for message in messages %}
+        <div class="alert-box success-box">{{ message }}</div>
+    {% endfor %}
+{% endif %}
+
+<div class="card mb-20">
+    <form method="get" class="search-bar">
+        <input
+            type="text"
+            name="q"
+            value="{{ q }}"
+            placeholder="Buscar por funcionario, cédula o estado..."
+            class="form-control"
+        >
+        <button type="submit" class="btn-primary btn-search">Buscar</button>
+    </form>
+</div>
+
+<div class="dashboard-grid-2 mb-20">
+    <div class="card">
+        <div class="section-head">
+            <h3>📋 Vacaciones registradas</h3>
+            <span class="section-subtitle">Listado general</span>
+        </div>
+
+        <div class="table-wrap">
+            <table class="table-dark">
+                <thead>
+                    <tr>
+                        <th>Funcionario</th>
+                        <th>Desde</th>
+                        <th>Hasta</th>
+                        <th>Días</th>
+                        <th>Estado</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for v in vacaciones %}
+                        <tr>
+                            <td>{{ v.funcionario.nombre_completo }}<br><small>CI: {{ v.funcionario.cedula }}</small></td>
+                            <td>{{ v.fecha_desde|date:"d/m/Y" }}</td>
+                            <td>{{ v.fecha_hasta|date:"d/m/Y" }}</td>
+                            <td>{{ v.dias_solicitados }}</td>
+                            <td>
+                                {% if v.estado == "aprobado" %}
+                                    <span class="badge-success">Aprobado</span>
+                                {% elif v.estado == "pendiente" %}
+                                    <span class="badge-warning">Pendiente</span>
+                                {% else %}
+                                    <span class="badge-danger">{{ v.get_estado_display }}</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                <a href="{% url 'vacacion_editar' v.pk %}" class="btn-table">Editar</a>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="6" class="empty-row">No hay vacaciones registradas todavía.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="section-head">
+            <h3>👥 Resumen por funcionario</h3>
+            <span class="section-subtitle">Antigüedad y saldo</span>
+        </div>
+
+        <div class="mini-list">
+            {% for f in funcionarios_resumen %}
+                <div class="mini-list-item mini-list-item-column">
+                    <div>
+                        <strong>{{ f.nombre_completo }}</strong>
+                        <p>CI: {{ f.cedula }}</p>
+                        <p>Antigüedad: {{ f.antiguedad_anios }} año(s)</p>
+                        <p>Días que corresponden: {{ f.dias_vacaciones_corresponden }}</p>
+                        <p>Días usados: {{ f.dias_vacaciones_usados }}</p>
+                        <p>Saldo disponible: {{ f.saldo_vacaciones }}</p>
+                    </div>
+                </div>
+            {% empty %}
+                <div class="empty-state-box">
+                    No hay funcionarios activos todavía.
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+
+{% block title %}{{ titulo_form }} | ClockIn{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>🏢 {{ titulo_form }}</h2>
+    <p>Completa los datos de la empresa.</p>
+</div>
+
+<div class="card form-card">
+    <form method="post">
+        {% csrf_token %}
+
+        <div class="form-grid">
+            <div class="form-field">
+                <label for="{{ form.nombre.id_for_label }}">Nombre</label>
+                {{ form.nombre }}
+                {{ form.nombre.errors }}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.ruc.id_for_label }}">RUC</label>
+                {{ form.ruc }}
+                {{ form.ruc.errors }}
+            </div>
+        </div>
+
+        <div class="checks-row">
+            <label class="check-item">
+                {{ form.activo }} <span>Empresa activa</span>
+            </label>
+        </div>
+
+        <div class="form-actions">
+            <a href="{% url 'empresas_lista' %}" class="btn-secondary">Volver</a>
+            <button type="submit" class="btn-primary btn-link">{{ boton_texto }}</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

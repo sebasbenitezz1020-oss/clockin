@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+
+{% block title %}Sucursales{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>🏬 Sucursales</h2>
+    <p>Administra las sucursales por empresa.</p>
+</div>
+
+<div class="card form-card">
+    <div class="form-actions" style="margin-bottom: 16px;">
+        <form method="get" style="display:grid; grid-template-columns: 1fr 1fr auto auto; gap:10px; width:100%;">
+            <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Buscar sucursal o empresa">
+
+            <select name="empresa" class="form-control">
+                <option value="">Todas las empresas</option>
+                {% for empresa in empresas %}
+                    <option value="{{ empresa.id }}" {% if empresa_id == empresa.id|stringformat:"s" %}selected{% endif %}>
+                        {{ empresa.nombre }}
+                    </option>
+                {% endfor %}
+            </select>
+
+            <button type="submit" class="btn-primary btn-link">Filtrar</button>
+            <a href="{% url 'sucursal_nueva' %}" class="btn-secondary">+ Nueva sucursal</a>
+        </form>
+    </div>
+
+    <div class="table-wrap">
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Empresa</th>
+                    <th>Sucursal</th>
+                    <th>Dirección</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for sucursal in sucursales %}
+                <tr>
+                    <td>{{ sucursal.empresa.nombre }}</td>
+                    <td>{{ sucursal.nombre }}</td>
+                    <td>{{ sucursal.direccion|default:"-" }}</td>
+                    <td>
+                        {% if sucursal.activo %}
+                            Activa
+                        {% else %}
+                            Inactiva
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{% url 'sucursal_editar' sucursal.id %}" class="btn-secondary">Editar</a>
+                        <a href="{% url 'sucursal_toggle_activo' sucursal.id %}" class="btn-secondary">
+                            {% if sucursal.activo %}Inactivar{% else %}Activar{% endif %}
+                        </a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5">No hay sucursales registradas.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
