@@ -8,7 +8,6 @@
         :root {
             --bg: #0b0f14;
             --panel: #121821;
-            --panel-2: #18212c;
             --border: #253243;
             --text: #f3f7fb;
             --muted: #9fb0c3;
@@ -39,7 +38,7 @@
 
         .screen {
             width: 100%;
-            max-width: 980px;
+            max-width: 1040px;
             background: rgba(18, 24, 33, 0.96);
             border: 1px solid var(--border);
             border-radius: 28px;
@@ -57,21 +56,14 @@
             background: rgba(255,255,255,0.02);
         }
 
-        .brand {
-            display: flex;
-            flex-direction: column;
-            gap: 4px;
-        }
-
         .brand h1 {
             margin: 0;
             font-size: 28px;
             font-weight: 800;
-            letter-spacing: 0.4px;
         }
 
         .brand p {
-            margin: 0;
+            margin: 6px 0 0;
             color: var(--muted);
             font-size: 14px;
         }
@@ -84,7 +76,6 @@
             font-size: 44px;
             font-weight: 800;
             line-height: 1;
-            letter-spacing: 1px;
         }
 
         .date {
@@ -95,7 +86,7 @@
 
         .content {
             display: grid;
-            grid-template-columns: 1.25fr 0.95fr;
+            grid-template-columns: 1.15fr .95fr;
             gap: 22px;
             padding: 22px;
         }
@@ -145,10 +136,6 @@
             font-weight: 700;
             cursor: pointer;
             transition: all 0.2s ease;
-        }
-
-        .mode-btn:hover {
-            transform: translateY(-1px);
         }
 
         .mode-btn.active.entrada {
@@ -207,13 +194,6 @@
             text-align: center;
         }
 
-        .status-panel {
-            min-height: 100%;
-            display: flex;
-            flex-direction: column;
-            justify-content: space-between;
-        }
-
         .status-badge {
             display: inline-flex;
             align-items: center;
@@ -235,7 +215,7 @@
             border-radius: 22px;
             background: #0f1620;
             border: 1px solid #1d2a38;
-            min-height: 280px;
+            min-height: 320px;
             display: flex;
             flex-direction: column;
             justify-content: center;
@@ -247,7 +227,7 @@
         }
 
         .result-name {
-            font-size: 34px;
+            font-size: 32px;
             font-weight: 800;
             line-height: 1.15;
             margin-bottom: 10px;
@@ -256,13 +236,46 @@
         .result-state {
             font-size: 24px;
             font-weight: 700;
+            margin-bottom: 10px;
+        }
+
+        .result-subtype {
+            font-size: 18px;
+            font-weight: 700;
             margin-bottom: 12px;
+            color: #e5eef8;
         }
 
         .result-detail {
-            font-size: 17px;
+            font-size: 16px;
             color: var(--muted);
             line-height: 1.6;
+        }
+
+        .detail-grid {
+            margin-top: 16px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        .detail-box {
+            background: rgba(255,255,255,.03);
+            border: 1px solid rgba(255,255,255,.05);
+            border-radius: 14px;
+            padding: 12px;
+        }
+
+        .detail-box .lab {
+            color: #94a3b8;
+            font-size: 12px;
+            margin-bottom: 6px;
+        }
+
+        .detail-box .val {
+            color: #fff;
+            font-size: 15px;
+            font-weight: 700;
         }
 
         .footer-box {
@@ -350,31 +363,14 @@
             display: none;
         }
 
-        @media (max-width: 900px) {
+        @media (max-width: 980px) {
             .content {
                 grid-template-columns: 1fr;
             }
-
-            .clock {
-                font-size: 34px;
-            }
-
-            .result-name {
-                font-size: 28px;
-            }
-
-            .result-state {
-                font-size: 22px;
-            }
         }
 
-        @media (max-width: 560px) {
-            body {
-                padding: 10px;
-            }
-
+        @media (max-width: 640px) {
             .topbar {
-                padding: 16px;
                 flex-direction: column;
                 align-items: flex-start;
             }
@@ -383,27 +379,13 @@
                 text-align: left;
             }
 
-            .content {
-                padding: 14px;
-                gap: 14px;
-            }
-
-            .camera-card,
-            .status-card {
-                padding: 14px;
-                border-radius: 18px;
-            }
-
-            .result-name {
-                font-size: 24px;
-            }
-
-            .result-state {
-                font-size: 20px;
-            }
-
+            .detail-grid,
             .footer-box {
                 grid-template-columns: 1fr;
+            }
+
+            .mode-selector {
+                flex-direction: column;
             }
         }
     </style>
@@ -413,7 +395,7 @@
         <div class="topbar">
             <div class="brand">
                 <h1>📸 ClockIn Biométrico</h1>
-                <p>Lectura facial para entrada y salida de funcionarios</p>
+                <p>Lectura facial para entrada, almuerzo, regreso y salida final</p>
             </div>
 
             <div class="clock-box">
@@ -440,39 +422,51 @@
                 </div>
 
                 <div class="camera-hint" id="cameraHint">
-                    Modo actual: ENTRADA. Colóquese frente a la cámara para registrar ingreso.
+                    Modo actual: ENTRADA. Sirve para entrada del día y regreso de almuerzo.
                 </div>
             </div>
 
             <div class="status-card idle-theme" id="statusCard">
-                <div class="status-panel">
-                    <div>
-                        <div class="status-title">
-                            <h2>Estado del lector</h2>
-                            <span id="systemStatusText">En espera</span>
-                        </div>
+                <div class="status-title">
+                    <h2>Estado del lector</h2>
+                    <span id="systemStatusText">En espera</span>
+                </div>
 
-                        <div class="status-badge" id="statusBadge">LISTO PARA ESCANEAR</div>
+                <div class="status-badge" id="statusBadge">LISTO PARA ESCANEAR</div>
 
-                        <div class="result-box" id="resultBox">
-                            <div class="result-icon" id="resultIcon">👤</div>
-                            <div class="result-name" id="resultName">Esperando rostro...</div>
-                            <div class="result-state" id="resultState">Seleccione entrada o salida</div>
-                            <div class="result-detail" id="resultDetail">
-                                El sistema solo registrará el tipo de marcación seleccionado.
-                            </div>
-                        </div>
+                <div class="result-box">
+                    <div class="result-icon" id="resultIcon">👤</div>
+                    <div class="result-name" id="resultName">Esperando rostro...</div>
+                    <div class="result-state" id="resultState">Seleccione ENTRADA o SALIDA</div>
+                    <div class="result-subtype" id="resultSubtype">El sistema mostrará aquí el tipo exacto de marcación.</div>
+                    <div class="result-detail" id="resultDetail">
+                        Entrada del día, salida a almuerzo, regreso de almuerzo o salida final.
                     </div>
 
-                    <div class="footer-box">
-                        <div class="mini-box">
-                            <div class="label">Modo</div>
-                            <div class="value" id="footerModo">Entrada</div>
+                    <div class="detail-grid">
+                        <div class="detail-box">
+                            <div class="lab">Hora</div>
+                            <div class="val" id="detailHora">—</div>
                         </div>
-                        <div class="mini-box">
-                            <div class="label">Captura</div>
-                            <div class="value">Automática</div>
+                        <div class="detail-box">
+                            <div class="lab">Turno</div>
+                            <div class="val" id="detailTurno">—</div>
                         </div>
+                        <div class="detail-box">
+                            <div class="lab">Atraso</div>
+                            <div class="val" id="detailAtraso">—</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="footer-box">
+                    <div class="mini-box">
+                        <div class="label">Modo seleccionado</div>
+                        <div class="value" id="footerModo">Entrada</div>
+                    </div>
+                    <div class="mini-box">
+                        <div class="label">Uso</div>
+                        <div class="value">Automático</div>
                     </div>
                 </div>
             </div>
@@ -495,7 +489,12 @@
         const resultIcon = document.getElementById("resultIcon");
         const resultName = document.getElementById("resultName");
         const resultState = document.getElementById("resultState");
+        const resultSubtype = document.getElementById("resultSubtype");
         const resultDetail = document.getElementById("resultDetail");
+
+        const detailHora = document.getElementById("detailHora");
+        const detailTurno = document.getElementById("detailTurno");
+        const detailAtraso = document.getElementById("detailAtraso");
 
         const btnEntrada = document.getElementById("btnEntrada");
         const btnSalida = document.getElementById("btnSalida");
@@ -532,10 +531,10 @@
             btnSalida.classList.toggle("active", modoSeleccionado === "salida");
 
             if (modoSeleccionado === "entrada") {
-                cameraHint.textContent = "Modo actual: ENTRADA. Colóquese frente a la cámara para registrar ingreso.";
+                cameraHint.textContent = "Modo actual: ENTRADA. Sirve para entrada del día y regreso de almuerzo.";
                 footerModo.textContent = "Entrada";
             } else {
-                cameraHint.textContent = "Modo actual: SALIDA. Colóquese frente a la cámara para registrar salida.";
+                cameraHint.textContent = "Modo actual: SALIDA. Sirve para salida a almuerzo y salida final.";
                 footerModo.textContent = "Salida";
             }
         }
@@ -603,46 +602,53 @@
             statusBadge.textContent = "LISTO PARA ESCANEAR";
             resultIcon.textContent = "👤";
             resultName.textContent = "Esperando rostro...";
-            resultState.textContent = modoSeleccionado === "entrada"
-                ? "Seleccione entrada"
-                : "Seleccione salida";
-            resultDetail.textContent = "El sistema solo registrará el tipo de marcación seleccionado.";
+            resultState.textContent = "Seleccione ENTRADA o SALIDA";
+            resultSubtype.textContent = "El sistema mostrará aquí el tipo exacto de marcación.";
+            resultDetail.textContent = "Entrada del día, salida a almuerzo, regreso de almuerzo o salida final.";
+            detailHora.textContent = "—";
+            detailTurno.textContent = "—";
+            detailAtraso.textContent = "—";
         }
 
         function programarReinicio() {
-            if (resetTimer) {
-                clearTimeout(resetTimer);
-            }
-
-            resetTimer = setTimeout(() => {
-                limpiarEstado();
-            }, 5000);
+            if (resetTimer) clearTimeout(resetTimer);
+            resetTimer = setTimeout(() => limpiarEstado(), 5000);
         }
 
         function activarPausa(segundos = 6) {
             pausaHasta = Date.now() + (segundos * 1000);
         }
 
+        function traducirTipo(tipo) {
+            if (tipo === "entrada") return "Entrada registrada";
+            if (tipo === "salida_almuerzo") return "Salida a almuerzo registrada";
+            if (tipo === "regreso_almuerzo") return "Regreso de almuerzo registrado";
+            if (tipo === "salida") return "Salida final registrada";
+            return "Marcación registrada";
+        }
+
+        function iconoTipo(tipo) {
+            if (tipo === "entrada") return "🟢";
+            if (tipo === "salida_almuerzo") return "🍽️";
+            if (tipo === "regreso_almuerzo") return "🔙";
+            if (tipo === "salida") return "🏁";
+            return "✅";
+        }
+
         function mostrarExito(data) {
             statusCard.className = "status-card ok-theme";
             systemStatusText.textContent = "Registro exitoso";
-            statusBadge.textContent = data.tipo === "salida" ? "SALIDA REGISTRADA" : "ENTRADA REGISTRADA";
-            resultIcon.textContent = data.tipo === "salida" ? "👋" : "✅";
+            statusBadge.textContent = "MARCACIÓN REGISTRADA";
+            resultIcon.textContent = iconoTipo(data.tipo);
             resultName.textContent = data.funcionario || "Funcionario reconocido";
-            resultState.textContent = data.tipo === "salida"
-                ? "Salida registrada correctamente"
-                : "Entrada registrada correctamente";
+            resultState.textContent = traducirTipo(data.tipo);
+            resultSubtype.textContent = data.subtipo || data.mensaje || "Marcación confirmada";
+            resultDetail.textContent = data.mensaje || "";
 
-            let detalle = "";
-            if (data.hora) detalle += "Hora: " + data.hora;
-            if (data.turno) detalle += "<br>Turno: " + data.turno;
-            if (data.llego_tarde) {
-                detalle += "<br>Atraso: " + (data.minutos_atraso || 0) + " minuto(s)";
-            } else if (data.tipo === "entrada") {
-                detalle += "<br>Ingreso en horario";
-            }
+            detailHora.textContent = data.hora || "—";
+            detailTurno.textContent = data.turno || "—";
+            detailAtraso.textContent = data.llego_tarde ? ((data.minutos_atraso || 0) + " min") : "0 min";
 
-            resultDetail.innerHTML = detalle || (data.mensaje || "");
             beepSuccess();
             activarPausa(6);
             programarReinicio();
@@ -653,9 +659,15 @@
             systemStatusText.textContent = "Aviso";
             statusBadge.textContent = "ATENCIÓN";
             resultIcon.textContent = "⚠️";
-            resultName.textContent = data.funcionario || "Funcionario reconocido";
-            resultState.textContent = data.mensaje || "Aviso";
-            resultDetail.innerHTML = "Modo seleccionado: " + modoSeleccionado.toUpperCase();
+            resultName.textContent = data.funcionario || "Marcación no permitida";
+            resultState.textContent = "Orden de marcación incorrecto";
+            resultSubtype.textContent = data.mensaje || "Revise el siguiente paso";
+            resultDetail.textContent = "Modo seleccionado: " + modoSeleccionado.toUpperCase();
+
+            detailHora.textContent = "—";
+            detailTurno.textContent = data.turno || "—";
+            detailAtraso.textContent = "—";
+
             beepWarn();
             activarPausa(5);
             programarReinicio();
@@ -668,7 +680,13 @@
             resultIcon.textContent = "❌";
             resultName.textContent = "No reconocido";
             resultState.textContent = "No fue posible validar el rostro";
-            resultDetail.innerHTML = errorText || "Intente nuevamente colocándose de frente a la cámara.";
+            resultSubtype.textContent = "Intente nuevamente";
+            resultDetail.textContent = errorText || "Colóquese de frente a la cámara.";
+
+            detailHora.textContent = "—";
+            detailTurno.textContent = "—";
+            detailAtraso.textContent = "—";
+
             beepError();
             programarReinicio();
         }
@@ -713,7 +731,10 @@
                     data.tipo === "ya_entrada" ||
                     data.tipo === "ya_salida" ||
                     data.tipo === "ya_completo" ||
-                    data.tipo === "sin_entrada"
+                    data.tipo === "sin_entrada" ||
+                    data.tipo === "espera_salida_almuerzo" ||
+                    data.tipo === "espera_regreso_almuerzo" ||
+                    data.tipo === "espera_salida_final"
                 ) {
                     mostrarAviso(data);
                 } else {

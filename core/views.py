@@ -519,7 +519,9 @@ def asistencia_marcar(request):
                 if not funcionario.turno:
                     messages.error(request, "El funcionario no tiene un turno asignado.")
                 else:
-                    if not asistencia.hora_entrada:
+                    siguiente = asistencia.siguiente_marcacion
+
+                    if siguiente == "entrada":
                         asistencia.hora_entrada = ahora
                         asistencia.calcular_atraso()
 
@@ -529,6 +531,7 @@ def asistencia_marcar(request):
                             asistencia.observacion = "Entrada registrada en horario."
 
                         asistencia.save()
+
                         registrar_historial(
                             request,
                             "Asistencia",
@@ -546,18 +549,66 @@ def asistencia_marcar(request):
                         }
                         messages.success(request, "Entrada registrada correctamente.")
 
-                    elif not asistencia.hora_salida:
-                        asistencia.hora_salida = ahora
-                        if asistencia.observacion:
-                            asistencia.observacion += " Salida registrada correctamente."
-                        else:
-                            asistencia.observacion = "Salida registrada correctamente."
+                    elif siguiente == "salida_almuerzo":
+                        asistencia.hora_salida_almuerzo = ahora
+                        asistencia.observacion = "Salida a almuerzo registrada correctamente."
                         asistencia.save()
+
                         registrar_historial(
                             request,
                             "Asistencia",
-                            "Salida",
-                            f"Se registró salida de {funcionario.nombre_completo} a las {ahora.strftime('%H:%M:%S')}."
+                            "Salida a almuerzo",
+                            f"Se registró salida a almuerzo de {funcionario.nombre_completo} a las {ahora.strftime('%H:%M:%S')}."
+                        )
+
+                        resultado = {
+                            "tipo": "salida_almuerzo",
+                            "funcionario": funcionario,
+                            "hora": ahora,
+                            "turno": funcionario.turno.nombre,
+                            "atraso": asistencia.minutos_atraso,
+                            "llego_tarde": asistencia.llego_tarde,
+                        }
+                        messages.success(request, "Salida a almuerzo registrada correctamente.")
+
+                    elif siguiente == "regreso_almuerzo":
+                        asistencia.hora_regreso_almuerzo = ahora
+                        if asistencia.observacion:
+                            asistencia.observacion += " Regreso de almuerzo registrado correctamente."
+                        else:
+                            asistencia.observacion = "Regreso de almuerzo registrado correctamente."
+                        asistencia.save()
+
+                        registrar_historial(
+                            request,
+                            "Asistencia",
+                            "Regreso de almuerzo",
+                            f"Se registró regreso de almuerzo de {funcionario.nombre_completo} a las {ahora.strftime('%H:%M:%S')}."
+                        )
+
+                        resultado = {
+                            "tipo": "regreso_almuerzo",
+                            "funcionario": funcionario,
+                            "hora": ahora,
+                            "turno": funcionario.turno.nombre,
+                            "atraso": asistencia.minutos_atraso,
+                            "llego_tarde": asistencia.llego_tarde,
+                        }
+                        messages.success(request, "Regreso de almuerzo registrado correctamente.")
+
+                    elif siguiente == "salida":
+                        asistencia.hora_salida = ahora
+                        if asistencia.observacion:
+                            asistencia.observacion += " Salida final registrada correctamente."
+                        else:
+                            asistencia.observacion = "Salida final registrada correctamente."
+                        asistencia.save()
+
+                        registrar_historial(
+                            request,
+                            "Asistencia",
+                            "Salida final",
+                            f"Se registró salida final de {funcionario.nombre_completo} a las {ahora.strftime('%H:%M:%S')}."
                         )
 
                         resultado = {
@@ -568,9 +619,10 @@ def asistencia_marcar(request):
                             "atraso": asistencia.minutos_atraso,
                             "llego_tarde": asistencia.llego_tarde,
                         }
-                        messages.success(request, "Salida registrada correctamente.")
+                        messages.success(request, "Salida final registrada correctamente.")
+
                     else:
-                        messages.warning(request, "El funcionario ya registró entrada y salida el día de hoy.")
+                        messages.warning(request, "El funcionario ya completó todas sus marcaciones del día.")
     else:
         form = MarcacionForm()
 
@@ -584,7 +636,6 @@ def asistencia_marcar(request):
         "asistencias_hoy": asistencias_hoy,
         "hoy": hoy,
     })
-
 
 @login_required
 def permisos_lista(request):

@@ -3,118 +3,340 @@
 {% block title %}Dashboard | ClockIn{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <h2>📊 Dashboard General</h2>
-    <p>Resumen en tiempo real de ClockIn Web — {{ hoy|date:"d/m/Y" }}</p>
-</div>
+<style>
+    .dash-page {
+        padding: 26px 0;
+    }
 
-<div class="cards-grid dashboard-cards-5">
-    <div class="card stat-card">
-        <span class="stat-label">Funcionarios activos</span>
-        <strong class="stat-number">{{ total_funcionarios }}</strong>
+    .dash-hero {
+        margin-bottom: 24px;
+    }
+
+    .dash-hero h2 {
+        margin: 0;
+        color: #fff;
+        font-size: 34px;
+        font-weight: 800;
+    }
+
+    .dash-hero p {
+        margin: 8px 0 0;
+        color: #94a3b8;
+    }
+
+    .dash-stats {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
+    .dash-stat {
+        background: linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
+        border: 1px solid rgba(255,255,255,.06);
+        border-radius: 22px;
+        padding: 22px;
+        box-shadow: 0 12px 36px rgba(0,0,0,.22);
+    }
+
+    .dash-stat .lab {
+        color: #94a3b8;
+        font-size: 14px;
+        margin-bottom: 10px;
+    }
+
+    .dash-stat .val {
+        color: #fff;
+        font-size: 40px;
+        font-weight: 800;
+        line-height: 1;
+    }
+
+    .dash-grid {
+        display: grid;
+        grid-template-columns: 1.1fr .9fr;
+        gap: 20px;
+    }
+
+    .dash-card {
+        background: linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
+        border: 1px solid rgba(255,255,255,.06);
+        border-radius: 24px;
+        box-shadow: 0 12px 36px rgba(0,0,0,.22);
+        overflow: hidden;
+    }
+
+    .dash-card-header {
+        padding: 20px 22px 10px;
+    }
+
+    .dash-card-header h3 {
+        margin: 0;
+        color: #fff;
+        font-size: 22px;
+        font-weight: 800;
+    }
+
+    .dash-card-header p {
+        margin: 8px 0 0;
+        color: #94a3b8;
+        font-size: 14px;
+    }
+
+    .dash-card-body {
+        padding: 0 22px 22px;
+    }
+
+    .dash-table-wrap {
+        overflow-x: auto;
+    }
+
+    .dash-table {
+        width: 100%;
+        min-width: 980px;
+        border-collapse: separate;
+        border-spacing: 0 10px;
+    }
+
+    .dash-table thead th {
+        color: #cdd6e1;
+        font-size: 13px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: .4px;
+        padding: 0 14px 6px;
+        white-space: nowrap;
+    }
+
+    .dash-table tbody tr {
+        background: rgba(255,255,255,.02);
+    }
+
+    .dash-table tbody td {
+        padding: 14px;
+        color: #f3f4f6;
+        border-top: 1px solid rgba(255,255,255,.04);
+        border-bottom: 1px solid rgba(255,255,255,.04);
+    }
+
+    .dash-table tbody td:first-child {
+        border-left: 1px solid rgba(255,255,255,.04);
+        border-top-left-radius: 16px;
+        border-bottom-left-radius: 16px;
+    }
+
+    .dash-table tbody td:last-child {
+        border-right: 1px solid rgba(255,255,255,.04);
+        border-top-right-radius: 16px;
+        border-bottom-right-radius: 16px;
+    }
+
+    .mini-list {
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+    }
+
+    .mini-item {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        padding: 14px 16px;
+        border-radius: 18px;
+        background: rgba(255,255,255,.03);
+        border: 1px solid rgba(255,255,255,.05);
+    }
+
+    .mini-item strong {
+        color: #fff;
+        display: block;
+        margin-bottom: 4px;
+    }
+
+    .mini-item span {
+        color: #94a3b8;
+        font-size: 13px;
+    }
+
+    .badge-soft {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 7px 12px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+        white-space: nowrap;
+        border: 1px solid transparent;
+    }
+
+    .badge-ok {
+        background: rgba(34,197,94,.12);
+        color: #86efac;
+        border-color: rgba(34,197,94,.24);
+    }
+
+    .badge-tarde {
+        background: rgba(239,68,68,.12);
+        color: #fca5a5;
+        border-color: rgba(239,68,68,.24);
+    }
+
+    .badge-almuerzo {
+        background: rgba(245,158,11,.12);
+        color: #fcd34d;
+        border-color: rgba(245,158,11,.22);
+    }
+
+    .badge-finalizado {
+        background: rgba(59,130,246,.12);
+        color: #93c5fd;
+        border-color: rgba(59,130,246,.24);
+    }
+
+    .muted {
+        color: #94a3b8;
+    }
+
+    @media (max-width: 1100px) {
+        .dash-stats {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .dash-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 640px) {
+        .dash-stats {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<div class="container-fluid dash-page">
+    <div class="dash-hero">
+        <h2>📊 Dashboard General</h2>
+        <p>Resumen en tiempo real de ClockIn para el día {{ hoy|date:"d/m/Y" }}.</p>
     </div>
 
-    <div class="card stat-card">
-        <span class="stat-label">Presentes hoy</span>
-        <strong class="stat-number">{{ presentes_hoy }}</strong>
+    <div class="dash-stats">
+        <div class="dash-stat">
+            <div class="lab">Funcionarios activos</div>
+            <div class="val">{{ total_funcionarios }}</div>
+        </div>
+        <div class="dash-stat">
+            <div class="lab">Presentes hoy</div>
+            <div class="val">{{ presentes_hoy }}</div>
+        </div>
+        <div class="dash-stat">
+            <div class="lab">Llegadas tarde</div>
+            <div class="val">{{ llegadas_tarde_hoy }}</div>
+        </div>
+        <div class="dash-stat">
+            <div class="lab">Salidas registradas</div>
+            <div class="val">{{ salidas_hoy }}</div>
+        </div>
+        <div class="dash-stat">
+            <div class="lab">Pendientes hoy</div>
+            <div class="val">{{ pendientes_hoy }}</div>
+        </div>
     </div>
 
-    <div class="card stat-card">
-        <span class="stat-label">Llegadas tarde</span>
-        <strong class="stat-number">{{ llegadas_tarde_hoy }}</strong>
-    </div>
+    <div class="dash-grid">
+        <div class="dash-card">
+            <div class="dash-card-header">
+                <h3>🕘 Últimas marcaciones</h3>
+                <p>Detalle en tiempo real de las asistencias del día.</p>
+            </div>
 
-    <div class="card stat-card">
-        <span class="stat-label">Salidas registradas</span>
-        <strong class="stat-number">{{ salidas_hoy }}</strong>
-    </div>
-
-    <div class="card stat-card">
-        <span class="stat-label">Pendientes</span>
-        <strong class="stat-number">{{ pendientes_hoy }}</strong>
-    </div>
-</div>
-
-<div class="dashboard-grid-2 mt-20">
-    <div class="card">
-        <div class="section-head">
-            <h3>⏱️ Últimas marcaciones</h3>
-            <span class="section-subtitle">Movimientos del día</span>
+            <div class="dash-card-body">
+                <div class="dash-table-wrap">
+                    <table class="dash-table">
+                        <thead>
+                            <tr>
+                                <th>Funcionario</th>
+                                <th>Turno</th>
+                                <th>Entrada</th>
+                                <th>Almuerzo</th>
+                                <th>Regreso</th>
+                                <th>Salida</th>
+                                <th>Horas</th>
+                                <th>Estado</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for a in ultimas_marcaciones %}
+                            <tr>
+                                <td>{{ a.funcionario.nombre_completo }}</td>
+                                <td>
+                                    {% if a.funcionario.turno %}
+                                        {{ a.funcionario.turno.nombre }}
+                                    {% else %}
+                                        -
+                                    {% endif %}
+                                </td>
+                                <td>{% if a.hora_entrada %}{{ a.hora_entrada|time:"H:i:s" }}{% else %}<span class="muted">—</span>{% endif %}</td>
+                                <td>{% if a.hora_salida_almuerzo %}{{ a.hora_salida_almuerzo|time:"H:i:s" }}{% else %}<span class="muted">—</span>{% endif %}</td>
+                                <td>{% if a.hora_regreso_almuerzo %}{{ a.hora_regreso_almuerzo|time:"H:i:s" }}{% else %}<span class="muted">—</span>{% endif %}</td>
+                                <td>{% if a.hora_salida %}{{ a.hora_salida|time:"H:i:s" }}{% else %}<span class="muted">—</span>{% endif %}</td>
+                                <td>{{ a.horas_trabajadas_texto }}</td>
+                                <td>
+                                    {% if a.estado_jornada == "En almuerzo" %}
+                                        <span class="badge-soft badge-almuerzo">{{ a.estado_jornada }}</span>
+                                    {% elif a.estado_jornada == "Finalizado" %}
+                                        <span class="badge-soft badge-finalizado">{{ a.estado_jornada }}</span>
+                                    {% elif a.llego_tarde %}
+                                        <span class="badge-soft badge-tarde">Tarde</span>
+                                    {% else %}
+                                        <span class="badge-soft badge-ok">{{ a.estado_jornada }}</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr>
+                                <td colspan="8" class="muted">No hay marcaciones recientes.</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
         </div>
 
-        <div class="table-wrap">
-            <table class="table-dark">
-                <thead>
-                    <tr>
-                        <th>Funcionario</th>
-                        <th>Turno</th>
-                        <th>Entrada</th>
-                        <th>Salida</th>
-                        <th>Estado</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for a in ultimas_marcaciones %}
-                        <tr>
-                            <td>{{ a.funcionario.nombre_completo }}</td>
-                            <td>{{ a.funcionario.turno.nombre|default:"-" }}</td>
-                            <td>{% if a.hora_entrada %}{{ a.hora_entrada|date:"H:i:s" }}{% else %}-{% endif %}</td>
-                            <td>{% if a.hora_salida %}{{ a.hora_salida|date:"H:i:s" }}{% else %}-{% endif %}</td>
-                            <td>
-                                {% if a.llego_tarde %}
-                                    <span class="badge-danger">Tarde</span>
-                                {% else %}
-                                    <span class="badge-success">En horario</span>
-                                {% endif %}
-                            </td>
-                        </tr>
+        <div class="dash-card">
+            <div class="dash-card-header">
+                <h3>👥 Funcionarios recientes</h3>
+                <p>Últimos funcionarios cargados en el sistema.</p>
+            </div>
+
+            <div class="dash-card-body">
+                <div class="mini-list">
+                    {% for funcionario in funcionarios_recientes %}
+                        <div class="mini-item">
+                            <div>
+                                <strong>{{ funcionario.nombre_completo }}</strong>
+                                <span>
+                                    {{ funcionario.cargo|default:"Sin cargo" }}
+                                    {% if funcionario.sucursal_mostrar %}
+                                        | {{ funcionario.sucursal_mostrar }}
+                                    {% endif %}
+                                </span>
+                            </div>
+                            {% if funcionario.activo %}
+                                <span class="badge-soft badge-ok">Activo</span>
+                            {% else %}
+                                <span class="badge-soft badge-tarde">Inactivo</span>
+                            {% endif %}
+                        </div>
                     {% empty %}
-                        <tr>
-                            <td colspan="5" class="empty-row">Aún no hay marcaciones registradas hoy.</td>
-                        </tr>
+                        <div class="muted">No hay funcionarios recientes.</div>
                     {% endfor %}
-                </tbody>
-            </table>
-        </div>
-    </div>
-
-    <div class="card">
-        <div class="section-head">
-            <h3>👥 Funcionarios recientes</h3>
-            <span class="section-subtitle">Últimos cargados</span>
-        </div>
-
-        <div class="mini-list">
-            {% for f in funcionarios_recientes %}
-                <div class="mini-list-item">
-                    <div>
-                        <strong>{{ f.nombre_completo }}</strong>
-                        <p>
-                            CI: {{ f.cedula }}
-                            {% if f.turno %}• {{ f.turno.nombre }}{% endif %}
-                        </p>
-                    </div>
-                    <span class="{% if f.activo %}badge-success{% else %}badge-danger{% endif %}">
-                        {% if f.activo %}Activo{% else %}Inactivo{% endif %}
-                    </span>
                 </div>
-            {% empty %}
-                <div class="empty-state-box">
-                    No hay funcionarios registrados todavía.
-                </div>
-            {% endfor %}
+            </div>
         </div>
     </div>
-</div>
-
-<div class="card mt-20">
-    <div class="section-head">
-        <h3>🚀 Estado actual del proyecto</h3>
-        <span class="section-subtitle">Base operativa</span>
-    </div>
-    <p>
-        ClockIn Web ya cuenta con módulos funcionales de Funcionarios, Turnos y Asistencia.
-        El siguiente paso podrá enfocarse en lector facial, permisos, vacaciones, ICL y reportes.
-    </p>
 </div>
 {% endblock %}

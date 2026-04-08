@@ -79,11 +79,7 @@ class Funcionario(models.Model):
     )
     cargo = models.CharField(max_length=100, blank=True, default="")
     sector = models.CharField(max_length=100, blank=True, default="")
-
-    # Campo viejo legado (se mantiene para no romper nada)
     sucursal = models.CharField(max_length=100, blank=True, default="")
-
-    # Nueva relación real
     sucursal_rel = models.ForeignKey(
         Sucursal,
         on_delete=models.SET_NULL,
@@ -171,6 +167,8 @@ class Asistencia(models.Model):
     fecha = models.DateField(default=timezone.localdate)
 
     hora_entrada = models.DateTimeField(null=True, blank=True)
+    hora_salida_almuerzo = models.DateTimeField(null=True, blank=True)
+    hora_regreso_almuerzo = models.DateTimeField(null=True, blank=True)
     hora_salida = models.DateTimeField(null=True, blank=True)
 
     minutos_atraso = models.PositiveIntegerField(default=0)
@@ -206,6 +204,72 @@ class Asistencia(models.Model):
         else:
             self.minutos_atraso = 0
             self.llego_tarde = False
+
+    @property
+    def siguiente_marcacion(self):
+        if not self.hora_entrada:
+            return "entrada"
+
+        if self.funcionario.turno and self.funcionario.turno.usa_almuerzo:
+            if not self.hora_salida_almuerzo:
+                return "salida_almuerzo"
+            if not self.hora_regreso_almuerzo:
+                return "regreso_almuerzo"
+
+        if not self.hora_salida:
+            return "salida"
+
+        return "completo"
+
+    @property
+    def horas_trabajadas_segundos(self):
+        total = 0
+
+        if self.hora_entrada:
+            if self.funcionario.turno and self.funcionario.turno.usa_almuerzo:
+                if self.hora_salida_almuerzo:
+                    total += int((self.hora_salida_almuerzo - self.hora_entrada).total_seconds())
+
+                if self.hora_regreso_almuerzo and self.hora_salida:
+                    total += int((self.hora_salida - self.hora_regreso_almuerzo).total_seconds())
+                elif self.hora_regreso_almuerzo and not self.hora_salida:
+                    ahora = timezone.localtime()
+                    total += int((ahora - self.hora_regreso_almuerzo).total_seconds())
+
+            else:
+                if self.hora_salida:
+                    total += int((self.hora_salida - self.hora_entrada).total_seconds())
+                else:
+                    ahora = timezone.localtime()
+                    total += int((ahora - self.hora_entrada).total_seconds())
+
+        return max(total, 0)
+
+    @property
+    def horas_trabajadas_texto(self):
+        segundos = self.horas_trabajadas_segundos
+        horas = segundos // 3600
+        minutos = (segundos % 3600) // 60
+        return f"{horas:02d}:{minutos:02d}"
+
+    @property
+    def estado_jornada(self):
+        if not self.hora_entrada:
+            return "Pendiente"
+
+        if self.funcionario.turno and self.funcionario.turno.usa_almuerzo:
+            if not self.hora_salida_almuerzo:
+                return "Trabajando"
+            if not self.hora_regreso_almuerzo:
+                return "En almuerzo"
+            if not self.hora_salida:
+                return "Trabajando"
+            return "Finalizado"
+
+        if not self.hora_salida:
+            return "Trabajando"
+
+        return "Finalizado"
 
 
 class PermisoLicencia(models.Model):

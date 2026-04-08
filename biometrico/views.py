@@ -103,8 +103,10 @@ def _marcar_asistencia_biometrica(request, funcionario, modo):
         fecha=hoy
     )
 
+    siguiente = asistencia.siguiente_marcacion
+
     if modo == "entrada":
-        if not asistencia.hora_entrada:
+        if siguiente == "entrada":
             asistencia.hora_entrada = ahora
             asistencia.calcular_atraso()
 
@@ -130,65 +132,140 @@ def _marcar_asistencia_biometrica(request, funcionario, modo):
                 "ok": True,
                 "tipo": "entrada",
                 "mensaje": "Entrada registrada correctamente.",
+                "subtipo": "Entrada del día",
                 "hora": ahora.strftime("%H:%M:%S"),
                 "llego_tarde": asistencia.llego_tarde,
                 "minutos_atraso": asistencia.minutos_atraso,
                 "turno": funcionario.turno.nombre,
             }
 
-        if asistencia.hora_entrada and not asistencia.hora_salida:
+        if siguiente == "regreso_almuerzo":
+            asistencia.hora_regreso_almuerzo = ahora
+
+            if asistencia.observacion:
+                asistencia.observacion += " Regreso de almuerzo registrado por biométrico."
+            else:
+                asistencia.observacion = "Regreso de almuerzo registrado por biométrico."
+
+            asistencia.save()
+
+            registrar_historial(
+                request,
+                "Asistencia",
+                "Regreso almuerzo biométrico",
+                f"Se registró regreso de almuerzo biométrico de {funcionario.nombre_completo} "
+                f"a las {ahora.strftime('%H:%M:%S')}."
+            )
+
+            return {
+                "ok": True,
+                "tipo": "regreso_almuerzo",
+                "mensaje": "Regreso de almuerzo registrado correctamente.",
+                "subtipo": "Vuelta de almuerzo",
+                "hora": ahora.strftime("%H:%M:%S"),
+                "llego_tarde": asistencia.llego_tarde,
+                "minutos_atraso": asistencia.minutos_atraso,
+                "turno": funcionario.turno.nombre,
+            }
+
+        if siguiente == "salida_almuerzo":
             return {
                 "ok": False,
-                "tipo": "ya_entrada",
-                "mensaje": "El funcionario ya registró su entrada hoy."
+                "tipo": "espera_salida_almuerzo",
+                "mensaje": "Aún corresponde registrar salida a almuerzo."
+            }
+
+        if siguiente == "salida":
+            return {
+                "ok": False,
+                "tipo": "espera_salida_final",
+                "mensaje": "Aún corresponde registrar salida final."
             }
 
         return {
             "ok": False,
             "tipo": "ya_completo",
-            "mensaje": "El funcionario ya registró entrada y salida el día de hoy."
+            "mensaje": "El funcionario ya completó todas sus marcaciones del día."
         }
 
-    if not asistencia.hora_entrada:
+    if modo == "salida":
+        if siguiente == "salida_almuerzo":
+            asistencia.hora_salida_almuerzo = ahora
+
+            if asistencia.observacion:
+                asistencia.observacion += " Salida a almuerzo registrada por biométrico."
+            else:
+                asistencia.observacion = "Salida a almuerzo registrada por biométrico."
+
+            asistencia.save()
+
+            registrar_historial(
+                request,
+                "Asistencia",
+                "Salida almuerzo biométrica",
+                f"Se registró salida a almuerzo biométrica de {funcionario.nombre_completo} "
+                f"a las {ahora.strftime('%H:%M:%S')}."
+            )
+
+            return {
+                "ok": True,
+                "tipo": "salida_almuerzo",
+                "mensaje": "Salida a almuerzo registrada correctamente.",
+                "subtipo": "Inicio de almuerzo",
+                "hora": ahora.strftime("%H:%M:%S"),
+                "llego_tarde": asistencia.llego_tarde,
+                "minutos_atraso": asistencia.minutos_atraso,
+                "turno": funcionario.turno.nombre,
+            }
+
+        if siguiente == "salida":
+            asistencia.hora_salida = ahora
+
+            if asistencia.observacion:
+                asistencia.observacion += " Salida final registrada correctamente por biométrico."
+            else:
+                asistencia.observacion = "Salida final registrada correctamente por biométrico."
+
+            asistencia.save()
+
+            registrar_historial(
+                request,
+                "Asistencia",
+                "Salida final biométrica",
+                f"Se registró salida final biométrica de {funcionario.nombre_completo} "
+                f"a las {ahora.strftime('%H:%M:%S')}."
+            )
+
+            return {
+                "ok": True,
+                "tipo": "salida",
+                "mensaje": "Salida final registrada correctamente.",
+                "subtipo": "Fin de jornada",
+                "hora": ahora.strftime("%H:%M:%S"),
+                "llego_tarde": asistencia.llego_tarde,
+                "minutos_atraso": asistencia.minutos_atraso,
+                "turno": funcionario.turno.nombre,
+            }
+
+        if siguiente == "entrada":
+            return {
+                "ok": False,
+                "tipo": "sin_entrada",
+                "mensaje": "Primero debe registrar entrada."
+            }
+
+        if siguiente == "regreso_almuerzo":
+            return {
+                "ok": False,
+                "tipo": "espera_regreso_almuerzo",
+                "mensaje": "Antes de salir debe registrar regreso de almuerzo."
+            }
+
         return {
             "ok": False,
-            "tipo": "sin_entrada",
-            "mensaje": "No se puede registrar salida porque aún no tiene entrada hoy."
+            "tipo": "ya_completo",
+            "mensaje": "El funcionario ya completó todas sus marcaciones del día."
         }
-
-    if not asistencia.hora_salida:
-        asistencia.hora_salida = ahora
-
-        if asistencia.observacion:
-            asistencia.observacion += " Salida registrada correctamente por biométrico."
-        else:
-            asistencia.observacion = "Salida registrada correctamente por biométrico."
-
-        asistencia.save()
-
-        registrar_historial(
-            request,
-            "Asistencia",
-            "Salida biométrica",
-            f"Se registró salida biométrica de {funcionario.nombre_completo} "
-            f"a las {ahora.strftime('%H:%M:%S')}."
-        )
-
-        return {
-            "ok": True,
-            "tipo": "salida",
-            "mensaje": "Salida registrada correctamente.",
-            "hora": ahora.strftime("%H:%M:%S"),
-            "llego_tarde": asistencia.llego_tarde,
-            "minutos_atraso": asistencia.minutos_atraso,
-            "turno": funcionario.turno.nombre,
-        }
-
-    return {
-        "ok": False,
-        "tipo": "ya_salida",
-        "mensaje": "El funcionario ya registró su salida hoy."
-    }
 
 
 # =========================
@@ -320,6 +397,7 @@ def reconocimiento(request):
         return JsonResponse({
             "ok": resultado["ok"],
             "tipo": resultado.get("tipo"),
+            "subtipo": resultado.get("subtipo"),
             "funcionario_id": funcionario.id,
             "funcionario": funcionario.nombre_completo,
             "mensaje": resultado.get("mensaje"),

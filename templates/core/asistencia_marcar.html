@@ -3,125 +3,477 @@
 {% block title %}Asistencia | ClockIn{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <h2>⏱️ Asistencia</h2>
-    <p>Registro de entrada y salida de funcionarios.</p>
-</div>
+<style>
+    .asis-page {
+        padding: 24px 0;
+    }
 
-{% if messages %}
-    {% for message in messages %}
-        <div class="alert-box {% if message.tags == 'success' %}success-box{% elif message.tags == 'error' %}error-box-strong{% else %}warning-box{% endif %}">
-            {{ message }}
+    .asis-hero {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+        margin-bottom: 20px;
+    }
+
+    .asis-title h2 {
+        margin: 0;
+        color: #fff;
+        font-size: 32px;
+        font-weight: 800;
+    }
+
+    .asis-title p {
+        margin: 8px 0 0;
+        color: #94a3b8;
+    }
+
+    .asis-card {
+        background: linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
+        border: 1px solid rgba(255,255,255,.06);
+        border-radius: 24px;
+        box-shadow: 0 12px 36px rgba(0,0,0,.24);
+        overflow: hidden;
+        margin-bottom: 22px;
+    }
+
+    .asis-card-header {
+        padding: 20px 22px 10px;
+    }
+
+    .asis-card-header h3 {
+        margin: 0;
+        color: #fff;
+        font-size: 18px;
+        font-weight: 800;
+    }
+
+    .asis-card-header p {
+        margin: 8px 0 0;
+        color: #94a3b8;
+        font-size: 14px;
+    }
+
+    .asis-card-body {
+        padding: 0 22px 22px;
+    }
+
+    .asis-form-grid {
+        display: grid;
+        grid-template-columns: 1fr 220px;
+        gap: 14px;
+        align-items: end;
+    }
+
+    .asis-label {
+        display: block;
+        color: #cbd5e1;
+        font-size: 14px;
+        margin-bottom: 8px;
+        font-weight: 700;
+    }
+
+    .asis-card input[type="text"],
+    .asis-card input[type="number"],
+    .asis-card input[type="search"] {
+        width: 100%;
+        background: #0f1722;
+        color: white;
+        border: 1px solid rgba(255,255,255,.08);
+        border-radius: 14px;
+        padding: 14px 16px;
+        outline: none;
+    }
+
+    .asis-card input:focus {
+        border-color: rgba(59,130,246,.45);
+        box-shadow: 0 0 0 3px rgba(59,130,246,.12);
+    }
+
+    .asis-btn {
+        border: none;
+        border-radius: 16px;
+        padding: 14px 18px;
+        background: linear-gradient(135deg, #2563eb, #3b82f6);
+        color: white;
+        font-weight: 800;
+        cursor: pointer;
+    }
+
+    .resultado-box {
+        margin-top: 18px;
+        padding: 16px 18px;
+        border-radius: 18px;
+        border: 1px solid rgba(255,255,255,.06);
+        background: rgba(255,255,255,.03);
+    }
+
+    .resultado-box h4 {
+        margin: 0 0 10px;
+        color: #fff;
+        font-size: 18px;
+    }
+
+    .resultado-grid {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 12px;
+    }
+
+    .resultado-item {
+        background: rgba(255,255,255,.03);
+        border: 1px solid rgba(255,255,255,.05);
+        border-radius: 14px;
+        padding: 12px;
+    }
+
+    .resultado-item .lab {
+        color: #94a3b8;
+        font-size: 12px;
+        margin-bottom: 6px;
+    }
+
+    .resultado-item .val {
+        color: #fff;
+        font-size: 15px;
+        font-weight: 700;
+    }
+
+    .tabla-wrap {
+        overflow-x: auto;
+        padding: 0 16px 18px;
+    }
+
+    .asis-table {
+        width: 100%;
+        min-width: 1450px;
+        border-collapse: separate;
+        border-spacing: 0 10px;
+    }
+
+    .asis-table thead th {
+        color: #cdd6e1;
+        font-size: 13px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.4px;
+        padding: 0 14px 6px;
+        white-space: nowrap;
+    }
+
+    .asis-table tbody tr {
+        background: rgba(255,255,255,.02);
+        transition: 0.2s ease;
+    }
+
+    .asis-table tbody tr:hover {
+        background: rgba(59,130,246,.08);
+    }
+
+    .asis-table tbody td {
+        padding: 16px 14px;
+        vertical-align: middle;
+        color: #f3f4f6;
+        border-top: 1px solid rgba(255,255,255,0.04);
+        border-bottom: 1px solid rgba(255,255,255,0.04);
+    }
+
+    .asis-table tbody td:first-child {
+        border-left: 1px solid rgba(255,255,255,0.04);
+        border-top-left-radius: 18px;
+        border-bottom-left-radius: 18px;
+    }
+
+    .asis-table tbody td:last-child {
+        border-right: 1px solid rgba(255,255,255,0.04);
+        border-top-right-radius: 18px;
+        border-bottom-right-radius: 18px;
+    }
+
+    .nombre-box {
+        display: flex;
+        flex-direction: column;
+        gap: 4px;
+    }
+
+    .nombre-box strong {
+        color: #fff;
+    }
+
+    .nombre-box span {
+        color: #94a3b8;
+        font-size: 13px;
+    }
+
+    .badge-soft {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 7px 12px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 700;
+        white-space: nowrap;
+        border: 1px solid transparent;
+    }
+
+    .badge-tarde {
+        background: rgba(239,68,68,.12);
+        color: #fca5a5;
+        border-color: rgba(239,68,68,.24);
+    }
+
+    .badge-ok {
+        background: rgba(34,197,94,.12);
+        color: #86efac;
+        border-color: rgba(34,197,94,.24);
+    }
+
+    .badge-almuerzo {
+        background: rgba(245,158,11,.12);
+        color: #fcd34d;
+        border-color: rgba(245,158,11,.22);
+    }
+
+    .badge-finalizado {
+        background: rgba(59,130,246,.12);
+        color: #93c5fd;
+        border-color: rgba(59,130,246,.24);
+    }
+
+    .muted {
+        color: #94a3b8;
+    }
+
+    .alert-list {
+        margin-bottom: 18px;
+    }
+
+    .alert-item {
+        padding: 12px 16px;
+        border-radius: 14px;
+        margin-bottom: 10px;
+        font-weight: 600;
+    }
+
+    .alert-success {
+        background: rgba(34,197,94,.12);
+        color: #86efac;
+        border: 1px solid rgba(34,197,94,.22);
+    }
+
+    .alert-error {
+        background: rgba(239,68,68,.12);
+        color: #fca5a5;
+        border: 1px solid rgba(239,68,68,.22);
+    }
+
+    .alert-warning {
+        background: rgba(245,158,11,.12);
+        color: #fcd34d;
+        border: 1px solid rgba(245,158,11,.22);
+    }
+
+    @media (max-width: 900px) {
+        .asis-form-grid,
+        .resultado-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<div class="container-fluid asis-page">
+    <div class="asis-hero">
+        <div class="asis-title">
+            <h2>⏱️ Asistencia</h2>
+            <p>Registro manual de marcaciones y seguimiento detallado de la jornada.</p>
         </div>
-    {% endfor %}
-{% endif %}
+    </div>
 
-<div class="card form-card mb-20">
-    <form method="post">
-        {% csrf_token %}
-        <div class="form-grid form-grid-1">
-            <div class="form-field">
-                <label for="{{ form.cedula.id_for_label }}">Cédula del funcionario</label>
-                {{ form.cedula }}
-                {{ form.cedula.errors }}
+    {% if messages %}
+    <div class="alert-list">
+        {% for message in messages %}
+            <div class="alert-item
+                {% if message.tags == 'success' %}alert-success{% endif %}
+                {% if message.tags == 'error' %}alert-error{% endif %}
+                {% if message.tags == 'warning' %}alert-warning{% endif %}
+            ">
+                {{ message }}
             </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="asis-card">
+        <div class="asis-card-header">
+            <h3>Registrar marcación</h3>
+            <p>Ingresa la cédula del funcionario para registrar la siguiente marcación disponible.</p>
         </div>
 
-        <div class="form-actions">
-            <button type="submit" class="btn-primary btn-link">Registrar marcación</button>
-        </div>
-    </form>
-</div>
+        <div class="asis-card-body">
+            <form method="post">
+                {% csrf_token %}
+                <div class="asis-form-grid">
+                    <div>
+                        <label class="asis-label" for="{{ form.cedula.id_for_label }}">Cédula del funcionario</label>
+                        {{ form.cedula }}
+                        {{ form.cedula.errors }}
+                    </div>
+                    <div>
+                        <button type="submit" class="asis-btn">Registrar marcación</button>
+                    </div>
+                </div>
+            </form>
 
-{% if resultado %}
-<div class="card mb-20">
-    <h3 class="section-title">
-        {% if resultado.tipo == "entrada" %}
-            ✅ Entrada registrada
-        {% else %}
-            🚪 Salida registrada
-        {% endif %}
-    </h3>
-
-    <div class="result-grid">
-        <div class="result-box">
-            <span class="result-label">Funcionario</span>
-            <strong>{{ resultado.funcionario.nombre_completo }}</strong>
-        </div>
-        <div class="result-box">
-            <span class="result-label">Cédula</span>
-            <strong>{{ resultado.funcionario.cedula }}</strong>
-        </div>
-        <div class="result-box">
-            <span class="result-label">Turno</span>
-            <strong>{{ resultado.turno }}</strong>
-        </div>
-        <div class="result-box">
-            <span class="result-label">Hora</span>
-            <strong>{{ resultado.hora|date:"H:i:s" }}</strong>
-        </div>
-        <div class="result-box">
-            <span class="result-label">Atraso</span>
-            <strong>{{ resultado.atraso }} min</strong>
-        </div>
-        <div class="result-box">
-            <span class="result-label">Estado</span>
-            <strong>
-                {% if resultado.llego_tarde %}
-                    Llegó tarde
-                {% else %}
-                    En horario
-                {% endif %}
-            </strong>
+            {% if resultado %}
+            <div class="resultado-box">
+                <h4>Última marcación registrada</h4>
+                <div class="resultado-grid">
+                    <div class="resultado-item">
+                        <div class="lab">Funcionario</div>
+                        <div class="val">{{ resultado.funcionario.nombre_completo }}</div>
+                    </div>
+                    <div class="resultado-item">
+                        <div class="lab">Tipo</div>
+                        <div class="val">
+                            {% if resultado.tipo == "entrada" %}Entrada{% endif %}
+                            {% if resultado.tipo == "salida_almuerzo" %}Salida almuerzo{% endif %}
+                            {% if resultado.tipo == "regreso_almuerzo" %}Regreso almuerzo{% endif %}
+                            {% if resultado.tipo == "salida" %}Salida final{% endif %}
+                        </div>
+                    </div>
+                    <div class="resultado-item">
+                        <div class="lab">Hora</div>
+                        <div class="val">{{ resultado.hora|time:"H:i:s" }}</div>
+                    </div>
+                    <div class="resultado-item">
+                        <div class="lab">Turno</div>
+                        <div class="val">{{ resultado.turno }}</div>
+                    </div>
+                    <div class="resultado-item">
+                        <div class="lab">Atraso</div>
+                        <div class="val">
+                            {% if resultado.llego_tarde %}
+                                {{ resultado.atraso }} min
+                            {% else %}
+                                0 min
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
         </div>
     </div>
-</div>
-{% endif %}
 
-<div class="card">
-    <div class="page-header mb-20">
-        <h3>📋 Marcaciones de hoy — {{ hoy|date:"d/m/Y" }}</h3>
-    </div>
+    <div class="asis-card">
+        <div class="asis-card-header">
+            <h3>📋 Marcaciones de hoy — {{ hoy|date:"d/m/Y" }}</h3>
+            <p>Detalle completo de entrada, almuerzo, regreso, salida final y horas trabajadas.</p>
+        </div>
 
-    <div class="table-wrap">
-        <table class="table-dark">
-            <thead>
-                <tr>
-                    <th>Cédula</th>
-                    <th>Funcionario</th>
-                    <th>Turno</th>
-                    <th>Entrada</th>
-                    <th>Salida</th>
-                    <th>Atraso</th>
-                    <th>Estado</th>
-                    <th>Observación</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for a in asistencias_hoy %}
+        <div class="tabla-wrap">
+            <table class="asis-table">
+                <thead>
+                    <tr>
+                        <th>Cédula</th>
+                        <th>Funcionario</th>
+                        <th>Turno</th>
+                        <th>Entrada</th>
+                        <th>Salida Almuerzo</th>
+                        <th>Regreso Almuerzo</th>
+                        <th>Salida Final</th>
+                        <th>Horas Trabajadas</th>
+                        <th>Atraso</th>
+                        <th>Estado</th>
+                        <th>Observación</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for a in asistencias_hoy %}
                     <tr>
                         <td>{{ a.funcionario.cedula }}</td>
-                        <td>{{ a.funcionario.nombre_completo }}</td>
-                        <td>{{ a.funcionario.turno.nombre|default:"-" }}</td>
-                        <td>{% if a.hora_entrada %}{{ a.hora_entrada|date:"H:i:s" }}{% else %}-{% endif %}</td>
-                        <td>{% if a.hora_salida %}{{ a.hora_salida|date:"H:i:s" }}{% else %}-{% endif %}</td>
-                        <td>{{ a.minutos_atraso }} min</td>
+
                         <td>
-                            {% if a.llego_tarde %}
-                                <span class="badge-danger">Tarde</span>
+                            <div class="nombre-box">
+                                <strong>{{ a.funcionario.nombre_completo }}</strong>
+                                <span>{{ a.funcionario.cargo|default:"Sin cargo" }}</span>
+                            </div>
+                        </td>
+
+                        <td>
+                            {% if a.funcionario.turno %}
+                                {{ a.funcionario.turno.nombre }}
                             {% else %}
-                                <span class="badge-success">En horario</span>
+                                -
                             {% endif %}
                         </td>
+
+                        <td>
+                            {% if a.hora_entrada %}
+                                {{ a.hora_entrada|time:"H:i:s" }}
+                            {% else %}
+                                <span class="muted">—</span>
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {% if a.hora_salida_almuerzo %}
+                                {{ a.hora_salida_almuerzo|time:"H:i:s" }}
+                            {% else %}
+                                <span class="muted">—</span>
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {% if a.hora_regreso_almuerzo %}
+                                {{ a.hora_regreso_almuerzo|time:"H:i:s" }}
+                            {% else %}
+                                <span class="muted">—</span>
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {% if a.hora_salida %}
+                                {{ a.hora_salida|time:"H:i:s" }}
+                            {% else %}
+                                <span class="muted">—</span>
+                            {% endif %}
+                        </td>
+
+                        <td>{{ a.horas_trabajadas_texto }}</td>
+
+                        <td>
+                            {% if a.minutos_atraso > 0 %}
+                                {{ a.minutos_atraso }} min
+                            {% else %}
+                                0 min
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {% if a.estado_jornada == "En almuerzo" %}
+                                <span class="badge-soft badge-almuerzo">{{ a.estado_jornada }}</span>
+                            {% elif a.estado_jornada == "Finalizado" %}
+                                <span class="badge-soft badge-finalizado">{{ a.estado_jornada }}</span>
+                            {% elif a.llego_tarde %}
+                                <span class="badge-soft badge-tarde">Tarde</span>
+                            {% else %}
+                                <span class="badge-soft badge-ok">{{ a.estado_jornada }}</span>
+                            {% endif %}
+                        </td>
+
                         <td>{{ a.observacion|default:"-" }}</td>
                     </tr>
-                {% empty %}
+                    {% empty %}
                     <tr>
-                        <td colspan="8" class="empty-row">Aún no hay marcaciones registradas hoy.</td>
+                        <td colspan="11" class="muted">No hay marcaciones registradas hoy.</td>
                     </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 {% endblock %}
