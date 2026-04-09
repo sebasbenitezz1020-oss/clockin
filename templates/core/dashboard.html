@@ -52,6 +52,51 @@
         line-height: 1;
     }
 
+    .dash-resumen {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
+    .dash-resumen-card {
+        background: linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
+        border: 1px solid rgba(255,255,255,.06);
+        border-radius: 22px;
+        padding: 20px;
+        box-shadow: 0 12px 36px rgba(0,0,0,.20);
+    }
+
+    .dash-resumen-card .top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        margin-bottom: 12px;
+    }
+
+    .dash-resumen-card .icon {
+        font-size: 24px;
+    }
+
+    .dash-resumen-card .title {
+        color: #94a3b8;
+        font-size: 14px;
+        font-weight: 700;
+    }
+
+    .dash-resumen-card .number {
+        color: #fff;
+        font-size: 34px;
+        font-weight: 800;
+        line-height: 1;
+    }
+
+    .trabajando .icon { color: #86efac; }
+    .almuerzo .icon { color: #fcd34d; }
+    .finalizados .icon { color: #93c5fd; }
+    .pendientes .icon { color: #fca5a5; }
+
     .dash-grid {
         display: grid;
         grid-template-columns: 1.1fr .9fr;
@@ -200,7 +245,8 @@
     }
 
     @media (max-width: 1100px) {
-        .dash-stats {
+        .dash-stats,
+        .dash-resumen {
             grid-template-columns: repeat(2, 1fr);
         }
 
@@ -210,7 +256,8 @@
     }
 
     @media (max-width: 640px) {
-        .dash-stats {
+        .dash-stats,
+        .dash-resumen {
             grid-template-columns: 1fr;
         }
     }
@@ -242,6 +289,40 @@
         <div class="dash-stat">
             <div class="lab">Pendientes hoy</div>
             <div class="val">{{ pendientes_hoy }}</div>
+        </div>
+    </div>
+
+    <div class="dash-resumen">
+        <div class="dash-resumen-card trabajando">
+            <div class="top">
+                <div class="title">Trabajando</div>
+                <div class="icon">🟢</div>
+            </div>
+            <div class="number">{{ trabajando_hoy }}</div>
+        </div>
+
+        <div class="dash-resumen-card almuerzo">
+            <div class="top">
+                <div class="title">En almuerzo</div>
+                <div class="icon">🍽️</div>
+            </div>
+            <div class="number">{{ en_almuerzo_hoy }}</div>
+        </div>
+
+        <div class="dash-resumen-card finalizados">
+            <div class="top">
+                <div class="title">Finalizados</div>
+                <div class="icon">🏁</div>
+            </div>
+            <div class="number">{{ finalizados_hoy }}</div>
+        </div>
+
+        <div class="dash-resumen-card pendientes">
+            <div class="top">
+                <div class="title">Pendientes</div>
+                <div class="icon">⏳</div>
+            </div>
+            <div class="number">{{ pendientes_hoy }}</div>
         </div>
     </div>
 

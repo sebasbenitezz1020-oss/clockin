@@ -43,36 +43,51 @@ def dashboard(request):
     hoy = timezone.localdate()
 
     total_funcionarios = Funcionario.objects.filter(activo=True).count()
-    presentes_hoy = Asistencia.objects.filter(
+
+    asistencias_hoy_qs = Asistencia.objects.select_related(
+        "funcionario",
+        "funcionario__turno"
+    ).filter(
         fecha=hoy,
-        hora_entrada__isnull=False,
         funcionario__activo=True
+    )
+
+    presentes_hoy = asistencias_hoy_qs.filter(
+        hora_entrada__isnull=False
     ).count()
 
-    llegadas_tarde_hoy = Asistencia.objects.filter(
-        fecha=hoy,
-        llego_tarde=True,
-        funcionario__activo=True
+    llegadas_tarde_hoy = asistencias_hoy_qs.filter(
+        llego_tarde=True
     ).count()
 
-    salidas_hoy = Asistencia.objects.filter(
-        fecha=hoy,
-        hora_salida__isnull=False,
-        funcionario__activo=True
+    salidas_hoy = asistencias_hoy_qs.filter(
+        hora_salida__isnull=False
     ).count()
 
     pendientes_hoy = max(total_funcionarios - presentes_hoy, 0)
 
-    ultimas_marcaciones = Asistencia.objects.select_related(
-        "funcionario",
-        "funcionario__turno"
-    ).filter(
-        fecha=hoy
-    ).order_by("-actualizado_en")[:8]
+    trabajando_hoy = 0
+    en_almuerzo_hoy = 0
+    finalizados_hoy = 0
+
+    for asistencia in asistencias_hoy_qs:
+        estado = asistencia.estado_jornada
+        if estado == "Trabajando":
+            trabajando_hoy += 1
+        elif estado == "En almuerzo":
+            en_almuerzo_hoy += 1
+        elif estado == "Finalizado":
+            finalizados_hoy += 1
+
+    ultimas_marcaciones = asistencias_hoy_qs.order_by("-actualizado_en")[:8]
 
     funcionarios_recientes = Funcionario.objects.filter(
         activo=True
-    ).select_related("turno", "sucursal_rel", "sucursal_rel__empresa").order_by("-creado_en")[:6]
+    ).select_related(
+        "turno",
+        "sucursal_rel",
+        "sucursal_rel__empresa"
+    ).order_by("-creado_en")[:6]
 
     context = {
         "titulo": "Dashboard ClockIn",
@@ -82,6 +97,9 @@ def dashboard(request):
         "llegadas_tarde_hoy": llegadas_tarde_hoy,
         "salidas_hoy": salidas_hoy,
         "pendientes_hoy": pendientes_hoy,
+        "trabajando_hoy": trabajando_hoy,
+        "en_almuerzo_hoy": en_almuerzo_hoy,
+        "finalizados_hoy": finalizados_hoy,
         "ultimas_marcaciones": ultimas_marcaciones,
         "funcionarios_recientes": funcionarios_recientes,
     }
@@ -281,11 +299,7 @@ def obtener_sucursales_por_empresa(request):
         activo=True
     ).order_by("nombre")
 
-    data = [
-        {"id": s.id, "nombre": s.nombre}
-        for s in sucursales
-    ]
-
+    data = [{"id": s.id, "nombre": s.nombre} for s in sucursales]
     return JsonResponse({"sucursales": data})
 
 
@@ -636,6 +650,7 @@ def asistencia_marcar(request):
         "asistencias_hoy": asistencias_hoy,
         "hoy": hoy,
     })
+
 
 @login_required
 def permisos_lista(request):
