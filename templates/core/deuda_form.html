@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+
+{% block title %}{{ titulo_form }} | ClockIn{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>💳 {{ titulo_form }}</h2>
+    <p>Registra una deuda que impactará en el salario neto del funcionario.</p>
+</div>
+
+<div class="card form-card">
+    <form method="post">
+        {% csrf_token %}
+
+        {% if form.errors %}
+            <div class="alert-box error-box-strong">
+                Revisa los campos marcados. Hay datos pendientes o inválidos.
+            </div>
+        {% endif %}
+
+        <div class="form-grid">
+            <div class="form-field">
+                <label for="{{ form.funcionario.id_for_label }}">Funcionario</label>
+                {{ form.funcionario }}
+                {{ form.funcionario.errors }}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.tipo.id_for_label }}">Tipo</label>
+                {{ form.tipo }}
+                {{ form.tipo.errors }}
+            </div>
+
+            <div class="form-field" style="grid-column: span 2;">
+                <label for="{{ form.descripcion.id_for_label }}">Descripción</label>
+                {{ form.descripcion }}
+                {{ form.descripcion.errors }}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.fecha.id_for_label }}">Fecha</label>
+                {{ form.fecha }}
+                {{ form.fecha.errors }}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.monto_total.id_for_label }}">Monto total</label>
+                {{ form.monto_total }}
+                {{ form.monto_total.errors }}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.saldo_pendiente.id_for_label }}">Saldo pendiente</label>
+                {{ form.saldo_pendiente }}
+                {{ form.saldo_pendiente.errors }}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.cuota_mensual.id_for_label }}">Cuota mensual</label>
+                {{ form.cuota_mensual }}
+                {{ form.cuota_mensual.errors }}
+            </div>
+        </div>
+
+        <div class="checks-row">
+            <label class="check-item">
+                {{ form.aplicar_en_nomina }} <span>Aplicar en nómina</span>
+            </label>
+
+            <label class="check-item">
+                {{ form.activa }} <span>Deuda activa</span>
+            </label>
+        </div>
+
+        <div class="form-actions">
+            <a href="{% url 'deudas_lista' %}" class="btn-secondary">Volver</a>
+            <button type="submit" class="btn-primary btn-link">{{ boton_texto }}</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

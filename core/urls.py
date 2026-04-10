@@ -13,6 +13,14 @@ from .views import (
     sucursal_toggle_activo,
     obtener_sucursales_por_empresa,
 
+    deudas_lista,
+    deuda_nueva,
+    deuda_editar,
+    deuda_toggle_activa,
+
+    nomina_lista,
+    nomina_toggle_pagado,
+
     funcionarios_lista,
     funcionario_nuevo,
     funcionario_editar,
@@ -51,6 +59,14 @@ urlpatterns = [
     path("sucursales/<int:pk>/editar/", sucursal_editar, name="sucursal_editar"),
     path("sucursales/<int:pk>/toggle-activo/", sucursal_toggle_activo, name="sucursal_toggle_activo"),
     path("ajax/sucursales-por-empresa/", obtener_sucursales_por_empresa, name="obtener_sucursales_por_empresa"),
+
+    path("deudas/", deudas_lista, name="deudas_lista"),
+    path("deudas/nueva/", deuda_nueva, name="deuda_nueva"),
+    path("deudas/<int:pk>/editar/", deuda_editar, name="deuda_editar"),
+    path("deudas/<int:pk>/toggle-activa/", deuda_toggle_activa, name="deuda_toggle_activa"),
+
+    path("nomina/", nomina_lista, name="nomina_lista"),
+    path("nomina/<int:pk>/toggle-pagado/", nomina_toggle_pagado, name="nomina_toggle_pagado"),
 
     path("funcionarios/", funcionarios_lista, name="funcionarios_lista"),
     path("funcionarios/nuevo/", funcionario_nuevo, name="funcionario_nuevo"),

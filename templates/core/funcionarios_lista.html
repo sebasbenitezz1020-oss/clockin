@@ -1,14 +1,15 @@
 {% extends "base.html" %}
+{% load number_filters %}
 
-{% block title %}Funcionarios{% endblock %}
+{% block title %}Funcionarios | ClockIn{% endblock %}
 
 {% block content %}
 <style>
-    .funcionarios-page {
+    .func-page {
         padding: 24px 0;
     }
 
-    .funcionarios-hero {
+    .func-hero {
         display: flex;
         justify-content: space-between;
         align-items: center;
@@ -17,163 +18,236 @@
         margin-bottom: 20px;
     }
 
-    .funcionarios-title h2 {
+    .func-title h2 {
         margin: 0;
-        font-size: 32px;
+        font-size: 34px;
         font-weight: 800;
-        color: #ffffff;
+        color: #fff;
     }
 
-    .funcionarios-title p {
-        margin: 6px 0 0;
-        color: #9ca3af;
+    .func-title p {
+        margin: 8px 0 0;
+        color: #94a3b8;
         font-size: 15px;
     }
 
-    .funcionarios-card {
-        background: linear-gradient(180deg, rgba(19, 24, 34, 0.98), rgba(14, 18, 27, 0.98));
-        border: 1px solid rgba(255,255,255,0.06);
-        border-radius: 24px;
-        box-shadow: 0 12px 36px rgba(0, 0, 0, 0.28);
-        overflow: hidden;
-    }
-
-    .funcionarios-toolbar {
-        padding: 18px;
-        border-bottom: 1px solid rgba(255,255,255,0.05);
-        background: rgba(255,255,255,0.02);
-    }
-
-    .funcionarios-search {
-        display: grid;
-        grid-template-columns: 1.3fr 1fr 1fr 180px;
-        gap: 12px;
-    }
-
-    .funcionarios-search input,
-    .funcionarios-search select {
-        width: 100%;
-        border: 1px solid rgba(255,255,255,0.08);
-        background: #0f1722;
-        color: #ffffff;
-        border-radius: 14px;
-        padding: 14px 16px;
-        font-size: 15px;
-        outline: none;
-    }
-
-    .funcionarios-search input::placeholder {
-        color: #7c8798;
-    }
-
-    .btn-func-primary {
+    .func-btn-main {
         border: none;
         border-radius: 16px;
         padding: 13px 18px;
-        font-weight: 700;
+        font-weight: 800;
         background: linear-gradient(135deg, #2563eb, #3b82f6);
-        color: white;
+        color: #fff;
         text-decoration: none;
         display: inline-flex;
         align-items: center;
         justify-content: center;
         gap: 8px;
+        box-shadow: 0 10px 24px rgba(37, 99, 235, 0.25);
     }
 
-    .btn-func-primary:hover {
-        color: white;
+    .func-btn-main:hover {
+        color: #fff;
         text-decoration: none;
+    }
+
+    .func-stats {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        margin-bottom: 20px;
+    }
+
+    .func-stat-card {
+        background: linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
+        border: 1px solid rgba(255,255,255,.06);
+        border-radius: 22px;
+        padding: 18px;
+        box-shadow: 0 12px 36px rgba(0,0,0,.22);
+    }
+
+    .func-stat-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 12px;
+    }
+
+    .func-stat-title {
+        color: #94a3b8;
+        font-size: 14px;
+        font-weight: 700;
+    }
+
+    .func-stat-icon {
+        font-size: 22px;
+    }
+
+    .func-stat-value {
+        color: #fff;
+        font-size: 28px;
+        font-weight: 800;
+        line-height: 1;
+    }
+
+    .func-card {
+        background: linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
+        border: 1px solid rgba(255,255,255,.06);
+        border-radius: 24px;
+        box-shadow: 0 12px 36px rgba(0,0,0,.28);
+        overflow: hidden;
+    }
+
+    .func-toolbar {
+        padding: 18px;
+        border-bottom: 1px solid rgba(255,255,255,.05);
+        background: rgba(255,255,255,.02);
+    }
+
+    .func-search {
+        display: grid;
+        grid-template-columns: 1.35fr 1fr 1fr 170px;
+        gap: 12px;
+    }
+
+    .func-search input,
+    .func-search select {
+        width: 100%;
+        border: 1px solid rgba(255,255,255,.08);
+        background: #0f1722;
+        color: #fff;
+        border-radius: 14px;
+        padding: 14px 16px;
+        font-size: 14px;
+        outline: none;
+    }
+
+    .func-search input::placeholder {
+        color: #7c8798;
+    }
+
+    .func-search input:focus,
+    .func-search select:focus {
+        border-color: rgba(59,130,246,.45);
+        box-shadow: 0 0 0 3px rgba(59,130,246,.12);
     }
 
     .btn-search {
         border: none;
         border-radius: 14px;
-        background: #1d4ed8;
-        color: white;
-        font-weight: 700;
+        background: linear-gradient(135deg, #1d4ed8, #2563eb);
+        color: #fff;
+        font-weight: 800;
         padding: 12px 16px;
     }
 
-    .funcionarios-table-wrap {
-        padding: 8px 14px 16px;
+    .func-table-wrap {
+        padding: 8px 10px 14px;
         overflow-x: auto;
     }
 
-    .funcionarios-table {
+    .func-table {
         width: 100%;
-        min-width: 1320px;
+        min-width: 1180px;
         border-collapse: separate;
-        border-spacing: 0 10px;
+        border-spacing: 0 8px;
+        table-layout: fixed;
     }
 
-    .funcionarios-table thead th {
+    .func-table thead th {
         color: #cdd6e1;
-        font-size: 13px;
+        font-size: 11px;
         font-weight: 700;
         text-transform: uppercase;
-        letter-spacing: 0.4px;
-        padding: 0 14px 6px;
-        white-space: nowrap;
-    }
-
-    .funcionarios-table tbody tr {
-        background: rgba(255,255,255,0.02);
-        transition: 0.2s ease;
-    }
-
-    .funcionarios-table tbody tr:hover {
-        background: rgba(59,130,246,0.08);
-    }
-
-    .funcionarios-table tbody td {
-        padding: 16px 14px;
-        vertical-align: middle;
-        color: #f3f4f6;
-        border-top: 1px solid rgba(255,255,255,0.04);
-        border-bottom: 1px solid rgba(255,255,255,0.04);
-    }
-
-    .funcionarios-table tbody td:first-child {
-        border-left: 1px solid rgba(255,255,255,0.04);
-        border-top-left-radius: 18px;
-        border-bottom-left-radius: 18px;
-    }
-
-    .funcionarios-table tbody td:last-child {
-        border-right: 1px solid rgba(255,255,255,0.04);
-        border-top-right-radius: 18px;
-        border-bottom-right-radius: 18px;
-    }
-
-    .funcionario-nombre {
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-    }
-
-    .funcionario-nombre strong {
-        font-size: 16px;
-        color: #ffffff;
+        letter-spacing: 0.2px;
+        padding: 0 8px 4px;
+        white-space: normal;
         line-height: 1.2;
     }
 
-    .funcionario-sub {
-        font-size: 13px;
-        color: #8f9bad;
+    .func-table tbody tr {
+        background: rgba(255,255,255,.02);
+        transition: .2s ease;
     }
 
-    .dato-secundario {
-        color: #d1d5db;
+    .func-table tbody tr:hover {
+        background: rgba(59,130,246,.08);
+    }
+
+    .func-table tbody td {
+        padding: 10px 8px;
+        vertical-align: middle;
+        color: #f3f4f6;
+        border-top: 1px solid rgba(255,255,255,.04);
+        border-bottom: 1px solid rgba(255,255,255,.04);
+        font-size: 13px;
+        line-height: 1.2;
+        word-break: break-word;
+    }
+
+    .func-table tbody td:first-child {
+        border-left: 1px solid rgba(255,255,255,.04);
+        border-top-left-radius: 16px;
+        border-bottom-left-radius: 16px;
+    }
+
+    .func-table tbody td:last-child {
+        border-right: 1px solid rgba(255,255,255,.04);
+        border-top-right-radius: 16px;
+        border-bottom-right-radius: 16px;
+    }
+
+    .func-main {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .func-main strong {
+        font-size: 14px;
+        color: #fff;
+        line-height: 1.2;
+    }
+
+    .func-sub {
+        font-size: 10px;
+        color: #94a3b8;
+        line-height: 1.2;
+    }
+
+    .func-data {
+        color: #e5e7eb;
+        font-weight: 700;
+    }
+
+    .text-right {
+        text-align: right;
+    }
+
+    .money {
+        display: block;
+        color: #fff;
+        font-weight: 800;
+        font-size: 13px;
+        line-height: 1.2;
+    }
+
+    .money-sub {
+        display: block;
+        margin-top: 2px;
+        color: #94a3b8;
+        font-size: 10px;
         font-weight: 600;
+        line-height: 1.15;
     }
 
     .badge-soft {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        padding: 7px 12px;
+        padding: 6px 10px;
         border-radius: 999px;
-        font-size: 12px;
+        font-size: 11px;
         font-weight: 700;
         white-space: nowrap;
         border: 1px solid transparent;
@@ -203,23 +277,89 @@
         border-color: rgba(239,68,68,0.25);
     }
 
+    .limite-box {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+
+    .limite-main {
+        color: #fff;
+        font-weight: 800;
+        font-size: 13px;
+        line-height: 1.15;
+    }
+
+    .limite-sub {
+        color: #94a3b8;
+        font-size: 10px;
+        font-weight: 600;
+        line-height: 1.15;
+    }
+
+    .progress-wrap {
+        width: 100%;
+        height: 8px;
+        background: rgba(255,255,255,.06);
+        border-radius: 999px;
+        overflow: hidden;
+        border: 1px solid rgba(255,255,255,.04);
+    }
+
+    .progress-bar {
+        height: 100%;
+        max-width: 100%;
+        border-radius: 999px;
+    }
+
+    .progress-ok {
+        background: linear-gradient(90deg, #22c55e, #4ade80);
+    }
+
+    .progress-warn {
+        background: linear-gradient(90deg, #f59e0b, #fbbf24);
+    }
+
+    .progress-danger {
+        background: linear-gradient(90deg, #ef4444, #f87171);
+    }
+
+    .alerta-limite {
+        font-size: 10px;
+        font-weight: 700;
+        margin-top: 1px;
+        line-height: 1.15;
+    }
+
+    .alerta-ok {
+        color: #86efac;
+    }
+
+    .alerta-warn {
+        color: #fcd34d;
+    }
+
+    .alerta-danger {
+        color: #fca5a5;
+    }
+
     .acciones-box {
         display: flex;
         flex-wrap: wrap;
-        gap: 8px;
+        gap: 6px;
     }
 
     .btn-accion {
         border: none;
-        border-radius: 12px;
-        padding: 9px 12px;
-        font-size: 13px;
-        font-weight: 700;
+        border-radius: 10px;
+        padding: 7px 9px;
+        font-size: 11px;
+        font-weight: 800;
         text-decoration: none;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        gap: 6px;
+        gap: 4px;
         white-space: nowrap;
     }
 
@@ -243,32 +383,90 @@
 
     .tabla-vacia {
         text-align: center;
-        padding: 30px 20px !important;
+        padding: 26px 20px !important;
         color: #94a3b8 !important;
     }
 
+    .func-table th:nth-child(1), .func-table td:nth-child(1) { width: 18%; }
+    .func-table th:nth-child(2), .func-table td:nth-child(2) { width: 8%; }
+    .func-table th:nth-child(3), .func-table td:nth-child(3) { width: 13%; }
+    .func-table th:nth-child(4), .func-table td:nth-child(4) { width: 11%; }
+    .func-table th:nth-child(5), .func-table td:nth-child(5) { width: 8%; }
+    .func-table th:nth-child(6), .func-table td:nth-child(6) { width: 14%; }
+    .func-table th:nth-child(7), .func-table td:nth-child(7) { width: 11%; }
+    .func-table th:nth-child(8), .func-table td:nth-child(8) { width: 7%; }
+    .func-table th:nth-child(9), .func-table td:nth-child(9) { width: 10%; }
+
+    @media (max-width: 1100px) {
+        .func-stats {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
     @media (max-width: 900px) {
-        .funcionarios-search {
+        .func-search {
             grid-template-columns: 1fr;
+        }
+
+        .func-stats {
+            grid-template-columns: 1fr;
+        }
+
+        .func-table {
+            min-width: 1080px;
         }
     }
 </style>
 
-<div class="container-fluid funcionarios-page">
-    <div class="funcionarios-hero">
-        <div class="funcionarios-title">
+<div class="container-fluid func-page">
+    <div class="func-hero">
+        <div class="func-title">
             <h2>👥 Funcionarios</h2>
-            <p>Gestión general de funcionarios, empresas, sucursales y biométrico</p>
+            <p>Gestión general de funcionarios, biométrico, sucursales y resumen financiero.</p>
         </div>
 
-        <a href="{% url 'funcionario_nuevo' %}" class="btn-func-primary">
+        <a href="{% url 'funcionario_nuevo' %}" class="func-btn-main">
             ➕ Nuevo funcionario
         </a>
     </div>
 
-    <div class="funcionarios-card">
-        <div class="funcionarios-toolbar">
-            <form method="get" class="funcionarios-search">
+    <div class="func-stats">
+        <div class="func-stat-card">
+            <div class="func-stat-top">
+                <div class="func-stat-title">Total funcionarios</div>
+                <div class="func-stat-icon">👥</div>
+            </div>
+            <div class="func-stat-value">{{ funcionarios|length|millares }}</div>
+        </div>
+
+        <div class="func-stat-card">
+            <div class="func-stat-top">
+                <div class="func-stat-title">Activos en lista</div>
+                <div class="func-stat-icon">✅</div>
+            </div>
+            <div class="func-stat-value">{{ funcionarios|length|millares }}</div>
+        </div>
+
+        <div class="func-stat-card">
+            <div class="func-stat-top">
+                <div class="func-stat-title">Con rostro</div>
+                <div class="func-stat-icon">📸</div>
+            </div>
+            <div class="func-stat-value">{{ funcionarios|length|millares }}</div>
+        </div>
+
+        <div class="func-stat-card">
+            <div class="func-stat-top">
+                <div class="func-stat-title">Empresas visibles</div>
+                <div class="func-stat-icon">🏢</div>
+            </div>
+            <div class="func-stat-value">{{ empresas|length|millares }}</div>
+        </div>
+    </div>
+
+    <div class="func-card">
+        <div class="func-toolbar">
+            <form method="get" class="func-search">
                 <input
                     type="text"
                     name="q"
@@ -302,66 +500,118 @@
             </form>
         </div>
 
-        <div class="funcionarios-table-wrap">
-            <table class="funcionarios-table">
+        <div class="func-table-wrap">
+            <table class="func-table">
                 <thead>
                     <tr>
                         <th>Funcionario</th>
                         <th>Cédula</th>
-                        <th>Empresa</th>
-                        <th>Sucursal</th>
-                        <th>Cargo</th>
-                        <th>Sector</th>
-                        <th>Turno</th>
-                        <th>Rostro</th>
-                        <th>Estado</th>
+                        <th>Empresa / Sucursal</th>
+                        <th>Cargo / Turno</th>
+                        <th>Salario / Bono</th>
+                        <th>Deuda / Neto</th>
+                        <th>Límite deuda</th>
+                        <th>Biométrico</th>
                         <th>Acciones</th>
                     </tr>
                 </thead>
+
                 <tbody>
                     {% for funcionario in funcionarios %}
                     <tr>
                         <td>
-                            <div class="funcionario-nombre">
+                            <div class="func-main">
                                 <strong>{{ funcionario.nombre }} {{ funcionario.apellido }}</strong>
-                                <span class="funcionario-sub">
-                                    {% if funcionario.ips %}
-                                        IPS: Sí
+                                <span class="func-sub">CI real: {{ funcionario.cedula|millares }}</span>
+                                <span class="func-sub">IPS: {% if funcionario.ips %}Sí{% else %}No{% endif %}</span>
+                                {% if funcionario.fecha_ingreso %}
+                                    <span class="func-sub">Ingreso: {{ funcionario.fecha_ingreso|date:"d/m/Y" }}</span>
+                                {% endif %}
+                            </div>
+                        </td>
+
+                        <td class="func-data">{{ funcionario.cedula|millares }}</td>
+
+                        <td>
+                            <div class="func-main">
+                                <strong>{{ funcionario.empresa_mostrar }}</strong>
+                                <span class="func-sub">{{ funcionario.sucursal_mostrar }}</span>
+                            </div>
+                        </td>
+
+                        <td>
+                            <div class="func-main">
+                                <strong>{{ funcionario.cargo|default:"Sin cargo" }}</strong>
+                                <span class="func-sub">{{ funcionario.sector|default:"Sin sector" }}</span>
+                                <span class="func-sub">
+                                    {% if funcionario.turno %}
+                                        Turno: {{ funcionario.turno.nombre }}
                                     {% else %}
-                                        IPS: No
+                                        Sin turno
                                     {% endif %}
                                 </span>
                             </div>
                         </td>
 
-                        <td class="dato-secundario">{{ funcionario.cedula }}</td>
-                        <td>{{ funcionario.empresa_mostrar }}</td>
-                        <td>{{ funcionario.sucursal_mostrar }}</td>
-                        <td>{{ funcionario.cargo|default:"-" }}</td>
-                        <td>{{ funcionario.sector|default:"-" }}</td>
+                        <td class="text-right">
+                            <span class="money">{{ funcionario.salario_base|guaranies }}</span>
+                            <span class="money-sub">Bono: {{ funcionario.bono|guaranies }}</span>
+                        </td>
 
-                        <td>
-                            {% if funcionario.turno %}
-                                <span class="dato-secundario">{{ funcionario.turno.nombre }}</span>
-                            {% else %}
-                                -
-                            {% endif %}
+                        <td class="text-right">
+                            <span class="money">{{ funcionario.total_deuda_activa|guaranies }}</span>
+                            <span class="money-sub">Neto: {{ funcionario.salario_neto_estimado|guaranies }}</span>
+                            <span class="money-sub">IPS: {{ funcionario.descuento_ips|guaranies }}</span>
                         </td>
 
                         <td>
-                            {% if funcionario.face_encoding %}
-                                <span class="badge-soft badge-rostro-ok">✅ Registrado</span>
-                            {% else %}
-                                <span class="badge-soft badge-rostro-pend">⏳ Pendiente</span>
-                            {% endif %}
+                            <div class="limite-box">
+                                <span class="limite-main">{{ funcionario.limite_deuda_monto|guaranies }}</span>
+                                <span class="limite-sub">Disponible: {{ funcionario.disponible_deuda|guaranies }}</span>
+
+                                {% with usado=funcionario.total_deuda_activa limite=funcionario.limite_deuda_monto %}
+                                    {% if limite > 0 %}
+                                        {% widthratio usado limite 100 as porcentaje_uso %}
+                                    {% else %}
+                                        {% widthratio 0 1 100 as porcentaje_uso %}
+                                    {% endif %}
+
+                                    <div class="progress-wrap">
+                                        <div
+                                            class="progress-bar {% if porcentaje_uso|add:'0' >= 100 %}progress-danger{% elif porcentaje_uso|add:'0' >= 80 %}progress-warn{% else %}progress-ok{% endif %}"
+                                            style="width: {{ porcentaje_uso }}%;">
+                                        </div>
+                                    </div>
+
+                                    <div class="alerta-limite {% if porcentaje_uso|add:'0' >= 100 %}alerta-danger{% elif porcentaje_uso|add:'0' >= 80 %}alerta-warn{% else %}alerta-ok{% endif %}">
+                                        Uso:
+                                        {% if porcentaje_uso|add:'0' > 100 %}
+                                            100%
+                                        {% else %}
+                                            {{ porcentaje_uso }}%
+                                        {% endif %}
+                                        {% if funcionario.excede_limite_deuda %}
+                                            | Excedido
+                                        {% endif %}
+                                    </div>
+                                {% endwith %}
+                            </div>
                         </td>
 
                         <td>
-                            {% if funcionario.activo %}
-                                <span class="badge-soft badge-activo">Activo</span>
-                            {% else %}
-                                <span class="badge-soft badge-inactivo">Inactivo</span>
-                            {% endif %}
+                            <div class="func-main">
+                                {% if funcionario.face_encoding %}
+                                    <span class="badge-soft badge-rostro-ok">✅ Rostro registrado</span>
+                                {% else %}
+                                    <span class="badge-soft badge-rostro-pend">⏳ Rostro pendiente</span>
+                                {% endif %}
+
+                                {% if funcionario.activo %}
+                                    <span class="badge-soft badge-activo">Activo</span>
+                                {% else %}
+                                    <span class="badge-soft badge-inactivo">Inactivo</span>
+                                {% endif %}
+                            </div>
                         </td>
 
                         <td>
@@ -372,9 +622,9 @@
 
                                 <a href="{% url 'registrar_rostro' funcionario.id %}" class="btn-accion btn-rostro">
                                     {% if funcionario.face_encoding %}
-                                        📸 Actualizar rostro
+                                        📸 Actualizar
                                     {% else %}
-                                        📸 Registrar rostro
+                                        📸 Registrar
                                     {% endif %}
                                 </a>
 
@@ -390,7 +640,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="10" class="tabla-vacia">
+                        <td colspan="9" class="tabla-vacia">
                             No se encontraron funcionarios.
                         </td>
                     </tr>

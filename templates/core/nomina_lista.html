@@ -1,0 +1,298 @@
+{% extends "base.html" %}
+{% load number_filters %}
+
+{% block title %}Nómina | ClockIn{% endblock %}
+
+{% block content %}
+<style>
+    .nom-page { padding: 24px 0; }
+    .nom-hero {
+        display:flex; justify-content:space-between; align-items:center; gap:16px; flex-wrap:wrap; margin-bottom:20px;
+    }
+    .nom-hero h2 { margin:0; font-size:34px; font-weight:800; color:#fff; }
+    .nom-hero p { margin:8px 0 0; color:#94a3b8; }
+    .nom-stats {
+        display:grid; grid-template-columns:repeat(5,1fr); gap:16px; margin-bottom:20px;
+    }
+    .nom-stat {
+        background: linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
+        border: 1px solid rgba(255,255,255,.06);
+        border-radius: 22px;
+        padding: 18px;
+        box-shadow: 0 12px 36px rgba(0,0,0,.22);
+    }
+    .nom-stat .lab { color:#94a3b8; font-size:13px; margin-bottom:10px; }
+    .nom-stat .val { color:#fff; font-size:26px; font-weight:800; line-height:1.1; }
+
+    .nom-card {
+        background: linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
+        border: 1px solid rgba(255,255,255,.06);
+        border-radius: 24px;
+        box-shadow: 0 12px 36px rgba(0,0,0,.28);
+        overflow: hidden;
+    }
+
+    .nom-toolbar {
+        padding: 18px;
+        border-bottom: 1px solid rgba(255,255,255,.05);
+        background: rgba(255,255,255,.02);
+        display:grid;
+        grid-template-columns: 1fr 1fr 1fr auto;
+        gap: 12px;
+    }
+
+    .nom-toolbar select, .nom-toolbar button {
+        width:100%;
+        border-radius:14px;
+        padding:14px 16px;
+        font-size:14px;
+        outline:none;
+    }
+
+    .nom-toolbar select {
+        border: 1px solid rgba(255,255,255,.08);
+        background: #0f1722;
+        color: #fff;
+    }
+
+    .btn-main {
+        border:none;
+        background: linear-gradient(135deg, #1d4ed8, #2563eb);
+        color:#fff;
+        font-weight:800;
+    }
+
+    .nom-table-wrap { padding: 8px 10px 14px; overflow-x:auto; }
+    .nom-table {
+        width:100%;
+        min-width:1300px;
+        border-collapse: separate;
+        border-spacing: 0 8px;
+        table-layout: fixed;
+    }
+
+    .nom-table thead th {
+        color:#cdd6e1;
+        font-size:11px;
+        font-weight:700;
+        text-transform:uppercase;
+        padding: 0 8px 4px;
+    }
+
+    .nom-table tbody td {
+        padding:10px 8px;
+        color:#f3f4f6;
+        font-size:13px;
+        border-top: 1px solid rgba(255,255,255,.04);
+        border-bottom: 1px solid rgba(255,255,255,.04);
+        background: rgba(255,255,255,.02);
+    }
+
+    .nom-table tbody td:first-child {
+        border-left: 1px solid rgba(255,255,255,.04);
+        border-top-left-radius:16px;
+        border-bottom-left-radius:16px;
+    }
+
+    .nom-table tbody td:last-child {
+        border-right: 1px solid rgba(255,255,255,.04);
+        border-top-right-radius:16px;
+        border-bottom-right-radius:16px;
+    }
+
+    .mini { display:flex; flex-direction:column; gap:2px; }
+    .mini strong { color:#fff; font-size:14px; }
+    .mini span { color:#94a3b8; font-size:10px; line-height:1.2; }
+    .money { display:block; color:#fff; font-weight:800; }
+    .sub { display:block; color:#94a3b8; font-size:10px; margin-top:2px; }
+    .text-right { text-align:right; }
+
+    .badge {
+        display:inline-flex; align-items:center; justify-content:center;
+        padding:6px 10px; border-radius:999px; font-size:11px; font-weight:700;
+    }
+    .badge-pendiente { background:rgba(245,158,11,.12); color:#fcd34d; border:1px solid rgba(245,158,11,.22); }
+    .badge-pagado { background:rgba(34,197,94,.12); color:#86efac; border:1px solid rgba(34,197,94,.22); }
+    .badge-anulado { background:rgba(239,68,68,.12); color:#fca5a5; border:1px solid rgba(239,68,68,.22); }
+    .badge-efectivo { background:rgba(168,85,247,.14); color:#d8b4fe; border:1px solid rgba(168,85,247,.22); }
+    .badge-banco { background:rgba(59,130,246,.12); color:#93c5fd; border:1px solid rgba(59,130,246,.22); }
+
+    .acciones { display:flex; gap:8px; flex-wrap:wrap; }
+    .btn-sm {
+        padding:8px 10px; border-radius:10px; font-size:11px; font-weight:800;
+        text-decoration:none; display:inline-flex; align-items:center; justify-content:center;
+    }
+    .btn-pagar { background:rgba(34,197,94,.12); color:#86efac; border:1px solid rgba(34,197,94,.22); }
+    .btn-revertir { background:rgba(239,68,68,.12); color:#fca5a5; border:1px solid rgba(239,68,68,.22); }
+
+    @media (max-width: 1100px) {
+        .nom-stats { grid-template-columns:repeat(2,1fr); }
+        .nom-toolbar { grid-template-columns:1fr; }
+    }
+
+    @media (max-width: 700px) {
+        .nom-stats { grid-template-columns:1fr; }
+    }
+</style>
+
+<div class="container-fluid nom-page">
+    <div class="nom-hero">
+        <div>
+            <h2>💰 Nómina</h2>
+            <p>Liquidación mensual final. El ICL define cuánto del bono base se paga en el período.</p>
+        </div>
+    </div>
+
+    <div class="nom-stats">
+        <div class="nom-stat">
+            <div class="lab">Total bruto</div>
+            <div class="val">{{ total_bruto|guaranies }}</div>
+        </div>
+        <div class="nom-stat">
+            <div class="lab">Total deudas</div>
+            <div class="val">{{ total_deudas|guaranies }}</div>
+        </div>
+        <div class="nom-stat">
+            <div class="lab">Total neto</div>
+            <div class="val">{{ total_neto|guaranies }}</div>
+        </div>
+        <div class="nom-stat">
+            <div class="lab">Pagados</div>
+            <div class="val">{{ total_pagados|millares }}</div>
+        </div>
+        <div class="nom-stat">
+            <div class="lab">Pendientes</div>
+            <div class="val">{{ total_pendientes|millares }}</div>
+        </div>
+    </div>
+
+    <div class="nom-card">
+        <form method="get" class="nom-toolbar">
+            <select name="mes">
+                {% for numero, nombre in meses %}
+                    <option value="{{ numero }}" {% if mes == numero %}selected{% endif %}>{{ nombre }}</option>
+                {% endfor %}
+            </select>
+
+            <select name="anio">
+                {% for item in anios %}
+                    <option value="{{ item }}" {% if anio == item %}selected{% endif %}>{{ item }}</option>
+                {% endfor %}
+            </select>
+
+            <select name="estado">
+                <option value="">Todos los estados</option>
+                {% for value, label in estados_pago %}
+                    <option value="{{ value }}" {% if estado == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+
+            <button type="submit" class="btn-main">Filtrar</button>
+        </form>
+
+        <form method="post" class="nom-toolbar" style="grid-template-columns:1fr;">
+            {% csrf_token %}
+            <button type="submit" class="btn-main">🔄 Generar / recalcular nómina del período</button>
+        </form>
+
+        <div class="nom-table-wrap">
+            <table class="nom-table">
+                <thead>
+                    <tr>
+                        <th>Funcionario</th>
+                        <th>Cobro</th>
+                        <th>Liquidación salarial</th>
+                        <th>Descuentos</th>
+                        <th>Neto final</th>
+                        <th>Estado</th>
+                        <th>Pago</th>
+                        <th>Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for nomina in nominas %}
+                    <tr>
+                        <td>
+                            <div class="mini">
+                                <strong>{{ nomina.funcionario.nombre_completo }}</strong>
+                                <span>CI: {{ nomina.funcionario.cedula|millares }}</span>
+                                <span>{{ nomina.funcionario.empresa_mostrar }} | {{ nomina.funcionario.sucursal_mostrar }}</span>
+                            </div>
+                        </td>
+
+                        <td>
+                            <div class="mini">
+                                {% if nomina.modalidad_cobro == "efectivo" %}
+                                    <span class="badge badge-efectivo">Efectivo</span>
+                                {% else %}
+                                    <span class="badge badge-banco">Transferencia</span>
+                                    <span>{{ nomina.banco|default:"-" }}</span>
+                                    <span>{{ nomina.tipo_cuenta|default:"-" }} | {{ nomina.numero_cuenta|default:"-" }}</span>
+                                {% endif %}
+                            </div>
+                        </td>
+
+                        <td class="text-right">
+                            <span class="money">Salario base: {{ nomina.salario_base|guaranies }}</span>
+                            <span class="sub">Bono base configurado: {{ nomina.bono_base|guaranies }}</span>
+                            <span class="sub">Bono pagado según ICL: {{ nomina.bono_icl|guaranies }}</span>
+                            <span class="sub">Salario bruto del período: {{ nomina.salario_bruto|guaranies }}</span>
+                        </td>
+
+                        <td class="text-right">
+                            <span class="money">IPS: {{ nomina.descuento_ips|guaranies }}</span>
+                            <span class="sub">Deudas: {{ nomina.descuento_deudas|guaranies }}</span>
+                        </td>
+
+                        <td class="text-right">
+                            <span class="money">{{ nomina.salario_neto|guaranies }}</span>
+                        </td>
+
+                        <td>
+                            {% if nomina.estado_pago == "pagado" %}
+                                <span class="badge badge-pagado">Pagado</span>
+                            {% elif nomina.estado_pago == "anulado" %}
+                                <span class="badge badge-anulado">Anulado</span>
+                            {% else %}
+                                <span class="badge badge-pendiente">Pendiente</span>
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            <div class="mini">
+                                <strong>{{ nomina.mes|stringformat:"02d" }}/{{ nomina.anio }}</strong>
+                                <span>
+                                    {% if nomina.fecha_pago %}
+                                        Pago: {{ nomina.fecha_pago|date:"d/m/Y" }}
+                                    {% else %}
+                                        Sin fecha de pago
+                                    {% endif %}
+                                </span>
+                            </div>
+                        </td>
+
+                        <td>
+                            <div class="acciones">
+                                <a href="{% url 'nomina_toggle_pagado' nomina.id %}" class="btn-sm {% if nomina.estado_pago == 'pagado' %}btn-revertir{% else %}btn-pagar{% endif %}">
+                                    {% if nomina.estado_pago == "pagado" %}
+                                        ↩ Revertir
+                                    {% else %}
+                                        ✅ Marcar pagado
+                                    {% endif %}
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="8" style="text-align:center; color:#94a3b8; padding:24px;">
+                            No hay registros de nómina para este período.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

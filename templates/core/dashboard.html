@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load number_filters %}
 
 {% block title %}Dashboard | ClockIn{% endblock %}
 
@@ -51,6 +52,49 @@
         font-weight: 800;
         line-height: 1;
     }
+
+    .dash-payroll {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        margin-bottom: 24px;
+    }
+
+    .dash-payroll-card {
+        background: linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
+        border: 1px solid rgba(255,255,255,.06);
+        border-radius: 22px;
+        padding: 20px;
+        box-shadow: 0 12px 36px rgba(0,0,0,.20);
+    }
+
+    .dash-payroll-card .top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 12px;
+    }
+
+    .dash-payroll-card .title {
+        color: #94a3b8;
+        font-size: 14px;
+        font-weight: 700;
+    }
+
+    .dash-payroll-card .icon {
+        font-size: 24px;
+    }
+
+    .dash-payroll-card .number {
+        color: #fff;
+        font-size: 30px;
+        font-weight: 800;
+        line-height: 1.2;
+    }
+
+    .bruto .icon { color: #93c5fd; }
+    .neto .icon { color: #86efac; }
+    .deudas .icon { color: #fcd34d; }
 
     .dash-resumen {
         display: grid;
@@ -246,6 +290,7 @@
 
     @media (max-width: 1100px) {
         .dash-stats,
+        .dash-payroll,
         .dash-resumen {
             grid-template-columns: repeat(2, 1fr);
         }
@@ -257,6 +302,7 @@
 
     @media (max-width: 640px) {
         .dash-stats,
+        .dash-payroll,
         .dash-resumen {
             grid-template-columns: 1fr;
         }
@@ -289,6 +335,32 @@
         <div class="dash-stat">
             <div class="lab">Pendientes hoy</div>
             <div class="val">{{ pendientes_hoy }}</div>
+        </div>
+    </div>
+
+    <div class="dash-payroll">
+        <div class="dash-payroll-card bruto">
+            <div class="top">
+                <div class="title">Total Salario Bruto</div>
+                <div class="icon">💼</div>
+            </div>
+            <div class="number"> {{ total_salario_bruto|guaranies }}</div>
+        </div>
+
+        <div class="dash-payroll-card neto">
+            <div class="top">
+                <div class="title">Total Salario Neto</div>
+                <div class="icon">💵</div>
+            </div>
+            <div class="number"> {{ total_salario_neto|guaranies }}</div>
+        </div>
+
+        <div class="dash-payroll-card deudas">
+            <div class="top">
+                <div class="title">Total Deudas Funcionarios</div>
+                <div class="icon">💳</div>
+            </div>
+            <div class="number"> {{ total_deudas_funcionarios|guaranies }}</div>
         </div>
     </div>
 

@@ -5,7 +5,7 @@
 {% block content %}
 <div class="page-header">
     <h2>📝 {{ titulo_form }}</h2>
-    <p>Completa la información principal del funcionario.</p>
+    <p>Completa la información principal, salarial y bancaria del funcionario.</p>
 </div>
 
 <div class="card form-card">
@@ -80,9 +80,39 @@
             </div>
 
             <div class="form-field">
-                <label for="{{ form.bono.id_for_label }}">Bono</label>
+                <label for="{{ form.bono.id_for_label }}">Bono base</label>
                 {{ form.bono }}
                 {{ form.bono.errors }}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.porcentaje_limite_deuda.id_for_label }}">Límite de deuda (%)</label>
+                {{ form.porcentaje_limite_deuda }}
+                {{ form.porcentaje_limite_deuda.errors }}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.modalidad_cobro.id_for_label }}">Modalidad de cobro</label>
+                {{ form.modalidad_cobro }}
+                {{ form.modalidad_cobro.errors }}
+            </div>
+
+            <div class="form-field datos-bancarios">
+                <label for="{{ form.banco.id_for_label }}">Banco</label>
+                {{ form.banco }}
+                {{ form.banco.errors }}
+            </div>
+
+            <div class="form-field datos-bancarios">
+                <label for="{{ form.tipo_cuenta.id_for_label }}">Tipo de cuenta</label>
+                {{ form.tipo_cuenta }}
+                {{ form.tipo_cuenta.errors }}
+            </div>
+
+            <div class="form-field datos-bancarios">
+                <label for="{{ form.numero_cuenta.id_for_label }}">Número de cuenta</label>
+                {{ form.numero_cuenta }}
+                {{ form.numero_cuenta.errors }}
             </div>
 
             <div class="form-field">
@@ -113,6 +143,21 @@
 document.addEventListener("DOMContentLoaded", function () {
     const empresaSelect = document.getElementById("id_empresa");
     const sucursalSelect = document.getElementById("id_sucursal_rel");
+    const modalidadCobro = document.getElementById("id_modalidad_cobro");
+    const camposBancarios = document.querySelectorAll(".datos-bancarios");
+
+    function toggleCamposBancarios() {
+        if (!modalidadCobro) return;
+        const mostrar = modalidadCobro.value === "transferencia";
+        camposBancarios.forEach(el => {
+            el.style.display = mostrar ? "block" : "none";
+        });
+    }
+
+    if (modalidadCobro) {
+        modalidadCobro.addEventListener("change", toggleCamposBancarios);
+        toggleCamposBancarios();
+    }
 
     if (!empresaSelect || !sucursalSelect) return;
 

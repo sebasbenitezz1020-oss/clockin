@@ -1,147 +1,537 @@
 {% extends "base.html" %}
+{% load number_filters %}
 
 {% block title %}ICL | ClockIn{% endblock %}
 
 {% block content %}
-<div class="page-header page-header-flex">
-    <div>
-        <h2>📈 ICL — Índice de Cumplimiento Laboral</h2>
-        <p>Resumen mensual mejorado con ausencias justificadas y bono proyectado.</p>
+<style>
+    .icl-page {
+        padding: 24px 0;
+    }
+
+    .icl-hero {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 16px;
+        flex-wrap: wrap;
+        margin-bottom: 20px;
+    }
+
+    .icl-title h2 {
+        margin: 0;
+        font-size: 34px;
+        font-weight: 800;
+        color: #fff;
+    }
+
+    .icl-title p {
+        margin: 8px 0 0;
+        color: #94a3b8;
+        font-size: 15px;
+    }
+
+    .icl-stats {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        margin-bottom: 20px;
+    }
+
+    .icl-stat-card {
+        background: linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
+        border: 1px solid rgba(255,255,255,.06);
+        border-radius: 22px;
+        padding: 18px;
+        box-shadow: 0 12px 36px rgba(0,0,0,.22);
+    }
+
+    .icl-stat-top {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 12px;
+    }
+
+    .icl-stat-title {
+        color: #94a3b8;
+        font-size: 14px;
+        font-weight: 700;
+    }
+
+    .icl-stat-icon {
+        font-size: 22px;
+    }
+
+    .icl-stat-value {
+        color: #fff;
+        font-size: 28px;
+        font-weight: 800;
+        line-height: 1;
+    }
+
+    .icl-card {
+        background: linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
+        border: 1px solid rgba(255,255,255,.06);
+        border-radius: 24px;
+        box-shadow: 0 12px 36px rgba(0,0,0,.28);
+        overflow: hidden;
+        margin-bottom: 20px;
+    }
+
+    .icl-toolbar {
+        padding: 18px;
+        border-bottom: 1px solid rgba(255,255,255,.05);
+        background: rgba(255,255,255,.02);
+    }
+
+    .icl-filters {
+        display: grid;
+        grid-template-columns: 1fr 1fr 180px;
+        gap: 12px;
+    }
+
+    .icl-filters select,
+    .icl-filters button {
+        width: 100%;
+        border-radius: 14px;
+        padding: 14px 16px;
+        font-size: 14px;
+        outline: none;
+    }
+
+    .icl-filters select {
+        border: 1px solid rgba(255,255,255,.08);
+        background: #0f1722;
+        color: #fff;
+    }
+
+    .icl-btn {
+        border: none;
+        background: linear-gradient(135deg, #1d4ed8, #2563eb);
+        color: #fff;
+        font-weight: 800;
+    }
+
+    .icl-table-wrap {
+        padding: 8px 10px 14px;
+        overflow-x: auto;
+    }
+
+    .icl-table {
+        width: 100%;
+        min-width: 1120px;
+        border-collapse: separate;
+        border-spacing: 0 8px;
+        table-layout: fixed;
+    }
+
+    .icl-table thead th {
+        color: #cdd6e1;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.2px;
+        padding: 0 8px 4px;
+        white-space: normal;
+        line-height: 1.2;
+    }
+
+    .icl-table tbody tr {
+        background: rgba(255,255,255,.02);
+        transition: .2s ease;
+    }
+
+    .icl-table tbody tr:hover {
+        background: rgba(59,130,246,.08);
+    }
+
+    .icl-table tbody td {
+        padding: 10px 8px;
+        vertical-align: middle;
+        color: #f3f4f6;
+        border-top: 1px solid rgba(255,255,255,.04);
+        border-bottom: 1px solid rgba(255,255,255,.04);
+        font-size: 13px;
+        line-height: 1.2;
+        word-break: break-word;
+    }
+
+    .icl-table tbody td:first-child {
+        border-left: 1px solid rgba(255,255,255,.04);
+        border-top-left-radius: 16px;
+        border-bottom-left-radius: 16px;
+    }
+
+    .icl-table tbody td:last-child {
+        border-right: 1px solid rgba(255,255,255,.04);
+        border-top-right-radius: 16px;
+        border-bottom-right-radius: 16px;
+    }
+
+    .icl-main {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .icl-main strong {
+        font-size: 14px;
+        color: #fff;
+        line-height: 1.2;
+    }
+
+    .icl-sub {
+        font-size: 10px;
+        color: #94a3b8;
+        line-height: 1.2;
+    }
+
+    .text-right {
+        text-align: right;
+    }
+
+    .money {
+        display: block;
+        color: #fff;
+        font-weight: 800;
+        font-size: 13px;
+        line-height: 1.2;
+    }
+
+    .money-sub {
+        display: block;
+        margin-top: 2px;
+        color: #94a3b8;
+        font-size: 10px;
+        font-weight: 600;
+        line-height: 1.15;
+    }
+
+    .badge-soft {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 6px 10px;
+        border-radius: 999px;
+        font-size: 11px;
+        font-weight: 700;
+        white-space: nowrap;
+        border: 1px solid transparent;
+    }
+
+    .badge-icl-top {
+        background: rgba(34,197,94,0.12);
+        color: #86efac;
+        border-color: rgba(34,197,94,0.25);
+    }
+
+    .badge-icl-mid {
+        background: rgba(245,158,11,0.12);
+        color: #fcd34d;
+        border-color: rgba(245,158,11,0.22);
+    }
+
+    .badge-icl-low {
+        background: rgba(239,68,68,0.12);
+        color: #fca5a5;
+        border-color: rgba(239,68,68,0.25);
+    }
+
+    .rank-box {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 20px;
+        padding: 18px;
+    }
+
+    .rank-panel {
+        background: rgba(255,255,255,.02);
+        border: 1px solid rgba(255,255,255,.05);
+        border-radius: 18px;
+        padding: 16px;
+    }
+
+    .rank-panel h3 {
+        margin: 0 0 14px;
+        color: #fff;
+        font-size: 18px;
+        font-weight: 800;
+    }
+
+    .rank-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .rank-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        padding: 10px 12px;
+        border-radius: 14px;
+        background: rgba(255,255,255,.03);
+        border: 1px solid rgba(255,255,255,.04);
+    }
+
+    .rank-name {
+        display: flex;
+        flex-direction: column;
+        gap: 2px;
+    }
+
+    .rank-name strong {
+        color: #fff;
+        font-size: 13px;
+        line-height: 1.2;
+    }
+
+    .rank-name span {
+        color: #94a3b8;
+        font-size: 10px;
+    }
+
+    .rank-score {
+        font-weight: 800;
+        font-size: 13px;
+        color: #fff;
+        white-space: nowrap;
+    }
+
+    .tabla-vacia {
+        text-align: center;
+        padding: 26px 20px !important;
+        color: #94a3b8 !important;
+    }
+
+    .icl-table th:nth-child(1), .icl-table td:nth-child(1) { width: 20%; }
+    .icl-table th:nth-child(2), .icl-table td:nth-child(2) { width: 14%; }
+    .icl-table th:nth-child(3), .icl-table td:nth-child(3) { width: 14%; }
+    .icl-table th:nth-child(4), .icl-table td:nth-child(4) { width: 9%; }
+    .icl-table th:nth-child(5), .icl-table td:nth-child(5) { width: 13%; }
+    .icl-table th:nth-child(6), .icl-table td:nth-child(6) { width: 10%; }
+    .icl-table th:nth-child(7), .icl-table td:nth-child(7) { width: 10%; }
+    .icl-table th:nth-child(8), .icl-table td:nth-child(8) { width: 10%; }
+
+    @media (max-width: 1100px) {
+        .icl-stats {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .rank-box {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 900px) {
+        .icl-filters {
+            grid-template-columns: 1fr;
+        }
+
+        .icl-stats {
+            grid-template-columns: 1fr;
+        }
+
+        .icl-table {
+            min-width: 1040px;
+        }
+    }
+</style>
+
+<div class="container-fluid icl-page">
+    <div class="icl-hero">
+        <div class="icl-title">
+            <h2>📈 ICL</h2>
+            <p>El ICL define cuánto del bono base se paga según el desempeño mensual.</p>
+        </div>
     </div>
-</div>
 
-<div class="card mb-20">
-    <form method="get" class="search-bar">
-        <select name="mes" class="form-control">
-            {% for num, nombre in meses %}
-                <option value="{{ num }}" {% if mes == num %}selected{% endif %}>{{ nombre }}</option>
-            {% endfor %}
-        </select>
-
-        <select name="anio" class="form-control">
-            {% for y in anios %}
-                <option value="{{ y }}" {% if anio == y %}selected{% endif %}>{{ y }}</option>
-            {% endfor %}
-        </select>
-
-        <button type="submit" class="btn-primary btn-search">Calcular</button>
-    </form>
-</div>
-
-<div class="cards-grid dashboard-cards-3 mb-20">
-    <div class="card stat-card">
-        <span class="stat-label">Mes evaluado</span>
-        <strong class="stat-number-small">{{ mes }}/{{ anio }}</strong>
-    </div>
-    <div class="card stat-card">
-        <span class="stat-label">Días laborales estimados</span>
-        <strong class="stat-number-small">{{ total_dias_laborales_estimados }}</strong>
-    </div>
-    <div class="card stat-card">
-        <span class="stat-label">Funcionarios evaluados</span>
-        <strong class="stat-number-small">{{ resultados|length }}</strong>
-    </div>
-</div>
-
-<div class="dashboard-grid-2 mb-20">
-    <div class="card">
-        <div class="section-head">
-            <h3>🏆 Top 5 ICL</h3>
-            <span class="section-subtitle">Mayor cumplimiento</span>
+    <div class="icl-stats">
+        <div class="icl-stat-card">
+            <div class="icl-stat-top">
+                <div class="icl-stat-title">Funcionarios evaluados</div>
+                <div class="icl-stat-icon">👥</div>
+            </div>
+            <div class="icl-stat-value">{{ resultados|length|millares }}</div>
         </div>
 
-        <div class="mini-list">
-            {% for item in top_5 %}
-                <div class="mini-list-item">
-                    <div>
-                        <strong>{{ item.funcionario.nombre_completo }}</strong>
-                        <p>CI: {{ item.funcionario.cedula }}</p>
-                        <p>Bono proyectado: Gs. {{ item.bono_proyectado }}</p>
-                    </div>
-                    <span class="badge-success">{{ item.icl }}%</span>
-                </div>
-            {% empty %}
-                <div class="empty-state-box">Sin datos.</div>
-            {% endfor %}
+        <div class="icl-stat-card">
+            <div class="icl-stat-top">
+                <div class="icl-stat-title">Mes analizado</div>
+                <div class="icl-stat-icon">🗓️</div>
+            </div>
+            <div class="icl-stat-value">{{ mes }}/{{ anio }}</div>
+        </div>
+
+        <div class="icl-stat-card">
+            <div class="icl-stat-top">
+                <div class="icl-stat-title">Días laborales</div>
+                <div class="icl-stat-icon">⏱️</div>
+            </div>
+            <div class="icl-stat-value">{{ total_dias_laborales_estimados|millares }}</div>
+        </div>
+
+        <div class="icl-stat-card">
+            <div class="icl-stat-top">
+                <div class="icl-stat-title">Top ICL</div>
+                <div class="icl-stat-icon">🏆</div>
+            </div>
+            <div class="icl-stat-value">
+                {% if top_5 %}
+                    {{ top_5.0.icl|millares }}%
+                {% else %}
+                    0%
+                {% endif %}
+            </div>
         </div>
     </div>
 
-    <div class="card">
-        <div class="section-head">
-            <h3>📉 Peores 5 ICL</h3>
-            <span class="section-subtitle">Menor cumplimiento</span>
+    <div class="icl-card">
+        <div class="icl-toolbar">
+            <form method="get" class="icl-filters">
+                <select name="mes">
+                    {% for numero, nombre in meses %}
+                        <option value="{{ numero }}" {% if mes == numero %}selected{% endif %}>{{ nombre }}</option>
+                    {% endfor %}
+                </select>
+
+                <select name="anio">
+                    {% for item in anios %}
+                        <option value="{{ item }}" {% if anio == item %}selected{% endif %}>{{ item }}</option>
+                    {% endfor %}
+                </select>
+
+                <button type="submit" class="icl-btn">Actualizar</button>
+            </form>
         </div>
 
-        <div class="mini-list">
-            {% for item in peores_5 %}
-                <div class="mini-list-item">
-                    <div>
-                        <strong>{{ item.funcionario.nombre_completo }}</strong>
-                        <p>CI: {{ item.funcionario.cedula }}</p>
-                        <p>Bono proyectado: Gs. {{ item.bono_proyectado }}</p>
-                    </div>
-                    <span class="badge-danger">{{ item.icl }}%</span>
-                </div>
-            {% empty %}
-                <div class="empty-state-box">Sin datos.</div>
-            {% endfor %}
-        </div>
-    </div>
-</div>
-
-<div class="card">
-    <div class="section-head">
-        <h3>📋 Detalle general</h3>
-        <span class="section-subtitle">Cálculo mensual mejorado por funcionario</span>
-    </div>
-
-    <div class="table-wrap">
-        <table class="table-dark">
-            <thead>
-                <tr>
-                    <th>Funcionario</th>
-                    <th>Cédula</th>
-                    <th>Asistencias</th>
-                    <th>Atrasos</th>
-                    <th>Aus. estimadas</th>
-                    <th>Permisos</th>
-                    <th>Vacaciones</th>
-                    <th>Aus. no justificadas</th>
-                    <th>ICL</th>
-                    <th>Bono base</th>
-                    <th>Bono proyectado</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for item in resultados %}
+        <div class="icl-table-wrap">
+            <table class="icl-table">
+                <thead>
                     <tr>
-                        <td>{{ item.funcionario.nombre_completo }}</td>
-                        <td>{{ item.funcionario.cedula }}</td>
-                        <td>{{ item.asistencias }}</td>
-                        <td>{{ item.atrasos }}</td>
-                        <td>{{ item.ausencias_estimadas }}</td>
-                        <td>{{ item.permisos_aprobados }}</td>
-                        <td>{{ item.vacaciones_aprobadas }}</td>
-                        <td>{{ item.ausencias_no_justificadas }}</td>
+                        <th>Funcionario</th>
+                        <th>Asistencia</th>
+                        <th>Ausencias</th>
+                        <th>ICL</th>
+                        <th>Bono base / Bono pagable</th>
+                        <th>Salario base</th>
+                        <th>Deudas mes</th>
+                        <th>Neto estimado</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for item in resultados %}
+                    <tr>
                         <td>
-                            {% if item.icl >= 80 %}
-                                <span class="badge-success">{{ item.icl }}%</span>
-                            {% elif item.icl >= 50 %}
-                                <span class="badge-warning">{{ item.icl }}%</span>
+                            <div class="icl-main">
+                                <strong>{{ item.funcionario.nombre_completo }}</strong>
+                                <span class="icl-sub">CI: {{ item.funcionario.cedula|millares }}</span>
+                                <span class="icl-sub">
+                                    {% if item.funcionario.turno %}
+                                        {{ item.funcionario.turno.nombre }}
+                                    {% else %}
+                                        Sin turno
+                                    {% endif %}
+                                </span>
+                            </div>
+                        </td>
+
+                        <td>
+                            <div class="icl-main">
+                                <strong>{{ item.asistencias|millares }} asistencia(s)</strong>
+                                <span class="icl-sub">Atrasos: {{ item.atrasos|millares }}</span>
+                            </div>
+                        </td>
+
+                        <td>
+                            <div class="icl-main">
+                                <strong>No justificadas: {{ item.ausencias_no_justificadas|millares }}</strong>
+                                <span class="icl-sub">Estimadas: {{ item.ausencias_estimadas|millares }}</span>
+                                <span class="icl-sub">Permisos: {{ item.permisos_aprobados|millares }} | Vacaciones: {{ item.vacaciones_aprobadas|millares }}</span>
+                            </div>
+                        </td>
+
+                        <td>
+                            {% if item.icl >= 85 %}
+                                <span class="badge-soft badge-icl-top">{{ item.icl|millares }}%</span>
+                            {% elif item.icl >= 60 %}
+                                <span class="badge-soft badge-icl-mid">{{ item.icl|millares }}%</span>
                             {% else %}
-                                <span class="badge-danger">{{ item.icl }}%</span>
+                                <span class="badge-soft badge-icl-low">{{ item.icl|millares }}%</span>
                             {% endif %}
                         </td>
-                        <td>Gs. {{ item.bono_base }}</td>
-                        <td><strong>Gs. {{ item.bono_proyectado }}</strong></td>
+
+                        <td class="text-right">
+                            <span class="money">{{ item.bono_base|guaranies }}</span>
+                            <span class="money-sub">Pagable según ICL: {{ item.bono_pagable_icl|guaranies }}</span>
+                        </td>
+
+                        <td class="text-right">
+                            <span class="money">{{ item.salario_base_mes|guaranies }}</span>
+                            <span class="money-sub">Bruto del mes: {{ item.salario_bruto|guaranies }}</span>
+                        </td>
+
+                        <td class="text-right">
+                            <span class="money">{{ item.deudas_mes|guaranies }}</span>
+                            <span class="money-sub">Descuento mensual</span>
+                        </td>
+
+                        <td class="text-right">
+                            <span class="money">{{ item.salario_neto|guaranies }}</span>
+                            <span class="money-sub">Neto estimado del período</span>
+                        </td>
                     </tr>
-                {% empty %}
+                    {% empty %}
                     <tr>
-                        <td colspan="11" class="empty-row">No hay funcionarios para calcular ICL.</td>
+                        <td colspan="8" class="tabla-vacia">
+                            No hay resultados para el período seleccionado.
+                        </td>
                     </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="icl-card">
+        <div class="rank-box">
+            <div class="rank-panel">
+                <h3>🏆 Top 5 ICL</h3>
+                <div class="rank-list">
+                    {% for item in top_5 %}
+                        <div class="rank-item">
+                            <div class="rank-name">
+                                <strong>{{ item.funcionario.nombre_completo }}</strong>
+                                <span>{{ item.funcionario.cedula|millares }}</span>
+                            </div>
+                            <div class="rank-score">{{ item.icl|millares }}%</div>
+                        </div>
+                    {% empty %}
+                        <div class="tabla-vacia">Sin datos.</div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="rank-panel">
+                <h3>📉 Peores 5 ICL</h3>
+                <div class="rank-list">
+                    {% for item in peores_5 %}
+                        <div class="rank-item">
+                            <div class="rank-name">
+                                <strong>{{ item.funcionario.nombre_completo }}</strong>
+                                <span>{{ item.funcionario.cedula|millares }}</span>
+                            </div>
+                            <div class="rank-score">{{ item.icl|millares }}%</div>
+                        </div>
+                    {% empty %}
+                        <div class="tabla-vacia">Sin datos.</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 {% endblock %}

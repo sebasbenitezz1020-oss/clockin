@@ -1,4 +1,5 @@
 {% extends "base.html" %}
+{% load number_filters %}
 
 {% block title %}Asistencia | ClockIn{% endblock %}
 
@@ -446,7 +447,7 @@
 
                         <td>
                             {% if a.minutos_atraso > 0 %}
-                                {{ a.minutos_atraso }} min
+                                {{ a.minutos_atraso|millares }} min
                             {% else %}
                                 0 min
                             {% endif %}

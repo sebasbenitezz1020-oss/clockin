@@ -1,9 +1,10 @@
 from calendar import monthrange
 from datetime import date, datetime
+from decimal import Decimal
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db.models import Q
+from django.db.models import Q, Sum
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
@@ -13,6 +14,7 @@ from .forms import (
     SucursalForm,
     FuncionarioForm,
     TurnoForm,
+    DeudaForm,
     MarcacionForm,
     PermisoLicenciaForm,
     VacacionForm,
@@ -22,6 +24,8 @@ from .models import (
     Sucursal,
     Funcionario,
     Turno,
+    Deuda,
+    NominaMensual,
     Asistencia,
     PermisoLicencia,
     Vacacion,
@@ -36,7 +40,89 @@ def registrar_historial(request, modulo, accion, descripcion):
         accion=accion,
         descripcion=descripcion,
     )
+def calcular_icl_funcionario_mes(funcionario, mes, anio):
+    dias_mes = monthrange(anio, mes)[1]
+    total_dias_laborales_estimados = sum(
+        1 for dia in range(1, dias_mes + 1)
+        if date(anio, mes, dia).weekday() != 6
+    )
 
+    asistencias = Asistencia.objects.filter(
+        funcionario=funcionario,
+        fecha__year=anio,
+        fecha__month=mes,
+        hora_entrada__isnull=False,
+    )
+
+    asistencias_count = asistencias.count()
+    atrasos_count = asistencias.filter(llego_tarde=True).count()
+
+    permisos_aprobados = PermisoLicencia.objects.filter(
+        funcionario=funcionario,
+        estado=PermisoLicencia.Estados.APROBADO,
+        fecha_desde__year=anio,
+        fecha_desde__month=mes,
+    ).count()
+
+    vacaciones_aprobadas = Vacacion.objects.filter(
+        funcionario=funcionario,
+        estado=Vacacion.Estados.APROBADO,
+        fecha_desde__year=anio,
+        fecha_desde__month=mes,
+    ).count()
+
+    ausencias_estimadas = max(total_dias_laborales_estimados - asistencias_count, 0)
+    ausencias_justificadas = permisos_aprobados + vacaciones_aprobadas
+    ausencias_no_justificadas = max(ausencias_estimadas - ausencias_justificadas, 0)
+
+    icl = 100 - (atrasos_count * 2) - (ausencias_no_justificadas * 5)
+    icl = max(0, min(100, icl))
+
+    return {
+        "icl": icl,
+        "asistencias": asistencias_count,
+        "atrasos": atrasos_count,
+        "ausencias_estimadas": ausencias_estimadas,
+        "ausencias_no_justificadas": ausencias_no_justificadas,
+    }
+
+
+def generar_nomina_funcionario(funcionario, mes, anio):
+    resumen_icl = calcular_icl_funcionario_mes(funcionario, mes, anio)
+
+    salario_base = Decimal(funcionario.salario_base or 0).quantize(Decimal("0.01"))
+    bono_base = Decimal(funcionario.bono or 0).quantize(Decimal("0.01"))
+    bono_icl = (bono_base * Decimal(resumen_icl["icl"]) / Decimal("100")).quantize(Decimal("0.01"))
+    salario_bruto = (salario_base + bono_icl).quantize(Decimal("0.01"))
+    descuento_ips = funcionario.descuento_ips
+    descuento_deudas = funcionario.descuento_deudas_mes
+
+    salario_neto = salario_bruto - descuento_ips - descuento_deudas
+    if salario_neto < 0:
+        salario_neto = Decimal("0.00")
+    salario_neto = salario_neto.quantize(Decimal("0.01"))
+
+    defaults = {
+        "salario_base": salario_base,
+        "bono_base": bono_base,
+        "bono_icl": bono_icl,
+        "salario_bruto": salario_bruto,
+        "descuento_ips": descuento_ips,
+        "descuento_deudas": descuento_deudas,
+        "salario_neto": salario_neto,
+        "modalidad_cobro": funcionario.modalidad_cobro,
+        "banco": funcionario.banco,
+        "tipo_cuenta": funcionario.tipo_cuenta,
+        "numero_cuenta": funcionario.numero_cuenta,
+    }
+
+    nomina, creada = NominaMensual.objects.update_or_create(
+        funcionario=funcionario,
+        mes=mes,
+        anio=anio,
+        defaults=defaults,
+    )
+    return nomina
 
 @login_required
 def dashboard(request):
@@ -89,6 +175,18 @@ def dashboard(request):
         "sucursal_rel__empresa"
     ).order_by("-creado_en")[:6]
 
+    funcionarios_activos = Funcionario.objects.filter(activo=True)
+    total_salario_bruto = Decimal("0.00")
+    total_salario_neto = Decimal("0.00")
+
+    for funcionario in funcionarios_activos:
+        total_salario_bruto += funcionario.salario_bruto
+        total_salario_neto += funcionario.salario_neto_estimado
+
+    total_deudas_funcionarios = Deuda.objects.filter(activa=True).aggregate(
+        total=Sum("saldo_pendiente")
+    )["total"] or Decimal("0.00")
+
     context = {
         "titulo": "Dashboard ClockIn",
         "hoy": hoy,
@@ -102,6 +200,9 @@ def dashboard(request):
         "finalizados_hoy": finalizados_hoy,
         "ultimas_marcaciones": ultimas_marcaciones,
         "funcionarios_recientes": funcionarios_recientes,
+        "total_salario_bruto": total_salario_bruto,
+        "total_salario_neto": total_salario_neto,
+        "total_deudas_funcionarios": total_deudas_funcionarios,
     }
     return render(request, "core/dashboard.html", context)
 
@@ -301,6 +402,103 @@ def obtener_sucursales_por_empresa(request):
 
     data = [{"id": s.id, "nombre": s.nombre} for s in sucursales]
     return JsonResponse({"sucursales": data})
+
+
+@login_required
+def deudas_lista(request):
+    q = request.GET.get("q", "").strip()
+    funcionario_id = request.GET.get("funcionario", "").strip()
+
+    deudas = Deuda.objects.select_related("funcionario").all()
+
+    if q:
+        deudas = deudas.filter(
+            Q(funcionario__nombre__icontains=q) |
+            Q(funcionario__apellido__icontains=q) |
+            Q(funcionario__cedula__icontains=q) |
+            Q(descripcion__icontains=q) |
+            Q(tipo__icontains=q)
+        )
+
+    if funcionario_id:
+        deudas = deudas.filter(funcionario_id=funcionario_id)
+
+    funcionarios = Funcionario.objects.filter(activo=True).order_by("apellido", "nombre")
+
+    return render(request, "core/deudas_lista.html", {
+        "deudas": deudas.order_by("-fecha", "-creado_en"),
+        "funcionarios": funcionarios,
+        "funcionario_id": funcionario_id,
+        "q": q,
+    })
+
+
+@login_required
+def deuda_nueva(request):
+    if request.method == "POST":
+        form = DeudaForm(request.POST)
+        if form.is_valid():
+            deuda = form.save()
+            registrar_historial(
+                request,
+                "Deudas",
+                "Crear",
+                f"Se creó deuda para {deuda.funcionario.nombre_completo} por {deuda.saldo_pendiente}."
+            )
+            messages.success(request, "Deuda creada correctamente.")
+            return redirect("deudas_lista")
+    else:
+        form = DeudaForm()
+
+    return render(request, "core/deuda_form.html", {
+        "form": form,
+        "titulo_form": "Nueva deuda",
+        "boton_texto": "Guardar deuda",
+    })
+
+
+@login_required
+def deuda_editar(request, pk):
+    deuda = get_object_or_404(Deuda, pk=pk)
+
+    if request.method == "POST":
+        form = DeudaForm(request.POST, instance=deuda)
+        if form.is_valid():
+            deuda = form.save()
+            registrar_historial(
+                request,
+                "Deudas",
+                "Editar",
+                f"Se editó deuda de {deuda.funcionario.nombre_completo}."
+            )
+            messages.success(request, "Deuda actualizada correctamente.")
+            return redirect("deudas_lista")
+    else:
+        form = DeudaForm(instance=deuda)
+
+    return render(request, "core/deuda_form.html", {
+        "form": form,
+        "titulo_form": f"Editar deuda: {deuda.funcionario.nombre_completo}",
+        "boton_texto": "Guardar cambios",
+        "deuda": deuda,
+    })
+
+
+@login_required
+def deuda_toggle_activa(request, pk):
+    deuda = get_object_or_404(Deuda, pk=pk)
+    deuda.activa = not deuda.activa
+    deuda.save()
+
+    estado = "activada" if deuda.activa else "inactivada"
+    registrar_historial(
+        request,
+        "Deudas",
+        "Cambio de estado",
+        f"Deuda de {deuda.funcionario.nombre_completo} fue {estado}."
+    )
+    messages.success(request, f"Deuda {estado} correctamente.")
+    return redirect("deudas_lista")
 
 
 @login_required
@@ -849,8 +1047,15 @@ def icl_lista(request):
         icl = 100 - (atrasos_count * 2) - (ausencias_no_justificadas * 5)
         icl = max(0, min(100, icl))
 
-        bono_base = float(funcionario.bono or 0)
-        bono_proyectado = round(bono_base * (icl / 100), 2)
+        bono_base = Decimal(funcionario.bono or 0).quantize(Decimal("0.01"))
+        bono_pagable_icl = (bono_base * Decimal(icl) / Decimal("100")).quantize(Decimal("0.01"))
+        salario_base = Decimal(funcionario.salario_base or 0).quantize(Decimal("0.01"))
+        salario_bruto_mes = (salario_base + bono_pagable_icl).quantize(Decimal("0.01"))
+        deudas_mes = funcionario.descuento_deudas_mes
+        salario_neto_mes = salario_bruto_mes - funcionario.descuento_ips - deudas_mes
+        if salario_neto_mes < 0:
+            salario_neto_mes = Decimal("0.00")
+        salario_neto_mes = salario_neto_mes.quantize(Decimal("0.01"))
 
         resultados.append({
             "funcionario": funcionario,
@@ -862,7 +1067,11 @@ def icl_lista(request):
             "ausencias_no_justificadas": ausencias_no_justificadas,
             "icl": icl,
             "bono_base": bono_base,
-            "bono_proyectado": bono_proyectado,
+            "bono_pagable_icl": bono_pagable_icl,
+            "salario_base_mes": salario_base,
+            "salario_bruto": salario_bruto_mes,
+            "salario_neto": salario_neto_mes,
+            "deudas_mes": deudas_mes,
         })
 
     resultados.sort(
@@ -970,6 +1179,9 @@ def reportes(request):
             "permisos_aprobados": permisos_aprobados,
             "vacaciones_aprobadas": vacaciones_aprobadas,
             "icl": icl,
+            "salario_bruto": funcionario.salario_bruto,
+            "deudas_mes": funcionario.descuento_deudas_mes,
+            "salario_neto": funcionario.salario_neto_estimado,
         })
 
     meses = [
@@ -1014,3 +1226,103 @@ def historial_lista(request):
         "historial": historial[:300],
         "q": q,
     })
+@login_required
+def nomina_lista(request):
+    hoy = timezone.localdate()
+    mes = int(request.GET.get("mes", hoy.month))
+    anio = int(request.GET.get("anio", hoy.year))
+    estado = request.GET.get("estado", "").strip()
+
+    if request.method == "POST":
+        funcionarios = Funcionario.objects.filter(activo=True).order_by("apellido", "nombre")
+        for funcionario in funcionarios:
+            generar_nomina_funcionario(funcionario, mes, anio)
+
+        registrar_historial(
+            request,
+            "Nómina",
+            "Generar/Recalcular",
+            f"Se generó o recalculó la nómina del período {mes:02d}/{anio}."
+        )
+        messages.success(request, f"Nómina de {mes:02d}/{anio} generada correctamente.")
+        return redirect(f"/nomina/?mes={mes}&anio={anio}")
+
+    nominas = NominaMensual.objects.select_related(
+        "funcionario",
+        "funcionario__sucursal_rel",
+        "funcionario__sucursal_rel__empresa"
+    ).filter(
+        mes=mes,
+        anio=anio
+    )
+
+    if not nominas.exists():
+        funcionarios = Funcionario.objects.filter(activo=True).order_by("apellido", "nombre")
+        for funcionario in funcionarios:
+            generar_nomina_funcionario(funcionario, mes, anio)
+        nominas = NominaMensual.objects.select_related(
+            "funcionario",
+            "funcionario__sucursal_rel",
+            "funcionario__sucursal_rel__empresa"
+        ).filter(
+            mes=mes,
+            anio=anio
+        )
+
+    if estado:
+        nominas = nominas.filter(estado_pago=estado)
+
+    nominas = nominas.order_by("funcionario__apellido", "funcionario__nombre")
+
+    total_bruto = nominas.aggregate(total=Sum("salario_bruto"))["total"] or Decimal("0.00")
+    total_deudas = nominas.aggregate(total=Sum("descuento_deudas"))["total"] or Decimal("0.00")
+    total_neto = nominas.aggregate(total=Sum("salario_neto"))["total"] or Decimal("0.00")
+    total_pagados = nominas.filter(estado_pago=NominaMensual.EstadosPago.PAGADO).count()
+    total_pendientes = nominas.filter(estado_pago=NominaMensual.EstadosPago.PENDIENTE).count()
+
+    meses = [
+        (1, "Enero"), (2, "Febrero"), (3, "Marzo"), (4, "Abril"),
+        (5, "Mayo"), (6, "Junio"), (7, "Julio"), (8, "Agosto"),
+        (9, "Septiembre"), (10, "Octubre"), (11, "Noviembre"), (12, "Diciembre"),
+    ]
+    anios = list(range(hoy.year - 2, hoy.year + 2))
+
+    return render(request, "core/nomina_lista.html", {
+        "nominas": nominas,
+        "mes": mes,
+        "anio": anio,
+        "estado": estado,
+        "meses": meses,
+        "anios": anios,
+        "total_bruto": total_bruto,
+        "total_deudas": total_deudas,
+        "total_neto": total_neto,
+        "total_pagados": total_pagados,
+        "total_pendientes": total_pendientes,
+        "estados_pago": NominaMensual.EstadosPago.choices,
+    })
+
+
+@login_required
+def nomina_toggle_pagado(request, pk):
+    nomina = get_object_or_404(NominaMensual, pk=pk)
+
+    if nomina.estado_pago == NominaMensual.EstadosPago.PAGADO:
+        nomina.estado_pago = NominaMensual.EstadosPago.PENDIENTE
+        nomina.fecha_pago = None
+        accion = "revirtió a pendiente"
+    else:
+        nomina.estado_pago = NominaMensual.EstadosPago.PAGADO
+        nomina.fecha_pago = timezone.localdate()
+        accion = "marcó como pagada"
+
+    nomina.save()
+
+    registrar_historial(
+        request,
+        "Nómina",
+        "Cambio de estado",
+        f"Se {accion} la nómina de {nomina.funcionario.nombre_completo} del período {nomina.mes:02d}/{nomina.anio}."
+    )
+    messages.success(request, "Estado de nómina actualizado correctamente.")
+    return redirect(f"/nomina/?mes={nomina.mes}&anio={nomina.anio}")

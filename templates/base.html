@@ -5,7 +5,6 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{% block title %}ClockIn{% endblock %}</title>
     <link rel="stylesheet" href="/static/css/styles.css">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body>
 
@@ -26,6 +25,8 @@
             <a href="{% url 'funcionarios_lista' %}">👥 Funcionarios</a>
             <a href="{% url 'turnos_lista' %}">🕓 Turnos</a>
             <a href="{% url 'asistencia_marcar' %}">⏱️ Asistencia</a>
+            <a href="{% url 'deudas_lista' %}">💳 Deudas</a>
+            <a href="{% url 'nomina_lista' %}">💰 Nómina</a>
             <a href="{% url 'biometrico_inicio' %}">📸 Biométrico</a>
             <a href="{% url 'permisos_lista' %}">📄 Permisos / Licencias</a>
             <a href="{% url 'vacaciones_lista' %}">🏖️ Vacaciones</a>

@@ -4,6 +4,7 @@ from .models import (
     Sucursal,
     Funcionario,
     Turno,
+    Deuda,
     PermisoLicencia,
     Vacacion,
 )
@@ -112,6 +113,11 @@ class FuncionarioForm(forms.ModelForm):
             "ips",
             "salario_base",
             "bono",
+            "porcentaje_limite_deuda",
+            "modalidad_cobro",
+            "banco",
+            "tipo_cuenta",
+            "numero_cuenta",
             "fecha_ingreso",
             "foto",
             "activo",
@@ -126,11 +132,20 @@ class FuncionarioForm(forms.ModelForm):
             "sector": forms.TextInput(attrs={"class": "form-control"}),
             "salario_base": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
             "bono": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
+            "porcentaje_limite_deuda": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
+            "modalidad_cobro": forms.Select(attrs={"class": "form-control"}),
+            "banco": forms.Select(attrs={"class": "form-control"}),
+            "tipo_cuenta": forms.Select(attrs={"class": "form-control"}),
+            "numero_cuenta": forms.TextInput(attrs={"class": "form-control"}),
             "foto": forms.ClearableFileInput(attrs={"class": "form-control"}),
             "activo": forms.CheckboxInput(attrs={"class": "form-check-input"}),
         }
         labels = {
             "sucursal_rel": "Sucursal",
+            "porcentaje_limite_deuda": "Límite de deuda (%)",
+            "modalidad_cobro": "Modalidad de cobro",
+            "tipo_cuenta": "Tipo de cuenta",
+            "numero_cuenta": "Número de cuenta",
         }
 
     def __init__(self, *args, **kwargs):
@@ -164,13 +179,6 @@ class FuncionarioForm(forms.ModelForm):
             except (ValueError, TypeError):
                 self.fields["sucursal_rel"].queryset = Sucursal.objects.none()
 
-        for option_value, option_label in self.fields["sucursal_rel"].choices:
-            try:
-                sucursal_obj = self.fields["sucursal_rel"].queryset.get(pk=option_value)
-                # Esto ayuda si luego personalizas el widget
-            except Exception:
-                pass        
-
     def clean_cedula(self):
         cedula = self.cleaned_data["cedula"].strip()
         qs = Funcionario.objects.filter(cedula=cedula)
@@ -186,9 +194,24 @@ class FuncionarioForm(forms.ModelForm):
         cleaned_data = super().clean()
         empresa = cleaned_data.get("empresa")
         sucursal_rel = cleaned_data.get("sucursal_rel")
+        modalidad_cobro = cleaned_data.get("modalidad_cobro")
+        banco = cleaned_data.get("banco")
+        tipo_cuenta = cleaned_data.get("tipo_cuenta")
+        numero_cuenta = (cleaned_data.get("numero_cuenta") or "").strip()
 
         if empresa and sucursal_rel and sucursal_rel.empresa_id != empresa.id:
             raise forms.ValidationError("La sucursal seleccionada no pertenece a la empresa elegida.")
+
+        if modalidad_cobro == Funcionario.ModalidadesCobro.TRANSFERENCIA:
+            if not banco or not tipo_cuenta or not numero_cuenta:
+                raise forms.ValidationError(
+                    "Si el funcionario cobra por transferencia, debes completar banco, tipo de cuenta y número de cuenta."
+                )
+
+        if modalidad_cobro == Funcionario.ModalidadesCobro.EFECTIVO:
+            cleaned_data["banco"] = ""
+            cleaned_data["tipo_cuenta"] = ""
+            cleaned_data["numero_cuenta"] = ""
 
         return cleaned_data
 
@@ -200,10 +223,82 @@ class FuncionarioForm(forms.ModelForm):
         else:
             obj.sucursal = ""
 
+        if obj.modalidad_cobro == Funcionario.ModalidadesCobro.EFECTIVO:
+            obj.banco = ""
+            obj.tipo_cuenta = ""
+            obj.numero_cuenta = ""
+
         if commit:
             obj.save()
             self.save_m2m()
         return obj
+
+
+class DeudaForm(forms.ModelForm):
+    fecha = forms.DateField(
+        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"})
+    )
+
+    class Meta:
+        model = Deuda
+        fields = [
+            "funcionario",
+            "tipo",
+            "descripcion",
+            "fecha",
+            "monto_total",
+            "saldo_pendiente",
+            "cuota_mensual",
+            "aplicar_en_nomina",
+            "activa",
+        ]
+        widgets = {
+            "funcionario": forms.Select(attrs={"class": "form-control"}),
+            "tipo": forms.Select(attrs={"class": "form-control"}),
+            "descripcion": forms.TextInput(attrs={"class": "form-control"}),
+            "monto_total": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
+            "saldo_pendiente": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
+            "cuota_mensual": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
+            "aplicar_en_nomina": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "activa": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["funcionario"].queryset = Funcionario.objects.filter(activo=True).order_by("apellido", "nombre")
+
+    def clean(self):
+        cleaned_data = super().clean()
+        funcionario = cleaned_data.get("funcionario")
+        monto_total = cleaned_data.get("monto_total") or 0
+        saldo_pendiente = cleaned_data.get("saldo_pendiente")
+        cuota_mensual = cleaned_data.get("cuota_mensual") or 0
+
+        if saldo_pendiente is None:
+            cleaned_data["saldo_pendiente"] = monto_total
+            saldo_pendiente = monto_total
+
+        if saldo_pendiente > monto_total:
+            raise forms.ValidationError("El saldo pendiente no puede ser mayor al monto total.")
+
+        if cuota_mensual < 0:
+            raise forms.ValidationError("La cuota mensual no puede ser negativa.")
+
+        if funcionario:
+            deuda_actual = funcionario.total_deuda_activa
+            if self.instance.pk:
+                deuda_actual -= self.instance.saldo_pendiente
+
+            deuda_proyectada = deuda_actual + saldo_pendiente
+            if deuda_proyectada > funcionario.limite_deuda_monto:
+                raise forms.ValidationError(
+                    f"Esta deuda supera el límite configurado del funcionario. "
+                    f"Límite: {funcionario.limite_deuda_monto} | "
+                    f"Deuda actual: {funcionario.total_deuda_activa} | "
+                    f"Deuda proyectada: {deuda_proyectada}"
+                )
+
+        return cleaned_data
 
 
 class MarcacionForm(forms.Form):

@@ -749,3 +749,96 @@ body {
 .table-responsive {
     overflow-x: auto;
 }
+.tabla-deudas {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.tabla-header,
+.tabla-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr 1fr 1.2fr 1.2fr 1.2fr 1.5fr 1fr 1.5fr;
+    gap: 12px;
+    align-items: center;
+}
+
+.tabla-header {
+    font-size: 13px;
+    color: #94a3b8;
+    padding: 0 10px;
+}
+
+.tabla-row {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.05);
+    border-radius: 16px;
+    padding: 14px 12px;
+}
+
+.funcionario strong {
+    display: block;
+    color: #fff;
+}
+
+.funcionario span {
+    font-size: 12px;
+    color: #94a3b8;
+}
+
+.sub {
+    display: block;
+    font-size: 12px;
+    color: #94a3b8;
+}
+
+.text-right {
+    text-align: right;
+}
+
+.text-center {
+    text-align: center;
+}
+
+.acciones {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+}
+
+.btn-editar,
+.btn-toggle {
+    padding: 6px 10px;
+    border-radius: 8px;
+    font-size: 12px;
+    text-decoration: none;
+}
+
+.btn-editar {
+    background: #2563eb;
+    color: white;
+}
+
+.btn-toggle {
+    background: #334155;
+    color: white;
+}
+
+.badge-activa {
+    background: rgba(34,197,94,0.15);
+    color: #4ade80;
+    padding: 5px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+}
+
+.badge-inactiva {
+    background: rgba(239,68,68,0.15);
+    color: #f87171;
+    padding: 5px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+}
+.progress-bar {
+    max-width: 100%;
+}
