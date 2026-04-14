@@ -66,6 +66,14 @@ const sidebar = document.getElementById("sidebar");
 if (toggle && sidebar) {
     toggle.addEventListener("click", () => {
         sidebar.classList.toggle("active");
+        document.body.classList.toggle("menu-open", sidebar.classList.contains("active"));
+    });
+
+    document.querySelectorAll(".sidebar .menu a").forEach(link => {
+        link.addEventListener("click", () => {
+            sidebar.classList.remove("active");
+            document.body.classList.remove("menu-open");
+        });
     });
 }
 </script>
