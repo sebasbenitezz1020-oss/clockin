@@ -2,64 +2,82 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
     <title>ClockIn Biométrico</title>
+
+    <meta name="theme-color" content="#05070b">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="ClockIn">
+
     <style>
         :root {
-            --bg: #0b0f14;
-            --panel: #121821;
-            --border: #253243;
+            --bg: #05070b;
+            --panel: #0f1620;
+            --panel-2: #121a25;
+            --border: #223244;
             --text: #f3f7fb;
             --muted: #9fb0c3;
             --ok: #22c55e;
             --warn: #f59e0b;
             --error: #ef4444;
             --accent: #38bdf8;
+            --accent-2: #60a5fa;
+            --glass: rgba(17, 24, 33, 0.90);
         }
 
         * {
             box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html, body {
+            margin: 0;
+            height: 100%;
+            width: 100%;
+            overflow: hidden;
+            background: var(--bg);
+            color: var(--text);
+            font-family: Arial, sans-serif;
         }
 
         body {
-            margin: 0;
-            min-height: 100vh;
             background:
-                radial-gradient(circle at top left, rgba(56, 189, 248, 0.12), transparent 28%),
-                radial-gradient(circle at top right, rgba(34, 197, 94, 0.10), transparent 25%),
-                linear-gradient(180deg, #0a0f14 0%, #0f1720 100%);
-            color: var(--text);
-            font-family: Arial, sans-serif;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            padding: 18px;
+                radial-gradient(circle at top left, rgba(56, 189, 248, 0.10), transparent 25%),
+                radial-gradient(circle at top right, rgba(34, 197, 94, 0.08), transparent 25%),
+                linear-gradient(180deg, #06090e 0%, #0a1017 100%);
         }
 
         .screen {
-            width: 100%;
-            max-width: 1040px;
-            background: rgba(18, 24, 33, 0.96);
-            border: 1px solid var(--border);
-            border-radius: 28px;
-            box-shadow: 0 20px 70px rgba(0, 0, 0, 0.45);
-            overflow: hidden;
+            width: 100vw;
+            height: 100dvh;
+            display: grid;
+            grid-template-rows: auto 1fr;
+            gap: 14px;
+            padding:
+                max(12px, env(safe-area-inset-top))
+                max(12px, env(safe-area-inset-right))
+                max(12px, env(safe-area-inset-bottom))
+                max(12px, env(safe-area-inset-left));
         }
 
         .topbar {
             display: flex;
             justify-content: space-between;
             align-items: center;
-            gap: 14px;
-            padding: 20px 24px;
-            border-bottom: 1px solid rgba(255,255,255,0.06);
-            background: rgba(255,255,255,0.02);
+            gap: 16px;
+            padding: 16px 20px;
+            border-radius: 24px;
+            border: 1px solid rgba(255,255,255,0.06);
+            background: rgba(18, 24, 33, 0.88);
+            box-shadow: 0 14px 40px rgba(0, 0, 0, 0.30);
         }
 
         .brand h1 {
             margin: 0;
-            font-size: 28px;
+            font-size: 30px;
             font-weight: 800;
+            letter-spacing: 0.2px;
         }
 
         .brand p {
@@ -68,12 +86,51 @@
             font-size: 14px;
         }
 
+        .topbar-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+        }
+
+        .mini-chip {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 14px;
+            border-radius: 999px;
+            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,0.08);
+            color: #d7e4ef;
+            font-size: 13px;
+            font-weight: 700;
+            white-space: nowrap;
+        }
+
+        .mini-chip.accent {
+            background: rgba(56, 189, 248, 0.10);
+            border-color: rgba(56, 189, 248, 0.22);
+            color: #7dd3fc;
+        }
+
+        .fullscreen-btn {
+            border: 1px solid rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.05);
+            color: #fff;
+            border-radius: 14px;
+            padding: 10px 14px;
+            font-size: 14px;
+            font-weight: 800;
+            cursor: pointer;
+        }
+
         .clock-box {
             text-align: right;
         }
 
         .clock {
-            font-size: 44px;
+            font-size: 40px;
             font-weight: 800;
             line-height: 1;
         }
@@ -81,22 +138,34 @@
         .date {
             margin-top: 6px;
             color: var(--muted);
-            font-size: 15px;
+            font-size: 14px;
         }
 
         .content {
+            min-height: 0;
             display: grid;
-            grid-template-columns: 1.15fr .95fr;
-            gap: 22px;
-            padding: 22px;
+            grid-template-columns: 1.2fr 0.95fr;
+            gap: 16px;
         }
 
         .camera-card,
         .status-card {
-            background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.015));
-            border: 1px solid rgba(255,255,255,0.05);
-            border-radius: 24px;
+            min-height: 0;
+            background: var(--glass);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 26px;
+            box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
+            overflow: hidden;
+            backdrop-filter: blur(10px);
+        }
+
+        .camera-inner,
+        .status-inner {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
             padding: 18px;
+            min-height: 0;
         }
 
         .camera-title,
@@ -104,13 +173,14 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
+            gap: 14px;
             margin-bottom: 14px;
         }
 
         .camera-title h2,
         .status-title h2 {
             margin: 0;
-            font-size: 20px;
+            font-size: 22px;
         }
 
         .camera-title span,
@@ -122,7 +192,7 @@
         .mode-selector {
             display: flex;
             gap: 12px;
-            margin-bottom: 16px;
+            margin-bottom: 14px;
         }
 
         .mode-btn {
@@ -130,41 +200,47 @@
             border: 1px solid #2a394b;
             background: #101722;
             color: #d9e6f2;
-            padding: 14px 16px;
-            border-radius: 16px;
+            padding: 15px 16px;
+            border-radius: 18px;
             font-size: 18px;
-            font-weight: 700;
+            font-weight: 800;
             cursor: pointer;
             transition: all 0.2s ease;
+            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
         }
 
         .mode-btn.active.entrada {
             background: rgba(34, 197, 94, 0.16);
             border-color: rgba(34, 197, 94, 0.45);
             color: #86efac;
+            box-shadow: 0 0 0 3px rgba(34,197,94,0.08) inset;
         }
 
         .mode-btn.active.salida {
             background: rgba(245, 158, 11, 0.16);
             border-color: rgba(245, 158, 11, 0.45);
             color: #fcd34d;
+            box-shadow: 0 0 0 3px rgba(245,158,11,0.08) inset;
         }
 
         .video-wrap {
             position: relative;
             width: 100%;
-            background: #05080c;
-            border-radius: 22px;
+            flex: 1;
+            min-height: 0;
+            background: #030507;
+            border-radius: 24px;
             overflow: hidden;
-            border: 2px solid #202c3a;
+            border: 2px solid #1f2d3d;
         }
 
         video {
             display: block;
             width: 100%;
-            aspect-ratio: 4 / 3;
+            height: 100%;
             object-fit: cover;
             background: black;
+            transform: scaleX(-1);
         }
 
         .scan-frame {
@@ -178,17 +254,68 @@
 
         .scan-frame::before {
             content: "";
-            width: 44%;
-            height: 58%;
-            border: 3px solid rgba(56, 189, 248, 0.75);
-            border-radius: 28px;
+            width: 42%;
+            height: 56%;
+            border: 3px solid rgba(56, 189, 248, 0.88);
+            border-radius: 30px;
             box-shadow:
-                0 0 0 9999px rgba(0,0,0,0.12) inset,
-                0 0 18px rgba(56, 189, 248, 0.25);
+                0 0 0 9999px rgba(0,0,0,0.14) inset,
+                0 0 24px rgba(56, 189, 248, 0.22);
+            transition: all 0.18s ease;
+        }
+
+        .video-wrap.has-face .scan-frame::before {
+            border-color: rgba(245, 158, 11, 0.96);
+            box-shadow:
+                0 0 0 9999px rgba(0,0,0,0.10) inset,
+                0 0 28px rgba(245, 158, 11, 0.30);
+        }
+
+        .video-wrap.validating .scan-frame::before {
+            border-color: rgba(34, 197, 94, 0.96);
+            box-shadow:
+                0 0 0 9999px rgba(0,0,0,0.08) inset,
+                0 0 30px rgba(34, 197, 94, 0.32);
+        }
+
+        .face-pill-row {
+            margin-top: 14px;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+
+        .face-pill {
+            padding: 10px 14px;
+            border-radius: 999px;
+            font-size: 13px;
+            font-weight: 700;
+            border: 1px solid rgba(255,255,255,0.08);
+            background: rgba(255,255,255,0.04);
+            color: #dbe7f3;
+            white-space: nowrap;
+        }
+
+        .face-pill.waiting {
+            color: #7dd3fc;
+            border-color: rgba(56, 189, 248, 0.22);
+            background: rgba(56, 189, 248, 0.08);
+        }
+
+        .face-pill.detected {
+            color: #fcd34d;
+            border-color: rgba(245, 158, 11, 0.24);
+            background: rgba(245, 158, 11, 0.08);
+        }
+
+        .face-pill.ready {
+            color: #86efac;
+            border-color: rgba(34, 197, 94, 0.24);
+            background: rgba(34, 197, 94, 0.08);
         }
 
         .camera-hint {
-            margin-top: 12px;
+            margin-top: 10px;
             color: var(--muted);
             font-size: 14px;
             text-align: center;
@@ -210,46 +337,47 @@
         }
 
         .result-box {
-            margin-top: 18px;
-            padding: 22px 18px;
+            margin-top: 16px;
+            padding: 20px 18px;
             border-radius: 22px;
-            background: #0f1620;
+            background: #0d141d;
             border: 1px solid #1d2a38;
-            min-height: 320px;
+            flex: 1;
+            min-height: 0;
             display: flex;
             flex-direction: column;
             justify-content: center;
         }
 
         .result-icon {
-            font-size: 48px;
+            font-size: 52px;
             margin-bottom: 12px;
         }
 
         .result-name {
-            font-size: 32px;
+            font-size: 34px;
             font-weight: 800;
-            line-height: 1.15;
+            line-height: 1.1;
             margin-bottom: 10px;
         }
 
         .result-state {
-            font-size: 24px;
+            font-size: 22px;
             font-weight: 700;
             margin-bottom: 10px;
         }
 
         .result-subtype {
-            font-size: 18px;
+            font-size: 17px;
             font-weight: 700;
             margin-bottom: 12px;
             color: #e5eef8;
         }
 
         .result-detail {
-            font-size: 16px;
+            font-size: 15px;
             color: var(--muted);
-            line-height: 1.6;
+            line-height: 1.55;
         }
 
         .detail-grid {
@@ -279,7 +407,7 @@
         }
 
         .footer-box {
-            margin-top: 18px;
+            margin-top: 16px;
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 12px;
@@ -363,16 +491,29 @@
             display: none;
         }
 
-        @media (max-width: 980px) {
+        @media (max-width: 1100px) {
             .content {
                 grid-template-columns: 1fr;
             }
+
+            .screen {
+                height: 100dvh;
+            }
+
+            .video-wrap {
+                min-height: 48dvh;
+            }
         }
 
-        @media (max-width: 640px) {
+        @media (max-width: 720px) {
             .topbar {
                 flex-direction: column;
-                align-items: flex-start;
+                align-items: stretch;
+            }
+
+            .topbar-right {
+                width: 100%;
+                justify-content: space-between;
             }
 
             .clock-box {
@@ -387,86 +528,116 @@
             .mode-selector {
                 flex-direction: column;
             }
+
+            .brand h1 {
+                font-size: 24px;
+            }
+
+            .result-name {
+                font-size: 28px;
+            }
+
+            .result-state {
+                font-size: 20px;
+            }
+
+            .scan-frame::before {
+                width: 54%;
+                height: 54%;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="screen">
+    <div class="screen" id="appScreen">
         <div class="topbar">
             <div class="brand">
                 <h1>📸 ClockIn Biométrico</h1>
-                <p>Lectura facial para entrada, almuerzo, regreso y salida final</p>
+                <p>Modo kiosco premium para entrada, almuerzo, regreso y salida final</p>
             </div>
 
-            <div class="clock-box">
-                <div class="clock" id="clock">00:00:00</div>
-                <div class="date" id="dateText">--</div>
+            <div class="topbar-right">
+                <div class="mini-chip accent" id="chipTiempo">Lectura en 1 segundo</div>
+                <button type="button" class="fullscreen-btn" id="btnFullscreen">⛶ Pantalla completa</button>
+                <div class="clock-box">
+                    <div class="clock" id="clock">00:00:00</div>
+                    <div class="date" id="dateText">--</div>
+                </div>
             </div>
         </div>
 
         <div class="content">
             <div class="camera-card">
-                <div class="camera-title">
-                    <h2>Cámara en vivo</h2>
-                    <span>Captura automática cada 3 segundos</span>
-                </div>
+                <div class="camera-inner">
+                    <div class="camera-title">
+                        <h2>Cámara en vivo</h2>
+                        <span id="cameraTopHint">Esperando detección de rostro</span>
+                    </div>
 
-                <div class="mode-selector">
-                    <button id="btnEntrada" class="mode-btn entrada active" type="button">🟢 ENTRADA</button>
-                    <button id="btnSalida" class="mode-btn salida" type="button">🟠 SALIDA</button>
-                </div>
+                    <div class="mode-selector">
+                        <button id="btnEntrada" class="mode-btn entrada active" type="button">🟢 ENTRADA</button>
+                        <button id="btnSalida" class="mode-btn salida" type="button">🟠 SALIDA</button>
+                    </div>
 
-                <div class="video-wrap">
-                    <video id="video" autoplay playsinline></video>
-                    <div class="scan-frame"></div>
-                </div>
+                    <div class="video-wrap" id="videoWrap">
+                        <video id="video" autoplay playsinline muted></video>
+                        <div class="scan-frame"></div>
+                    </div>
 
-                <div class="camera-hint" id="cameraHint">
-                    Modo actual: ENTRADA. Sirve para entrada del día y regreso de almuerzo.
+                    <div class="face-pill-row">
+                        <div class="face-pill waiting" id="pillRostro">Sin rostro detectado</div>
+                        <div class="face-pill" id="pillCuenta">Esperando...</div>
+                    </div>
+
+                    <div class="camera-hint" id="cameraHint">
+                        Modo actual: ENTRADA. Sirve para entrada del día y regreso de almuerzo.
+                    </div>
                 </div>
             </div>
 
             <div class="status-card idle-theme" id="statusCard">
-                <div class="status-title">
-                    <h2>Estado del lector</h2>
-                    <span id="systemStatusText">En espera</span>
-                </div>
-
-                <div class="status-badge" id="statusBadge">LISTO PARA ESCANEAR</div>
-
-                <div class="result-box">
-                    <div class="result-icon" id="resultIcon">👤</div>
-                    <div class="result-name" id="resultName">Esperando rostro...</div>
-                    <div class="result-state" id="resultState">Seleccione ENTRADA o SALIDA</div>
-                    <div class="result-subtype" id="resultSubtype">El sistema mostrará aquí el tipo exacto de marcación.</div>
-                    <div class="result-detail" id="resultDetail">
-                        Entrada del día, salida a almuerzo, regreso de almuerzo o salida final.
+                <div class="status-inner">
+                    <div class="status-title">
+                        <h2>Estado del lector</h2>
+                        <span id="systemStatusText">En espera</span>
                     </div>
 
-                    <div class="detail-grid">
-                        <div class="detail-box">
-                            <div class="lab">Hora</div>
-                            <div class="val" id="detailHora">—</div>
-                        </div>
-                        <div class="detail-box">
-                            <div class="lab">Turno</div>
-                            <div class="val" id="detailTurno">—</div>
-                        </div>
-                        <div class="detail-box">
-                            <div class="lab">Atraso</div>
-                            <div class="val" id="detailAtraso">—</div>
-                        </div>
-                    </div>
-                </div>
+                    <div class="status-badge" id="statusBadge">LISTO PARA ESCANEAR</div>
 
-                <div class="footer-box">
-                    <div class="mini-box">
-                        <div class="label">Modo seleccionado</div>
-                        <div class="value" id="footerModo">Entrada</div>
+                    <div class="result-box">
+                        <div class="result-icon" id="resultIcon">👤</div>
+                        <div class="result-name" id="resultName">Esperando rostro...</div>
+                        <div class="result-state" id="resultState">Sin sonido mientras no haya rostro</div>
+                        <div class="result-subtype" id="resultSubtype">El sistema solo intentará leer cuando detecte una cara.</div>
+                        <div class="result-detail" id="resultDetail">
+                            Cuando un rostro permanezca estable frente a cámara por 1 segundo, se intentará la validación.
+                        </div>
+
+                        <div class="detail-grid">
+                            <div class="detail-box">
+                                <div class="lab">Hora</div>
+                                <div class="val" id="detailHora">—</div>
+                            </div>
+                            <div class="detail-box">
+                                <div class="lab">Turno</div>
+                                <div class="val" id="detailTurno">—</div>
+                            </div>
+                            <div class="detail-box">
+                                <div class="lab">Atraso</div>
+                                <div class="val" id="detailAtraso">—</div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="mini-box">
-                        <div class="label">Uso</div>
-                        <div class="value">Automático</div>
+
+                    <div class="footer-box">
+                        <div class="mini-box">
+                            <div class="label">Modo seleccionado</div>
+                            <div class="value" id="footerModo">Entrada</div>
+                        </div>
+                        <div class="mini-box">
+                            <div class="label">Lectura automática</div>
+                            <div class="value">Solo con rostro</div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -478,6 +649,9 @@
     <script>
         const video = document.getElementById("video");
         const canvas = document.getElementById("canvas");
+
+        const appScreen = document.getElementById("appScreen");
+        const btnFullscreen = document.getElementById("btnFullscreen");
 
         const clock = document.getElementById("clock");
         const dateText = document.getElementById("dateText");
@@ -499,12 +673,26 @@
         const btnEntrada = document.getElementById("btnEntrada");
         const btnSalida = document.getElementById("btnSalida");
         const cameraHint = document.getElementById("cameraHint");
+        const cameraTopHint = document.getElementById("cameraTopHint");
         const footerModo = document.getElementById("footerModo");
+        const videoWrap = document.getElementById("videoWrap");
+        const pillRostro = document.getElementById("pillRostro");
+        const pillCuenta = document.getElementById("pillCuenta");
 
-        let capturando = false;
+        const DETECCION_INTERVALO = 350;
+        const ESTABILIDAD_MS = 1000;
+        const PAUSA_EXITO_MS = 4000;
+        const PAUSA_AVISO_MS = 3000;
+        const PAUSA_ERROR_MS = 2200;
+
         let resetTimer = null;
         let pausaHasta = 0;
         let modoSeleccionado = "entrada";
+        let enviando = false;
+        let rostroPresente = false;
+        let rostroDetectadoDesde = null;
+        let ultimaDeteccion = 0;
+        let streamReady = false;
 
         function actualizarReloj() {
             const ahora = new Date();
@@ -551,6 +739,26 @@
             limpiarEstado();
         });
 
+        async function activarFullscreen() {
+            try {
+                if (!document.fullscreenElement && appScreen.requestFullscreen) {
+                    await appScreen.requestFullscreen();
+                }
+            } catch (e) {}
+        }
+
+        btnFullscreen.addEventListener("click", activarFullscreen);
+
+        document.addEventListener("fullscreenchange", () => {
+            if (document.fullscreenElement) {
+                btnFullscreen.textContent = "✅ Full screen activo";
+            } else {
+                btnFullscreen.textContent = "⛶ Pantalla completa";
+            }
+        });
+
+        document.addEventListener("click", activarFullscreen, { once: true });
+
         function beepSuccess() {
             try {
                 const ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -562,7 +770,7 @@
                 osc.connect(gain);
                 gain.connect(ctx.destination);
                 osc.start();
-                osc.stop(ctx.currentTime + 0.15);
+                osc.stop(ctx.currentTime + 0.12);
             } catch (e) {}
         }
 
@@ -573,11 +781,11 @@
                 const gain = ctx.createGain();
                 osc.type = "triangle";
                 osc.frequency.setValueAtTime(520, ctx.currentTime);
-                gain.gain.setValueAtTime(0.08, ctx.currentTime);
+                gain.gain.setValueAtTime(0.07, ctx.currentTime);
                 osc.connect(gain);
                 gain.connect(ctx.destination);
                 osc.start();
-                osc.stop(ctx.currentTime + 0.18);
+                osc.stop(ctx.currentTime + 0.14);
             } catch (e) {}
         }
 
@@ -588,11 +796,11 @@
                 const gain = ctx.createGain();
                 osc.type = "square";
                 osc.frequency.setValueAtTime(220, ctx.currentTime);
-                gain.gain.setValueAtTime(0.08, ctx.currentTime);
+                gain.gain.setValueAtTime(0.07, ctx.currentTime);
                 osc.connect(gain);
                 gain.connect(ctx.destination);
                 osc.start();
-                osc.stop(ctx.currentTime + 0.20);
+                osc.stop(ctx.currentTime + 0.16);
             } catch (e) {}
         }
 
@@ -602,9 +810,9 @@
             statusBadge.textContent = "LISTO PARA ESCANEAR";
             resultIcon.textContent = "👤";
             resultName.textContent = "Esperando rostro...";
-            resultState.textContent = "Seleccione ENTRADA o SALIDA";
-            resultSubtype.textContent = "El sistema mostrará aquí el tipo exacto de marcación.";
-            resultDetail.textContent = "Entrada del día, salida a almuerzo, regreso de almuerzo o salida final.";
+            resultState.textContent = "Sin sonido mientras no haya rostro";
+            resultSubtype.textContent = "El sistema solo intentará leer cuando detecte una cara.";
+            resultDetail.textContent = "Cuando un rostro permanezca estable frente a cámara por 1 segundo, se intentará la validación.";
             detailHora.textContent = "—";
             detailTurno.textContent = "—";
             detailAtraso.textContent = "—";
@@ -612,11 +820,14 @@
 
         function programarReinicio() {
             if (resetTimer) clearTimeout(resetTimer);
-            resetTimer = setTimeout(() => limpiarEstado(), 5000);
+            resetTimer = setTimeout(() => limpiarEstado(), 3000);
         }
 
-        function activarPausa(segundos = 6) {
-            pausaHasta = Date.now() + (segundos * 1000);
+        function activarPausa(ms) {
+            pausaHasta = Date.now() + ms;
+            rostroPresente = false;
+            rostroDetectadoDesde = null;
+            actualizarIndicadoresRostro(false);
         }
 
         function traducirTipo(tipo) {
@@ -635,6 +846,61 @@
             return "✅";
         }
 
+        function actualizarIndicadoresRostro(hayRostro, restanteMs = null, validando = false) {
+            if (validando) {
+                videoWrap.classList.add("validating");
+                videoWrap.classList.remove("has-face");
+                pillRostro.className = "face-pill ready";
+                pillRostro.textContent = "Validando rostro…";
+                pillCuenta.className = "face-pill ready";
+                pillCuenta.textContent = "Procesando";
+                cameraTopHint.textContent = "Validando captura";
+                return;
+            }
+
+            videoWrap.classList.remove("validating");
+
+            if (!hayRostro) {
+                videoWrap.classList.remove("has-face");
+                pillRostro.className = "face-pill waiting";
+                pillRostro.textContent = "Sin rostro detectado";
+                pillCuenta.className = "face-pill";
+                pillCuenta.textContent = "Esperando...";
+                cameraTopHint.textContent = "Esperando detección de rostro";
+                return;
+            }
+
+            videoWrap.classList.add("has-face");
+            pillRostro.className = "face-pill detected";
+            pillRostro.textContent = "Rostro detectado";
+
+            if (restanteMs !== null && restanteMs > 0) {
+                const segundos = (restanteMs / 1000).toFixed(1);
+                pillCuenta.className = "face-pill detected";
+                pillCuenta.textContent = `Captura en ${segundos}s`;
+                cameraTopHint.textContent = "Mantenga el rostro dentro del cuadro";
+            } else {
+                pillCuenta.className = "face-pill ready";
+                pillCuenta.textContent = "Listo para leer";
+                cameraTopHint.textContent = "Rostro listo para validación";
+            }
+        }
+
+        function mostrarEsperaConRostro(restanteMs) {
+            statusCard.className = "status-card idle-theme";
+            systemStatusText.textContent = "Rostro detectado";
+            statusBadge.textContent = "PREPARANDO CAPTURA";
+            resultIcon.textContent = "🧠";
+            resultName.textContent = "Rostro detectado";
+            resultState.textContent = "Preparando validación";
+            resultSubtype.textContent = `Mantenga el rostro estable ${Math.max(1, Math.ceil(restanteMs / 1000))} segundo(s)`;
+            resultDetail.textContent = "La lectura solo se ejecutará cuando haya un rostro estable frente a la cámara.";
+
+            detailHora.textContent = "—";
+            detailTurno.textContent = "—";
+            detailAtraso.textContent = "—";
+        }
+
         function mostrarExito(data) {
             statusCard.className = "status-card ok-theme";
             systemStatusText.textContent = "Registro exitoso";
@@ -650,11 +916,11 @@
             detailAtraso.textContent = data.llego_tarde ? ((data.minutos_atraso || 0) + " min") : "0 min";
 
             beepSuccess();
-            activarPausa(6);
+            activarPausa(PAUSA_EXITO_MS);
             programarReinicio();
         }
 
-        function mostrarAviso(data) {
+        function mostrarAviso(data, conSonido = true) {
             statusCard.className = "status-card warn-theme";
             systemStatusText.textContent = "Aviso";
             statusBadge.textContent = "ATENCIÓN";
@@ -668,12 +934,12 @@
             detailTurno.textContent = data.turno || "—";
             detailAtraso.textContent = "—";
 
-            beepWarn();
-            activarPausa(5);
+            if (conSonido) beepWarn();
+            activarPausa(PAUSA_AVISO_MS);
             programarReinicio();
         }
 
-        function mostrarError(errorText) {
+        function mostrarError(errorText, conSonido = true) {
             statusCard.className = "status-card error-theme";
             systemStatusText.textContent = "Error";
             statusBadge.textContent = "NO RECONOCIDO";
@@ -687,71 +953,165 @@
             detailTurno.textContent = "—";
             detailAtraso.textContent = "—";
 
-            beepError();
+            if (conSonido) beepError();
+            activarPausa(PAUSA_ERROR_MS);
             programarReinicio();
         }
 
-        navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" }, audio: false })
-            .then(stream => {
-                video.srcObject = stream;
-            })
-            .catch(error => {
-                mostrarError("No se pudo abrir la cámara: " + error);
-            });
-
-        function capturar() {
-            if (capturando) return;
-            if (Date.now() < pausaHasta) return;
-            if (!video.videoWidth || !video.videoHeight) return;
-
-            capturando = true;
-
+        function capturarFrame(calidad = 0.85, anchoObjetivo = null) {
             const ctx = canvas.getContext("2d");
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const vw = video.videoWidth;
+            const vh = video.videoHeight;
 
-            const data = canvas.toDataURL("image/jpeg", 0.90);
+            if (!vw || !vh) return null;
 
-            fetch("/biometrico/reconocer/", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/x-www-form-urlencoded",
-                },
-                body: new URLSearchParams({
-                    imagen: data,
-                    modo: modoSeleccionado
-                })
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.ok) {
-                    mostrarExito(data);
-                } else if (
-                    data.tipo === "ya_entrada" ||
-                    data.tipo === "ya_salida" ||
-                    data.tipo === "ya_completo" ||
-                    data.tipo === "sin_entrada" ||
-                    data.tipo === "espera_salida_almuerzo" ||
-                    data.tipo === "espera_regreso_almuerzo" ||
-                    data.tipo === "espera_salida_final"
-                ) {
-                    mostrarAviso(data);
-                } else {
-                    mostrarError(data.error || data.mensaje || "No reconocido");
-                }
-            })
-            .catch(error => {
-                mostrarError("Error al reconocer: " + error);
-            })
-            .finally(() => {
-                capturando = false;
-            });
+            let width = vw;
+            let height = vh;
+
+            if (anchoObjetivo && vw > anchoObjetivo) {
+                const ratio = vh / vw;
+                width = anchoObjetivo;
+                height = Math.round(anchoObjetivo * ratio);
+            }
+
+            canvas.width = width;
+            canvas.height = height;
+            ctx.drawImage(video, 0, 0, width, height);
+
+            return canvas.toDataURL("image/jpeg", calidad);
         }
+
+        async function detectarRostro() {
+            if (!streamReady || !video.videoWidth || !video.videoHeight) return;
+
+            const ahora = Date.now();
+            if (enviando || ahora < pausaHasta) return;
+            if (ahora - ultimaDeteccion < DETECCION_INTERVALO) return;
+
+            ultimaDeteccion = ahora;
+
+            const data = capturarFrame(0.65, 640);
+            if (!data) return;
+
+            try {
+                const res = await fetch("/biometrico/reconocer/", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/x-www-form-urlencoded",
+                    },
+                    body: new URLSearchParams({
+                        imagen: data,
+                        modo: modoSeleccionado,
+                        solo_deteccion: "1"
+                    })
+                });
+
+                const json = await res.json();
+                const hayRostro = !!json.hay_rostro;
+
+                if (!hayRostro) {
+                    rostroPresente = false;
+                    rostroDetectadoDesde = null;
+                    actualizarIndicadoresRostro(false);
+                    return;
+                }
+
+                if (!rostroPresente) {
+                    rostroPresente = true;
+                    rostroDetectadoDesde = Date.now();
+                }
+
+                const transcurrido = Date.now() - rostroDetectadoDesde;
+                const restante = Math.max(ESTABILIDAD_MS - transcurrido, 0);
+
+                actualizarIndicadoresRostro(true, restante);
+                mostrarEsperaConRostro(restante);
+
+                if (transcurrido >= ESTABILIDAD_MS) {
+                    await reconocerRostro();
+                }
+            } catch (error) {
+                // silencio en detección
+            }
+        }
+
+        async function reconocerRostro() {
+            if (enviando) return;
+            if (Date.now() < pausaHasta) return;
+
+            const data = capturarFrame(0.90);
+            if (!data) return;
+
+            enviando = true;
+            actualizarIndicadoresRostro(true, 0, true);
+
+            try {
+                const res = await fetch("/biometrico/reconocer/", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/x-www-form-urlencoded",
+                    },
+                    body: new URLSearchParams({
+                        imagen: data,
+                        modo: modoSeleccionado
+                    })
+                });
+
+                const dataJson = await res.json();
+
+                if (dataJson.ok) {
+                    mostrarExito(dataJson);
+                } else if (
+                    dataJson.tipo === "ya_entrada" ||
+                    dataJson.tipo === "ya_salida" ||
+                    dataJson.tipo === "ya_completo" ||
+                    dataJson.tipo === "sin_entrada" ||
+                    dataJson.tipo === "espera_salida_almuerzo" ||
+                    dataJson.tipo === "espera_regreso_almuerzo" ||
+                    dataJson.tipo === "espera_salida_final"
+                ) {
+                    mostrarAviso(dataJson, true);
+                } else if (dataJson.tipo === "sin_rostro") {
+                    rostroPresente = false;
+                    rostroDetectadoDesde = null;
+                    limpiarEstado();
+                    actualizarIndicadoresRostro(false);
+                } else if (dataJson.tipo === "anti_fraude" || dataJson.tipo === "rostro_estatico") {
+                    mostrarAviso({
+                        mensaje: dataJson.mensaje || "Mueva ligeramente el rostro e intente nuevamente.",
+                        turno: dataJson.turno || "—"
+                    }, false);
+                } else {
+                    mostrarError(dataJson.mensaje || dataJson.error || "No reconocido", true);
+                }
+            } catch (error) {
+                mostrarError("Error al validar el rostro. Intente nuevamente.", false);
+            } finally {
+                enviando = false;
+            }
+        }
+
+        navigator.mediaDevices.getUserMedia({
+            video: {
+                facingMode: "user",
+                width: { ideal: 1280 },
+                height: { ideal: 720 }
+            },
+            audio: false
+        })
+        .then(stream => {
+            video.srcObject = stream;
+            streamReady = true;
+        })
+        .catch(error => {
+            mostrarError("No se pudo abrir la cámara.", false);
+        });
 
         actualizarModoUI();
         limpiarEstado();
-        setInterval(capturar, 3000);
+        actualizarIndicadoresRostro(false);
+
+        setInterval(detectarRostro, DETECCION_INTERVALO);
     </script>
 </body>
 </html>

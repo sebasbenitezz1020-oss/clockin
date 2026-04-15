@@ -1,36 +1,39 @@
 import base64
 import os
 import tempfile
+from io import BytesIO
 
 import cv2
 import face_recognition
 import numpy as np
 from PIL import Image
-from io import BytesIO
 
-from django.shortcuts import render, get_object_or_404
 from django.http import JsonResponse
+from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 
-from core.models import Funcionario, Asistencia
+from core.models import Asistencia, Funcionario
 from core.views import registrar_historial
 from .utils_face import reconocer
 
 
 # =========================
-# ANTI FRAUDE BÁSICO
+# ANTI FRAUDE / CONTROL
 # =========================
 ultimo_frame_gray = None
 ultimo_tiempo_captura = None
 
 
 def _base64_a_frame(data_url):
-    header, encoded = data_url.split(",", 1)
-    img_bytes = base64.b64decode(encoded)
-    np_arr = np.frombuffer(img_bytes, np.uint8)
-    frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
-    return frame
+    try:
+        header, encoded = data_url.split(",", 1)
+        img_bytes = base64.b64decode(encoded)
+        np_arr = np.frombuffer(img_bytes, np.uint8)
+        frame = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+        return frame
+    except Exception:
+        return None
 
 
 def _detectar_movimiento(frame_actual):
@@ -63,11 +66,37 @@ def _controlar_tiempo():
 
     diferencia = (ahora - ultimo_tiempo_captura).total_seconds()
 
-    if diferencia < 2:
+    if diferencia < 1:
         return False
 
     ultimo_tiempo_captura = ahora
     return True
+
+
+def _detectar_rostros_en_frame(frame_bgr):
+    """
+    Devuelve lista de ubicaciones de rostro.
+    Se hace sobre una versión reducida para ganar velocidad.
+    """
+    rgb = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2RGB)
+    small = cv2.resize(rgb, (0, 0), fx=0.35, fy=0.35)
+    face_locations = face_recognition.face_locations(small, model="hog")
+    return face_locations
+
+
+def _mensaje_error_amigable(error_texto):
+    texto = str(error_texto or "").lower()
+
+    if "sizes of input arguments do not match" in texto:
+        return "No fue posible validar el rostro. Ajuste el rostro dentro del recuadro e intente nuevamente."
+
+    if "could not open" in texto or "cannot open" in texto:
+        return "No se pudo procesar la imagen capturada. Intente nuevamente."
+
+    if "no face" in texto or "rostro" in texto:
+        return "No se detectó un rostro válido. Colóquese de frente a la cámara."
+
+    return "No fue posible validar el rostro. Intente nuevamente."
 
 
 # =========================
@@ -335,7 +364,7 @@ def registrar_rostro(request, funcionario_id):
             })
 
         except Exception as e:
-            return JsonResponse({"ok": False, "error": str(e)})
+            return JsonResponse({"ok": False, "error": _mensaje_error_amigable(str(e))})
 
     return JsonResponse({"ok": False, "error": "Método no permitido"})
 
@@ -347,6 +376,7 @@ def reconocimiento(request):
 
     data = request.POST.get("imagen")
     modo = request.POST.get("modo", "entrada").strip().lower()
+    solo_deteccion = request.POST.get("solo_deteccion", "0").strip() in ["1", "true", "True"]
 
     if not data:
         return JsonResponse({"ok": False, "error": "No se recibió imagen"})
@@ -354,26 +384,44 @@ def reconocimiento(request):
     temp_path = None
 
     try:
-        if not _controlar_tiempo():
-            return JsonResponse({
-                "ok": False,
-                "tipo": "anti_fraude",
-                "error": "Captura demasiado rápida. Espere un momento."
-            })
-
         frame = _base64_a_frame(data)
         if frame is None:
             return JsonResponse({
                 "ok": False,
-                "tipo": "anti_fraude",
+                "tipo": "error_imagen",
                 "error": "No se pudo procesar la imagen."
+            })
+
+        rostros = _detectar_rostros_en_frame(frame)
+        hay_rostro = len(rostros) > 0
+
+        if solo_deteccion:
+            return JsonResponse({
+                "ok": True,
+                "tipo": "deteccion",
+                "hay_rostro": hay_rostro,
+                "cantidad_rostros": len(rostros),
+            })
+
+        if not hay_rostro:
+            return JsonResponse({
+                "ok": False,
+                "tipo": "sin_rostro",
+                "mensaje": "Esperando rostro frente a cámara."
+            })
+
+        if not _controlar_tiempo():
+            return JsonResponse({
+                "ok": False,
+                "tipo": "anti_fraude",
+                "mensaje": "Espere un instante para una nueva lectura."
             })
 
         if not _detectar_movimiento(frame):
             return JsonResponse({
                 "ok": False,
-                "tipo": "anti_fraude",
-                "error": "No se detecta movimiento suficiente. Posible intento de fraude."
+                "tipo": "rostro_estatico",
+                "mensaje": "Mueva ligeramente el rostro e intente nuevamente."
             })
 
         image_data = base64.b64decode(data.split(",")[1])
@@ -389,7 +437,7 @@ def reconocimiento(request):
             return JsonResponse({
                 "ok": False,
                 "tipo": "no_reconocido",
-                "error": "No reconocido"
+                "mensaje": "Rostro detectado, pero no fue reconocido."
             })
 
         resultado = _marcar_asistencia_biometrica(request, funcionario, modo)
@@ -409,7 +457,11 @@ def reconocimiento(request):
         })
 
     except Exception as e:
-        return JsonResponse({"ok": False, "error": str(e)})
+        return JsonResponse({
+            "ok": False,
+            "tipo": "error_validacion",
+            "mensaje": _mensaje_error_amigable(str(e))
+        })
 
     finally:
         if temp_path and os.path.exists(temp_path):
