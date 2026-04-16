@@ -13,9 +13,9 @@
     <style>
         :root {
             --bg: #05070b;
-            --panel: #0f1620;
-            --panel-2: #121a25;
-            --border: #223244;
+            --panel: rgba(17, 24, 33, 0.92);
+            --panel-soft: rgba(13, 20, 29, 0.95);
+            --border: rgba(255,255,255,0.06);
             --text: #f3f7fb;
             --muted: #9fb0c3;
             --ok: #22c55e;
@@ -23,7 +23,6 @@
             --error: #ef4444;
             --accent: #38bdf8;
             --accent-2: #60a5fa;
-            --glass: rgba(17, 24, 33, 0.90);
         }
 
         * {
@@ -33,8 +32,8 @@
 
         html, body {
             margin: 0;
-            height: 100%;
             width: 100%;
+            height: 100%;
             overflow: hidden;
             background: var(--bg);
             color: var(--text);
@@ -43,9 +42,9 @@
 
         body {
             background:
-                radial-gradient(circle at top left, rgba(56, 189, 248, 0.10), transparent 25%),
-                radial-gradient(circle at top right, rgba(34, 197, 94, 0.08), transparent 25%),
-                linear-gradient(180deg, #06090e 0%, #0a1017 100%);
+                radial-gradient(circle at top left, rgba(56, 189, 248, 0.10), transparent 26%),
+                radial-gradient(circle at top right, rgba(34, 197, 94, 0.08), transparent 24%),
+                linear-gradient(180deg, #05070b 0%, #09111a 100%);
         }
 
         .screen {
@@ -68,16 +67,17 @@
             gap: 16px;
             padding: 16px 20px;
             border-radius: 24px;
-            border: 1px solid rgba(255,255,255,0.06);
             background: rgba(18, 24, 33, 0.88);
-            box-shadow: 0 14px 40px rgba(0, 0, 0, 0.30);
+            border: 1px solid var(--border);
+            box-shadow: 0 14px 40px rgba(0,0,0,.30);
+            backdrop-filter: blur(10px);
         }
 
         .brand h1 {
             margin: 0;
             font-size: 30px;
             font-weight: 800;
-            letter-spacing: 0.2px;
+            letter-spacing: .2px;
         }
 
         .brand p {
@@ -100,8 +100,8 @@
             justify-content: center;
             padding: 10px 14px;
             border-radius: 999px;
-            background: rgba(255,255,255,0.05);
-            border: 1px solid rgba(255,255,255,0.08);
+            background: rgba(255,255,255,.05);
+            border: 1px solid rgba(255,255,255,.08);
             color: #d7e4ef;
             font-size: 13px;
             font-weight: 700;
@@ -115,8 +115,8 @@
         }
 
         .fullscreen-btn {
-            border: 1px solid rgba(255,255,255,0.08);
-            background: rgba(255,255,255,0.05);
+            border: 1px solid rgba(255,255,255,.08);
+            background: rgba(255,255,255,.05);
             color: #fff;
             border-radius: 14px;
             padding: 10px 14px;
@@ -144,17 +144,17 @@
         .content {
             min-height: 0;
             display: grid;
-            grid-template-columns: 1.2fr 0.95fr;
+            grid-template-columns: 1.15fr 1fr;
             gap: 16px;
         }
 
         .camera-card,
         .status-card {
             min-height: 0;
-            background: var(--glass);
-            border: 1px solid rgba(255,255,255,0.06);
+            background: var(--panel);
+            border: 1px solid var(--border);
             border-radius: 26px;
-            box-shadow: 0 18px 50px rgba(0, 0, 0, 0.28);
+            box-shadow: 0 18px 50px rgba(0,0,0,.28);
             overflow: hidden;
             backdrop-filter: blur(10px);
         }
@@ -205,8 +205,7 @@
             font-size: 18px;
             font-weight: 800;
             cursor: pointer;
-            transition: all 0.2s ease;
-            box-shadow: inset 0 0 0 1px rgba(255,255,255,0.02);
+            transition: .2s ease;
         }
 
         .mode-btn.active.entrada {
@@ -261,7 +260,7 @@
             box-shadow:
                 0 0 0 9999px rgba(0,0,0,0.14) inset,
                 0 0 24px rgba(56, 189, 248, 0.22);
-            transition: all 0.18s ease;
+            transition: all .18s ease;
         }
 
         .video-wrap.has-face .scan-frame::before {
@@ -290,8 +289,8 @@
             border-radius: 999px;
             font-size: 13px;
             font-weight: 700;
-            border: 1px solid rgba(255,255,255,0.08);
-            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,.08);
+            background: rgba(255,255,255,.04);
             color: #dbe7f3;
             white-space: nowrap;
         }
@@ -330,45 +329,48 @@
             border-radius: 999px;
             font-size: 13px;
             font-weight: 700;
-            letter-spacing: 0.4px;
-            background: rgba(255,255,255,0.06);
+            letter-spacing: .4px;
+            background: rgba(255,255,255,.06);
             color: #dbe7f3;
-            border: 1px solid rgba(255,255,255,0.06);
+            border: 1px solid rgba(255,255,255,.06);
         }
 
         .result-box {
             margin-top: 16px;
-            padding: 20px 18px;
-            border-radius: 22px;
-            background: #0d141d;
+            padding: 22px 20px;
+            border-radius: 24px;
+            background: var(--panel-soft);
             border: 1px solid #1d2a38;
             flex: 1;
             min-height: 0;
             display: flex;
             flex-direction: column;
             justify-content: center;
+            transition: .22s ease;
         }
 
         .result-icon {
-            font-size: 52px;
-            margin-bottom: 12px;
+            font-size: 62px;
+            margin-bottom: 10px;
+            line-height: 1;
         }
 
         .result-name {
-            font-size: 34px;
-            font-weight: 800;
-            line-height: 1.1;
+            font-size: 38px;
+            font-weight: 900;
+            line-height: 1.05;
             margin-bottom: 10px;
+            letter-spacing: -.3px;
         }
 
         .result-state {
-            font-size: 22px;
-            font-weight: 700;
+            font-size: 24px;
+            font-weight: 800;
             margin-bottom: 10px;
         }
 
         .result-subtype {
-            font-size: 17px;
+            font-size: 18px;
             font-weight: 700;
             margin-bottom: 12px;
             color: #e5eef8;
@@ -381,7 +383,7 @@
         }
 
         .detail-grid {
-            margin-top: 16px;
+            margin-top: 18px;
             display: grid;
             grid-template-columns: repeat(3, 1fr);
             gap: 10px;
@@ -390,7 +392,7 @@
         .detail-box {
             background: rgba(255,255,255,.03);
             border: 1px solid rgba(255,255,255,.05);
-            border-radius: 14px;
+            border-radius: 16px;
             padding: 12px;
         }
 
@@ -402,8 +404,8 @@
 
         .detail-box .val {
             color: #fff;
-            font-size: 15px;
-            font-weight: 700;
+            font-size: 16px;
+            font-weight: 800;
         }
 
         .footer-box {
@@ -441,8 +443,13 @@
             color: #86efac;
         }
 
+        .ok-theme .result-box {
+            box-shadow: 0 0 0 1px rgba(34,197,94,.10), 0 0 36px rgba(34,197,94,.08);
+        }
+
         .ok-theme .result-state,
-        .ok-theme .result-icon {
+        .ok-theme .result-icon,
+        .ok-theme .result-name {
             color: var(--ok);
         }
 
@@ -472,7 +479,8 @@
         }
 
         .error-theme .result-state,
-        .error-theme .result-icon {
+        .error-theme .result-icon,
+        .error-theme .result-name {
             color: var(--error);
         }
 
@@ -487,6 +495,16 @@
             color: var(--accent);
         }
 
+        .pulse-success {
+            animation: pulseSuccess .65s ease;
+        }
+
+        @keyframes pulseSuccess {
+            0% { transform: scale(.98); opacity: .85; }
+            50% { transform: scale(1.015); opacity: 1; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
         canvas {
             display: none;
         }
@@ -494,10 +512,6 @@
         @media (max-width: 1100px) {
             .content {
                 grid-template-columns: 1fr;
-            }
-
-            .screen {
-                height: 100dvh;
             }
 
             .video-wrap {
@@ -534,11 +548,11 @@
             }
 
             .result-name {
-                font-size: 28px;
+                font-size: 30px;
             }
 
             .result-state {
-                font-size: 20px;
+                font-size: 21px;
             }
 
             .scan-frame::before {
@@ -604,13 +618,13 @@
 
                     <div class="status-badge" id="statusBadge">LISTO PARA ESCANEAR</div>
 
-                    <div class="result-box">
+                    <div class="result-box" id="resultBox">
                         <div class="result-icon" id="resultIcon">👤</div>
                         <div class="result-name" id="resultName">Esperando rostro...</div>
-                        <div class="result-state" id="resultState">Sin sonido mientras no haya rostro</div>
-                        <div class="result-subtype" id="resultSubtype">El sistema solo intentará leer cuando detecte una cara.</div>
+                        <div class="result-state" id="resultState">Sistema en espera silenciosa</div>
+                        <div class="result-subtype" id="resultSubtype">Acerque el rostro al recuadro para iniciar la validación.</div>
                         <div class="result-detail" id="resultDetail">
-                            Cuando un rostro permanezca estable frente a cámara por 1 segundo, se intentará la validación.
+                            La lectura se ejecuta automáticamente cuando el rostro permanece estable frente a cámara por 1 segundo.
                         </div>
 
                         <div class="detail-grid">
@@ -657,6 +671,7 @@
         const dateText = document.getElementById("dateText");
 
         const statusCard = document.getElementById("statusCard");
+        const resultBox = document.getElementById("resultBox");
         const systemStatusText = document.getElementById("systemStatusText");
         const statusBadge = document.getElementById("statusBadge");
 
@@ -750,11 +765,9 @@
         btnFullscreen.addEventListener("click", activarFullscreen);
 
         document.addEventListener("fullscreenchange", () => {
-            if (document.fullscreenElement) {
-                btnFullscreen.textContent = "✅ Full screen activo";
-            } else {
-                btnFullscreen.textContent = "⛶ Pantalla completa";
-            }
+            btnFullscreen.textContent = document.fullscreenElement
+                ? "✅ Full screen activo"
+                : "⛶ Pantalla completa";
         });
 
         document.addEventListener("click", activarFullscreen, { once: true });
@@ -804,15 +817,21 @@
             } catch (e) {}
         }
 
+        function aplicarPulse() {
+            resultBox.classList.remove("pulse-success");
+            void resultBox.offsetWidth;
+            resultBox.classList.add("pulse-success");
+        }
+
         function limpiarEstado() {
             statusCard.className = "status-card idle-theme";
             systemStatusText.textContent = "En espera";
             statusBadge.textContent = "LISTO PARA ESCANEAR";
             resultIcon.textContent = "👤";
             resultName.textContent = "Esperando rostro...";
-            resultState.textContent = "Sin sonido mientras no haya rostro";
-            resultSubtype.textContent = "El sistema solo intentará leer cuando detecte una cara.";
-            resultDetail.textContent = "Cuando un rostro permanezca estable frente a cámara por 1 segundo, se intentará la validación.";
+            resultState.textContent = "Sistema en espera silenciosa";
+            resultSubtype.textContent = "Acerque el rostro al recuadro para iniciar la validación.";
+            resultDetail.textContent = "La lectura se ejecuta automáticamente cuando el rostro permanece estable frente a cámara por 1 segundo.";
             detailHora.textContent = "—";
             detailTurno.textContent = "—";
             detailAtraso.textContent = "—";
@@ -831,11 +850,11 @@
         }
 
         function traducirTipo(tipo) {
-            if (tipo === "entrada") return "Entrada registrada";
-            if (tipo === "salida_almuerzo") return "Salida a almuerzo registrada";
-            if (tipo === "regreso_almuerzo") return "Regreso de almuerzo registrado";
-            if (tipo === "salida") return "Salida final registrada";
-            return "Marcación registrada";
+            if (tipo === "entrada") return "Entrada confirmada";
+            if (tipo === "salida_almuerzo") return "Salida a almuerzo confirmada";
+            if (tipo === "regreso_almuerzo") return "Regreso de almuerzo confirmado";
+            if (tipo === "salida") return "Salida final confirmada";
+            return "Marcación confirmada";
         }
 
         function iconoTipo(tipo) {
@@ -851,10 +870,10 @@
                 videoWrap.classList.add("validating");
                 videoWrap.classList.remove("has-face");
                 pillRostro.className = "face-pill ready";
-                pillRostro.textContent = "Validando rostro…";
+                pillRostro.textContent = "Validando identidad…";
                 pillCuenta.className = "face-pill ready";
                 pillCuenta.textContent = "Procesando";
-                cameraTopHint.textContent = "Validando captura";
+                cameraTopHint.textContent = "Validando identidad";
                 return;
             }
 
@@ -878,23 +897,23 @@
                 const segundos = (restanteMs / 1000).toFixed(1);
                 pillCuenta.className = "face-pill detected";
                 pillCuenta.textContent = `Captura en ${segundos}s`;
-                cameraTopHint.textContent = "Mantenga el rostro dentro del cuadro";
+                cameraTopHint.textContent = "Mantenga el rostro dentro del recuadro";
             } else {
                 pillCuenta.className = "face-pill ready";
-                pillCuenta.textContent = "Listo para leer";
-                cameraTopHint.textContent = "Rostro listo para validación";
+                pillCuenta.textContent = "Listo para validar";
+                cameraTopHint.textContent = "Rostro listo para lectura";
             }
         }
 
         function mostrarEsperaConRostro(restanteMs) {
             statusCard.className = "status-card idle-theme";
             systemStatusText.textContent = "Rostro detectado";
-            statusBadge.textContent = "PREPARANDO CAPTURA";
+            statusBadge.textContent = "PREPARANDO LECTURA";
             resultIcon.textContent = "🧠";
             resultName.textContent = "Rostro detectado";
             resultState.textContent = "Preparando validación";
             resultSubtype.textContent = `Mantenga el rostro estable ${Math.max(1, Math.ceil(restanteMs / 1000))} segundo(s)`;
-            resultDetail.textContent = "La lectura solo se ejecutará cuando haya un rostro estable frente a la cámara.";
+            resultDetail.textContent = "La identidad se validará automáticamente en cuanto el rostro permanezca estable dentro del recuadro.";
 
             detailHora.textContent = "—";
             detailTurno.textContent = "—";
@@ -903,18 +922,19 @@
 
         function mostrarExito(data) {
             statusCard.className = "status-card ok-theme";
-            systemStatusText.textContent = "Registro exitoso";
-            statusBadge.textContent = "MARCACIÓN REGISTRADA";
+            systemStatusText.textContent = "Lectura exitosa";
+            statusBadge.textContent = "ASISTENCIA REGISTRADA";
             resultIcon.textContent = iconoTipo(data.tipo);
             resultName.textContent = data.funcionario || "Funcionario reconocido";
             resultState.textContent = traducirTipo(data.tipo);
-            resultSubtype.textContent = data.subtipo || data.mensaje || "Marcación confirmada";
-            resultDetail.textContent = data.mensaje || "";
+            resultSubtype.textContent = data.subtipo || data.mensaje || "Marcación confirmada correctamente";
+            resultDetail.textContent = data.mensaje || "La operación fue procesada exitosamente.";
 
             detailHora.textContent = data.hora || "—";
             detailTurno.textContent = data.turno || "—";
             detailAtraso.textContent = data.llego_tarde ? ((data.minutos_atraso || 0) + " min") : "0 min";
 
+            aplicarPulse();
             beepSuccess();
             activarPausa(PAUSA_EXITO_MS);
             programarReinicio();
@@ -922,13 +942,13 @@
 
         function mostrarAviso(data, conSonido = true) {
             statusCard.className = "status-card warn-theme";
-            systemStatusText.textContent = "Aviso";
-            statusBadge.textContent = "ATENCIÓN";
+            systemStatusText.textContent = "Atención";
+            statusBadge.textContent = "REVISE LA MARCACIÓN";
             resultIcon.textContent = "⚠️";
-            resultName.textContent = data.funcionario || "Marcación no permitida";
-            resultState.textContent = "Orden de marcación incorrecto";
-            resultSubtype.textContent = data.mensaje || "Revise el siguiente paso";
-            resultDetail.textContent = "Modo seleccionado: " + modoSeleccionado.toUpperCase();
+            resultName.textContent = data.funcionario || "Marcación no disponible";
+            resultState.textContent = "Secuencia de marcación no válida";
+            resultSubtype.textContent = data.mensaje || "La siguiente acción esperada no corresponde a este modo.";
+            resultDetail.textContent = "Cambie el modo o espere la siguiente marcación correspondiente.";
 
             detailHora.textContent = "—";
             detailTurno.textContent = data.turno || "—";
@@ -941,13 +961,13 @@
 
         function mostrarError(errorText, conSonido = true) {
             statusCard.className = "status-card error-theme";
-            systemStatusText.textContent = "Error";
-            statusBadge.textContent = "NO RECONOCIDO";
+            systemStatusText.textContent = "No validado";
+            statusBadge.textContent = "ROSTRO NO RECONOCIDO";
             resultIcon.textContent = "❌";
-            resultName.textContent = "No reconocido";
-            resultState.textContent = "No fue posible validar el rostro";
-            resultSubtype.textContent = "Intente nuevamente";
-            resultDetail.textContent = errorText || "Colóquese de frente a la cámara.";
+            resultName.textContent = "Validación no completada";
+            resultState.textContent = "No pudimos confirmar la identidad";
+            resultSubtype.textContent = "Intente nuevamente frente a la cámara";
+            resultDetail.textContent = errorText || "Ajuste el rostro dentro del recuadro y vuelva a intentar.";
 
             detailHora.textContent = "—";
             detailTurno.textContent = "—";
@@ -976,7 +996,10 @@
 
             canvas.width = width;
             canvas.height = height;
-            ctx.drawImage(video, 0, 0, width, height);
+            ctx.save();
+            ctx.scale(-1, 1);
+            ctx.drawImage(video, -width, 0, width, height);
+            ctx.restore();
 
             return canvas.toDataURL("image/jpeg", calidad);
         }
@@ -1031,7 +1054,7 @@
                     await reconocerRostro();
                 }
             } catch (error) {
-                // silencio en detección
+                // silencio en modo espera
             }
         }
 
@@ -1085,7 +1108,7 @@
                     mostrarError(dataJson.mensaje || dataJson.error || "No reconocido", true);
                 }
             } catch (error) {
-                mostrarError("Error al validar el rostro. Intente nuevamente.", false);
+                mostrarError("No fue posible completar la validación. Intente nuevamente.", false);
             } finally {
                 enviando = false;
             }
@@ -1103,8 +1126,8 @@
             video.srcObject = stream;
             streamReady = true;
         })
-        .catch(error => {
-            mostrarError("No se pudo abrir la cámara.", false);
+        .catch(() => {
+            mostrarError("No se pudo abrir la cámara del dispositivo.", false);
         });
 
         actualizarModoUI();
