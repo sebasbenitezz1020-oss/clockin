@@ -1,9 +1,10 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import get_object_or_404, redirect, render
-from usuarios.utils import es_admin_total
 
+from .forms import UsuarioForm
 from .models import PermisoUsuario, Usuario
+from .utils import es_admin_total
 
 
 ACCIONES = [
@@ -20,10 +21,11 @@ ACCIONES = [
 
 @login_required
 def usuarios_lista(request):
-    q = request.GET.get("q", "").strip()
     if not es_admin_total(request.user):
         messages.error(request, "No tienes permiso para acceder a usuarios y permisos.")
         return redirect("dashboard")
+
+    q = request.GET.get("q", "").strip()
 
     usuarios = Usuario.objects.all().order_by("first_name", "last_name", "username")
 
@@ -45,11 +47,82 @@ def usuarios_lista(request):
 
 
 @login_required
-def usuario_permisos(request, pk):
+def usuario_nuevo(request):
+    if not es_admin_total(request.user):
+        messages.error(request, "No tienes permiso para crear usuarios.")
+        return redirect("dashboard")
+
+    if request.method == "POST":
+        form = UsuarioForm(request.POST, es_edicion=False)
+        if form.is_valid():
+            usuario = form.save()
+            messages.success(request, f"Usuario {usuario.username} creado correctamente.")
+            return redirect("usuarios_lista")
+    else:
+        form = UsuarioForm(es_edicion=False)
+
+    return render(request, "usuarios/usuario_form.html", {
+        "form": form,
+        "titulo_form": "Nuevo usuario",
+        "boton_texto": "Guardar usuario",
+        "modo_edicion": False,
+    })
+
+
+@login_required
+def usuario_editar(request, pk):
+    if not es_admin_total(request.user):
+        messages.error(request, "No tienes permiso para editar usuarios.")
+        return redirect("dashboard")
+
     usuario = get_object_or_404(Usuario, pk=pk)
+
+    if request.method == "POST":
+        form = UsuarioForm(request.POST, instance=usuario, es_edicion=True)
+        if form.is_valid():
+            usuario = form.save()
+            messages.success(request, f"Usuario {usuario.username} actualizado correctamente.")
+            return redirect("usuarios_lista")
+    else:
+        form = UsuarioForm(instance=usuario, es_edicion=True)
+
+    return render(request, "usuarios/usuario_form.html", {
+        "form": form,
+        "titulo_form": f"Editar usuario: {usuario.username}",
+        "boton_texto": "Guardar cambios",
+        "modo_edicion": True,
+        "usuario_obj": usuario,
+    })
+
+
+@login_required
+def usuario_toggle_activo(request, pk):
+    if not es_admin_total(request.user):
+        messages.error(request, "No tienes permiso para cambiar el estado de usuarios.")
+        return redirect("dashboard")
+
+    usuario = get_object_or_404(Usuario, pk=pk)
+
+    if usuario == request.user and usuario.activo:
+        messages.error(request, "No puedes inactivarte a ti mismo.")
+        return redirect("usuarios_lista")
+
+    usuario.activo = not usuario.activo
+    usuario.is_active = usuario.activo
+    usuario.save(update_fields=["activo", "is_active"])
+
+    estado = "activado" if usuario.activo else "inactivado"
+    messages.success(request, f"Usuario {usuario.username} {estado} correctamente.")
+    return redirect("usuarios_lista")
+
+
+@login_required
+def usuario_permisos(request, pk):
     if not es_admin_total(request.user):
         messages.error(request, "No tienes permiso para editar permisos.")
         return redirect("dashboard")
+
+    usuario = get_object_or_404(Usuario, pk=pk)
 
     modulos = list(PermisoUsuario.Modulos.choices)
 

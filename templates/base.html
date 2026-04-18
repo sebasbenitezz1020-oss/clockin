@@ -451,6 +451,16 @@
         </header>
 
         <section class="page">
+            {% if messages %}
+                <div style="margin-bottom: 16px;">
+                    {% for message in messages %}
+                        <div class="alert-box {% if message.tags == 'error' %}error-box-strong{% elif message.tags == 'warning' %}warning-box{% else %}success-box{% endif %}" style="margin-bottom:10px;">
+                            {{ message }}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
             {% block content %}{% endblock %}
         </section>
     </main>

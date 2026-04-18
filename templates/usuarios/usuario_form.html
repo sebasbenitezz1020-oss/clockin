@@ -1,0 +1,206 @@
+{% extends "base.html" %}
+
+{% block title %}{{ titulo_form }} | ClockIn{% endblock %}
+
+{% block content %}
+<style>
+    .uform-card {
+        max-width: 950px;
+        background: linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
+        border: 1px solid rgba(255,255,255,.06);
+        border-radius: 24px;
+        padding: 22px;
+        box-shadow: 0 12px 36px rgba(0,0,0,.22);
+    }
+
+    .uform-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+    }
+
+    .uform-field {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .uform-field.full {
+        grid-column: 1 / -1;
+    }
+
+    .uform-field label {
+        color: #e5e7eb;
+        font-size: 13px;
+        font-weight: 700;
+    }
+
+    .uform-help {
+        color: #94a3b8;
+        font-size: 12px;
+        line-height: 1.45;
+        margin-top: -2px;
+    }
+
+    .uform-field input,
+    .uform-field select {
+        width: 100%;
+        border: 1px solid rgba(255,255,255,.08);
+        background: #0f1722;
+        color: #fff;
+        border-radius: 14px;
+        padding: 13px 14px;
+        font-size: 14px;
+        outline: none;
+    }
+
+    .uform-check {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 18px;
+        background: rgba(255,255,255,.03);
+        border: 1px solid rgba(255,255,255,.05);
+        border-radius: 14px;
+        padding: 12px 14px;
+        width: fit-content;
+    }
+
+    .uform-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+        margin-top: 20px;
+        flex-wrap: wrap;
+    }
+
+    .uform-btn-soft,
+    .uform-btn-main {
+        padding: 13px 18px;
+        border-radius: 14px;
+        font-size: 14px;
+        font-weight: 800;
+        text-decoration: none;
+        border: none;
+        cursor: pointer;
+    }
+
+    .uform-btn-soft {
+        background: rgba(255,255,255,.05);
+        color: #fff;
+        border: 1px solid rgba(255,255,255,.08);
+    }
+
+    .uform-btn-main {
+        background: linear-gradient(135deg, var(--brand-primary), var(--brand-primary-dark));
+        color: #fff;
+        box-shadow: 0 10px 24px var(--brand-shadow);
+    }
+
+    .errorlist {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        color: #fca5a5;
+        font-size: 12px;
+    }
+
+    @media (max-width: 720px) {
+        .uform-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<div class="page-header">
+    <h2>👤 {{ titulo_form }}</h2>
+    <p>
+        {% if modo_edicion %}
+            Edita los datos base del usuario. Luego puedes ajustar sus permisos personalizados.
+        {% else %}
+            Crea un usuario y luego asígnale los permisos que podrá usar dentro del sistema.
+        {% endif %}
+    </p>
+</div>
+
+<div class="uform-card">
+    <form method="post">
+        {% csrf_token %}
+
+        {% if form.errors %}
+            <div class="alert-box error-box-strong" style="margin-bottom:16px;">
+                Revisa los campos marcados.
+            </div>
+        {% endif %}
+
+        <div class="uform-grid">
+            <div class="uform-field">
+                <label>Nombre</label>
+                {{ form.first_name }}
+                {{ form.first_name.errors }}
+            </div>
+
+            <div class="uform-field">
+                <label>Apellido</label>
+                {{ form.last_name }}
+                {{ form.last_name.errors }}
+            </div>
+
+            <div class="uform-field">
+                <label>Usuario</label>
+                {{ form.username }}
+                {{ form.username.errors }}
+            </div>
+
+            <div class="uform-field">
+                <label>Email</label>
+                {{ form.email }}
+                {{ form.email.errors }}
+            </div>
+
+            <div class="uform-field">
+                <label>Teléfono</label>
+                {{ form.telefono }}
+                {{ form.telefono.errors }}
+            </div>
+
+            <div class="uform-field">
+                <label>Rol base</label>
+                {{ form.rol }}
+                {{ form.rol.errors }}
+            </div>
+
+            <div class="uform-field">
+                <label>Contraseña</label>
+                {% if modo_edicion %}
+                    <div class="uform-help">Déjala en blanco si no quieres cambiarla.</div>
+                {% endif %}
+                {{ form.password1 }}
+                {{ form.password1.errors }}
+            </div>
+
+            <div class="uform-field">
+                <label>Confirmar contraseña</label>
+                {% if modo_edicion %}
+                    <div class="uform-help">Solo completa este campo si vas a cambiar la contraseña.</div>
+                {% endif %}
+                {{ form.password2 }}
+                {{ form.password2.errors }}
+            </div>
+        </div>
+
+        <label class="uform-check">
+            {{ form.activo }}
+            <span>Usuario activo</span>
+        </label>
+
+        <div class="uform-actions">
+            <a href="{% url 'usuarios_lista' %}" class="uform-btn-soft">Volver</a>
+            {% if modo_edicion and usuario_obj %}
+                <a href="{% url 'usuario_permisos' usuario_obj.id %}" class="uform-btn-soft">Ir a permisos</a>
+            {% endif %}
+            <button type="submit" class="uform-btn-main">{{ boton_texto }}</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

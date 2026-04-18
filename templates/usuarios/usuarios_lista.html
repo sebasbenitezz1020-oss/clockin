@@ -25,6 +25,18 @@
         color: #94a3b8;
     }
 
+    .usr-btn {
+        padding: 13px 18px;
+        border-radius: 14px;
+        text-decoration: none;
+        font-size: 14px;
+        font-weight: 800;
+        border: none;
+        background: linear-gradient(135deg, var(--brand-primary), var(--brand-primary-dark));
+        color: #fff;
+        box-shadow: 0 10px 24px var(--brand-shadow);
+    }
+
     .usr-card {
         background: linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
         border: 1px solid rgba(255,255,255,.06);
@@ -63,7 +75,7 @@
 
     .usr-table {
         width: 100%;
-        min-width: 760px;
+        min-width: 980px;
         border-collapse: separate;
         border-spacing: 0 8px;
     }
@@ -111,6 +123,18 @@
         border: 1px solid rgba(59,130,246,.22);
     }
 
+    .usr-link-soft {
+        background: rgba(255,255,255,.05);
+        color: #e5e7eb;
+        border: 1px solid rgba(255,255,255,.08);
+    }
+
+    .usr-link-danger {
+        background: rgba(239,68,68,.14);
+        color: #fecaca;
+        border: 1px solid rgba(239,68,68,.22);
+    }
+
     .usr-badge {
         display: inline-flex;
         padding: 6px 10px;
@@ -130,13 +154,21 @@
         color: #fecaca;
         border: 1px solid rgba(239,68,68,.22);
     }
+
+    .usr-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
 </style>
 
 <div class="usr-head">
     <div>
         <h2>👤 Usuarios</h2>
-        <p>Administra usuarios y entra a la matriz de permisos de cada uno.</p>
+        <p>Administra usuarios, sus estados y la matriz de permisos de cada uno.</p>
     </div>
+
+    <a href="{% url 'usuario_nuevo' %}" class="usr-btn">➕ Nuevo usuario</a>
 </div>
 
 <div class="usr-card">
@@ -151,9 +183,10 @@
                 <tr>
                     <th>Usuario</th>
                     <th>Nombre</th>
+                    <th>Email</th>
                     <th>Rol base</th>
                     <th>Estado</th>
-                    <th>Permisos</th>
+                    <th>Acciones</th>
                 </tr>
             </thead>
             <tbody>
@@ -161,6 +194,7 @@
                 <tr>
                     <td>{{ u.username }}</td>
                     <td>{{ u.get_full_name|default:"-" }}</td>
+                    <td>{{ u.email|default:"-" }}</td>
                     <td>{{ u.get_rol_display }}</td>
                     <td>
                         {% if u.activo %}
@@ -170,12 +204,18 @@
                         {% endif %}
                     </td>
                     <td>
-                        <a href="{% url 'usuario_permisos' u.id %}" class="usr-link">Configurar permisos</a>
+                        <div class="usr-actions">
+                            <a href="{% url 'usuario_editar' u.id %}" class="usr-link usr-link-soft">Editar</a>
+                            <a href="{% url 'usuario_permisos' u.id %}" class="usr-link">Permisos</a>
+                            <a href="{% url 'usuario_toggle_activo' u.id %}" class="usr-link-danger">
+                                {% if u.activo %}Inactivar{% else %}Activar{% endif %}
+                            </a>
+                        </div>
                     </td>
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="5" style="text-align:center; color:#94a3b8; padding:22px;">
+                    <td colspan="6" style="text-align:center; color:#94a3b8; padding:22px;">
                         No hay usuarios.
                     </td>
                 </tr>

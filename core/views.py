@@ -17,7 +17,7 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
-from usuarios.utils import validar_permiso_o_redirigir
+from usuarios.utils import validar_permiso_o_redirigir, tiene_permiso
 
 from .forms import (
     ConfiguracionGeneralForm,
@@ -177,65 +177,84 @@ def generar_nomina_funcionario(funcionario, mes, anio):
 
 @login_required
 def dashboard(request):
-    permiso = validar_permiso_o_redirigir(request, "dashboard", "puede_ver")
-    if permiso:
-        return permiso
-
     hoy = timezone.localdate()
 
-    total_funcionarios = Funcionario.objects.filter(activo=True).count()
+    perm_funcionarios = tiene_permiso(request.user, "funcionarios", "puede_ver")
+    perm_asistencia = tiene_permiso(request.user, "asistencia", "puede_ver")
+    perm_deudas = tiene_permiso(request.user, "deudas", "puede_ver")
+    perm_nomina = tiene_permiso(request.user, "nomina", "puede_ver")
+    perm_icl = tiene_permiso(request.user, "icl", "puede_ver")
+    perm_reportes = tiene_permiso(request.user, "reportes", "puede_ver")
+    perm_dias_libres = tiene_permiso(request.user, "dias_libres", "puede_ver")
+    perm_liquidacion = tiene_permiso(request.user, "liquidacion", "puede_ver")
 
-    asistencias_hoy_qs = Asistencia.objects.select_related(
-        "funcionario",
-        "funcionario__turno"
-    ).filter(
-        fecha=hoy,
-        funcionario__activo=True
-    )
-
-    presentes_hoy = asistencias_hoy_qs.filter(hora_entrada__isnull=False).count()
-    llegadas_tarde_hoy = asistencias_hoy_qs.filter(llego_tarde=True).count()
-    salidas_hoy = asistencias_hoy_qs.filter(hora_salida__isnull=False).count()
-    pendientes_hoy = max(total_funcionarios - presentes_hoy, 0)
-
+    total_funcionarios = 0
+    presentes_hoy = 0
+    llegadas_tarde_hoy = 0
+    salidas_hoy = 0
+    pendientes_hoy = 0
     trabajando_hoy = 0
     en_almuerzo_hoy = 0
     finalizados_hoy = 0
-
-    for asistencia in asistencias_hoy_qs:
-        estado = asistencia.estado_jornada
-        if estado == "Trabajando":
-            trabajando_hoy += 1
-        elif estado == "En almuerzo":
-            en_almuerzo_hoy += 1
-        elif estado == "Finalizado":
-            finalizados_hoy += 1
-
-    ultimas_marcaciones = asistencias_hoy_qs.order_by("-actualizado_en")[:8]
-
-    funcionarios_recientes = Funcionario.objects.filter(
-        activo=True
-    ).select_related(
-        "turno",
-        "sucursal_rel",
-        "sucursal_rel__empresa"
-    ).order_by("-creado_en")[:6]
-
-    funcionarios_activos = Funcionario.objects.filter(activo=True)
+    ultimas_marcaciones = []
+    funcionarios_recientes = []
     total_salario_bruto = Decimal("0.00")
     total_salario_neto = Decimal("0.00")
+    total_deudas_funcionarios = Decimal("0.00")
 
-    for funcionario in funcionarios_activos:
-        total_salario_bruto += funcionario.salario_bruto
-        total_salario_neto += funcionario.salario_neto_estimado
+    if perm_funcionarios:
+        total_funcionarios = Funcionario.objects.filter(activo=True).count()
 
-    total_deudas_funcionarios = Deuda.objects.filter(activa=True).aggregate(
-        total=Sum("saldo_pendiente")
-    )["total"] or Decimal("0.00")
+        funcionarios_recientes = Funcionario.objects.filter(
+            activo=True
+        ).select_related(
+            "turno",
+            "sucursal_rel",
+            "sucursal_rel__empresa"
+        ).order_by("-creado_en")[:6]
+
+    if perm_asistencia:
+        asistencias_hoy_qs = Asistencia.objects.select_related(
+            "funcionario",
+            "funcionario__turno"
+        ).filter(
+            fecha=hoy,
+            funcionario__activo=True
+        )
+
+        presentes_hoy = asistencias_hoy_qs.filter(hora_entrada__isnull=False).count()
+        llegadas_tarde_hoy = asistencias_hoy_qs.filter(llego_tarde=True).count()
+        salidas_hoy = asistencias_hoy_qs.filter(hora_salida__isnull=False).count()
+
+        if perm_funcionarios:
+            pendientes_hoy = max(total_funcionarios - presentes_hoy, 0)
+
+        for asistencia in asistencias_hoy_qs:
+            estado = asistencia.estado_jornada
+            if estado == "Trabajando":
+                trabajando_hoy += 1
+            elif estado == "En almuerzo":
+                en_almuerzo_hoy += 1
+            elif estado == "Finalizado":
+                finalizados_hoy += 1
+
+        ultimas_marcaciones = asistencias_hoy_qs.order_by("-actualizado_en")[:8]
+
+    if perm_nomina:
+        funcionarios_activos = Funcionario.objects.filter(activo=True)
+        for funcionario in funcionarios_activos:
+            total_salario_bruto += funcionario.salario_bruto
+            total_salario_neto += funcionario.salario_neto_estimado
+
+    if perm_deudas:
+        total_deudas_funcionarios = Deuda.objects.filter(activa=True).aggregate(
+            total=Sum("saldo_pendiente")
+        )["total"] or Decimal("0.00")
 
     context = {
         "titulo": "Dashboard ClockIn",
         "hoy": hoy,
+
         "total_funcionarios": total_funcionarios,
         "presentes_hoy": presentes_hoy,
         "llegadas_tarde_hoy": llegadas_tarde_hoy,
@@ -249,9 +268,17 @@ def dashboard(request):
         "total_salario_bruto": total_salario_bruto,
         "total_salario_neto": total_salario_neto,
         "total_deudas_funcionarios": total_deudas_funcionarios,
+
+        "perm_funcionarios": perm_funcionarios,
+        "perm_asistencia": perm_asistencia,
+        "perm_deudas": perm_deudas,
+        "perm_nomina": perm_nomina,
+        "perm_icl": perm_icl,
+        "perm_reportes": perm_reportes,
+        "perm_dias_libres": perm_dias_libres,
+        "perm_liquidacion": perm_liquidacion,
     }
     return render(request, "core/dashboard.html", context)
-
 
 @login_required
 def empresas_lista(request):

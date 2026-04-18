@@ -360,6 +360,15 @@
         color: #94a3b8;
     }
 
+    .dash-empty {
+        background: linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
+        border: 1px solid rgba(255,255,255,.06);
+        border-radius: 24px;
+        padding: 28px;
+        color: #cbd5e1;
+        box-shadow: 0 12px 36px rgba(0,0,0,.22);
+    }
+
     @media (max-width: 1100px) {
         .dash-stats,
         .dash-payroll,
@@ -387,30 +396,42 @@
         <p>Resumen en tiempo real de ClockIn para el día {{ hoy|date:"d/m/Y" }}.</p>
     </div>
 
+    {% if perm_funcionarios or perm_asistencia or perm_nomina or perm_deudas %}
     <div class="dash-stats">
+        {% if perm_funcionarios %}
         <div class="dash-stat">
             <div class="lab">Funcionarios activos</div>
             <div class="val">{{ total_funcionarios }}</div>
         </div>
+        {% endif %}
+
+        {% if perm_asistencia %}
         <div class="dash-stat">
             <div class="lab">Presentes hoy</div>
             <div class="val">{{ presentes_hoy }}</div>
         </div>
+
         <div class="dash-stat">
             <div class="lab">Llegadas tarde</div>
             <div class="val">{{ llegadas_tarde_hoy }}</div>
         </div>
+
         <div class="dash-stat">
             <div class="lab">Salidas registradas</div>
             <div class="val">{{ salidas_hoy }}</div>
         </div>
+
         <div class="dash-stat">
             <div class="lab">Pendientes hoy</div>
             <div class="val">{{ pendientes_hoy }}</div>
         </div>
+        {% endif %}
     </div>
+    {% endif %}
 
+    {% if perm_nomina or perm_deudas %}
     <div class="dash-payroll">
+        {% if perm_nomina %}
         <div class="dash-payroll-card bruto">
             <div class="top">
                 <div class="title">Total Salario Bruto</div>
@@ -426,7 +447,9 @@
             </div>
             <div class="number">{{ total_salario_neto|guaranies }}</div>
         </div>
+        {% endif %}
 
+        {% if perm_deudas %}
         <div class="dash-payroll-card deudas">
             <div class="top">
                 <div class="title">Total Deudas Funcionarios</div>
@@ -434,8 +457,11 @@
             </div>
             <div class="number">{{ total_deudas_funcionarios|guaranies }}</div>
         </div>
+        {% endif %}
     </div>
+    {% endif %}
 
+    {% if perm_asistencia %}
     <div class="dash-resumen">
         <div class="dash-resumen-card trabajando">
             <div class="top">
@@ -469,8 +495,11 @@
             <div class="number">{{ pendientes_hoy }}</div>
         </div>
     </div>
+    {% endif %}
 
+    {% if perm_asistencia or perm_funcionarios %}
     <div class="dash-grid">
+        {% if perm_asistencia %}
         <div class="dash-card">
             <div class="dash-card-header">
                 <h3>🕘 Últimas marcaciones</h3>
@@ -530,7 +559,9 @@
                 </div>
             </div>
         </div>
+        {% endif %}
 
+        {% if perm_funcionarios %}
         <div class="dash-card">
             <div class="dash-card-header">
                 <h3>👥 Funcionarios recientes</h3>
@@ -562,6 +593,13 @@
                 </div>
             </div>
         </div>
+        {% endif %}
     </div>
+    {% else %}
+    <div class="dash-empty">
+        Bienvenido al sistema. Tu cuenta ya inició correctamente, pero no tienes paneles visibles en el Dashboard todavía.
+        Pide al administrador que te habilite permisos para los módulos que vas a utilizar.
+    </div>
+    {% endif %}
 </div>
 {% endblock %}
