@@ -1,0 +1,460 @@
+{% extends "base.html" %}
+{% load number_filters %}
+
+{% block title %}Detalle Liquidación | ClockIn{% endblock %}
+
+{% block content %}
+<style>
+    .liqdet-page {
+        padding: 24px 0;
+    }
+
+    .liqdet-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 16px;
+        flex-wrap: wrap;
+        margin-bottom: 20px;
+    }
+
+    .liqdet-title h2 {
+        margin: 0;
+        color: #fff;
+        font-size: 34px;
+        font-weight: 800;
+    }
+
+    .liqdet-title p {
+        margin: 8px 0 0;
+        color: #94a3b8;
+        font-size: 15px;
+    }
+
+    .liqdet-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+    }
+
+    .liqdet-btn {
+        padding: 12px 16px;
+        border-radius: 14px;
+        text-decoration: none;
+        font-size: 14px;
+        font-weight: 800;
+        border: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 8px;
+    }
+
+    .liqdet-btn:hover {
+        text-decoration: none;
+        transform: translateY(-1px);
+    }
+
+    .liqdet-btn-main {
+        background: linear-gradient(135deg, var(--brand-primary), var(--brand-primary-dark));
+        color: #fff;
+        box-shadow: 0 10px 24px var(--brand-shadow);
+    }
+
+    .liqdet-btn-soft {
+        background: rgba(255,255,255,.05);
+        color: #fff;
+        border: 1px solid rgba(255,255,255,.08);
+    }
+
+    .liqdet-btn-danger {
+        background: rgba(220,38,38,.16);
+        color: #fecaca;
+        border: 1px solid rgba(220,38,38,.25);
+    }
+
+    .liqdet-top {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 16px;
+        margin-bottom: 20px;
+    }
+
+    .liqdet-card {
+        background: linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
+        border: 1px solid rgba(255,255,255,.06);
+        border-radius: 22px;
+        padding: 18px;
+        box-shadow: 0 12px 36px rgba(0,0,0,.22);
+        position: relative;
+        overflow: hidden;
+    }
+
+    .liqdet-card::before {
+        content: "";
+        position: absolute;
+        inset: 0 0 auto 0;
+        height: 3px;
+        background: linear-gradient(90deg, var(--brand-primary), var(--brand-primary-dark));
+        opacity: .95;
+    }
+
+    .liqdet-label {
+        color: #94a3b8;
+        font-size: 13px;
+        font-weight: 700;
+        margin-bottom: 10px;
+    }
+
+    .liqdet-number {
+        color: #fff;
+        font-size: 30px;
+        font-weight: 900;
+        line-height: 1;
+    }
+
+    .liqdet-number.small {
+        font-size: 24px;
+    }
+
+    .liqdet-grid {
+        display: grid;
+        grid-template-columns: 1.15fr .85fr;
+        gap: 18px;
+    }
+
+    .liqdet-block {
+        background: linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
+        border: 1px solid rgba(255,255,255,.06);
+        border-radius: 24px;
+        padding: 20px;
+        box-shadow: 0 12px 36px rgba(0,0,0,.22);
+    }
+
+    .liqdet-block h3 {
+        margin: 0 0 14px;
+        color: #fff;
+        font-size: 22px;
+        font-weight: 800;
+    }
+
+    .liqdet-list {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+    }
+
+    .liqdet-line {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 10px 0;
+        border-bottom: 1px solid rgba(255,255,255,.05);
+        font-size: 14px;
+    }
+
+    .liqdet-line:last-child {
+        border-bottom: none;
+    }
+
+    .liqdet-line span:first-child {
+        color: #cbd5e1;
+    }
+
+    .liqdet-line strong {
+        color: #fff;
+        text-align: right;
+    }
+
+    .liqdet-panel {
+        margin-top: 14px;
+        background: rgba(255,255,255,.03);
+        border: 1px solid rgba(255,255,255,.05);
+        border-radius: 18px;
+        padding: 16px;
+    }
+
+    .liqdet-panel-title {
+        color: #fff;
+        font-size: 15px;
+        font-weight: 800;
+        margin-bottom: 12px;
+    }
+
+    .liqdet-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 7px 12px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 800;
+        border: 1px solid transparent;
+    }
+
+    .estado-borrador {
+        background: rgba(148,163,184,.14);
+        color: #cbd5e1;
+        border-color: rgba(148,163,184,.20);
+    }
+
+    .estado-confirmada {
+        background: rgba(59,130,246,.14);
+        color: #bfdbfe;
+        border-color: rgba(59,130,246,.22);
+    }
+
+    .estado-pagada {
+        background: rgba(34,197,94,.14);
+        color: #bbf7d0;
+        border-color: rgba(34,197,94,.22);
+    }
+
+    .estado-anulada {
+        background: rgba(239,68,68,.14);
+        color: #fecaca;
+        border-color: rgba(239,68,68,.22);
+    }
+
+    .liqdet-alert {
+        margin-top: 16px;
+        padding: 14px 16px;
+        border-radius: 16px;
+        background: rgba(245,158,11,.12);
+        border: 1px solid rgba(245,158,11,.25);
+        color: #fde68a;
+        font-size: 14px;
+        line-height: 1.45;
+    }
+
+    .liqdet-note {
+        color: #94a3b8;
+        font-size: 13px;
+        line-height: 1.5;
+        margin-top: 10px;
+    }
+
+    @media (max-width: 1100px) {
+        .liqdet-top {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .liqdet-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 720px) {
+        .liqdet-top {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<div class="container-fluid liqdet-page">
+    <div class="liqdet-head">
+        <div class="liqdet-title">
+            <h2>🧾 Detalle de liquidación</h2>
+            <p>
+                {{ liquidacion.funcionario.nombre_completo }} ·
+                {{ liquidacion.get_tipo_salida_display }} ·
+                Salida: {{ liquidacion.fecha_salida|date:"d/m/Y" }}
+            </p>
+        </div>
+
+        <div class="liqdet-actions">
+            <a href="{% url 'liquidaciones_lista' %}" class="liqdet-btn liqdet-btn-soft">← Volver</a>
+            <a href="{% url 'liquidacion_pdf' liquidacion.id %}" class="liqdet-btn liqdet-btn-soft" target="_blank">🖨️ PDF</a>
+
+            {% if liquidacion.estado == "borrador" %}
+                <a href="{% url 'liquidacion_confirmar' liquidacion.id %}" class="liqdet-btn liqdet-btn-main">✅ Confirmar</a>
+            {% endif %}
+
+            {% if liquidacion.estado == "confirmada" %}
+                <a href="{% url 'liquidacion_marcar_pagada' liquidacion.id %}" class="liqdet-btn liqdet-btn-main">💸 Marcar pagada</a>
+            {% endif %}
+
+            {% if liquidacion.estado != "pagada" and liquidacion.estado != "anulada" %}
+                <a href="{% url 'liquidacion_anular' liquidacion.id %}" class="liqdet-btn liqdet-btn-danger">⛔ Anular</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <div class="liqdet-top">
+        <div class="liqdet-card">
+            <div class="liqdet-label">Estado</div>
+            <div>
+                {% if liquidacion.estado == "borrador" %}
+                    <span class="liqdet-badge estado-borrador">Borrador</span>
+                {% elif liquidacion.estado == "confirmada" %}
+                    <span class="liqdet-badge estado-confirmada">Confirmada</span>
+                {% elif liquidacion.estado == "pagada" %}
+                    <span class="liqdet-badge estado-pagada">Pagada</span>
+                {% elif liquidacion.estado == "anulada" %}
+                    <span class="liqdet-badge estado-anulada">Anulada</span>
+                {% endif %}
+            </div>
+        </div>
+
+        <div class="liqdet-card">
+            <div class="liqdet-label">Total haberes</div>
+            <div class="liqdet-number small">{{ liquidacion.total_haberes|guaranies }}</div>
+        </div>
+
+        <div class="liqdet-card">
+            <div class="liqdet-label">Total descuentos</div>
+            <div class="liqdet-number small">{{ liquidacion.total_descuentos|guaranies }}</div>
+        </div>
+
+        <div class="liqdet-card">
+            <div class="liqdet-label">Total liquidación</div>
+            <div class="liqdet-number">{{ liquidacion.total_liquidacion|guaranies }}</div>
+        </div>
+    </div>
+
+    <div class="liqdet-grid">
+        <div class="liqdet-block">
+            <h3>Haberes y descuentos</h3>
+
+            <div class="liqdet-panel">
+                <div class="liqdet-panel-title">Haberes</div>
+                <div class="liqdet-list">
+                    <div class="liqdet-line">
+                        <span>Salario pendiente</span>
+                        <strong>{{ liquidacion.salario_pendiente_monto|guaranies }}</strong>
+                    </div>
+                    <div class="liqdet-line">
+                        <span>Vacaciones causadas pendientes</span>
+                        <strong>{{ liquidacion.vacaciones_causadas_pendientes_dias }} día(s) · {{ liquidacion.vacaciones_causadas_monto|guaranies }}</strong>
+                    </div>
+                    <div class="liqdet-line">
+                        <span>Vacaciones proporcionales</span>
+                        <strong>{{ liquidacion.vacaciones_proporcionales_dias }} día(s) · {{ liquidacion.vacaciones_proporcionales_monto|guaranies }}</strong>
+                    </div>
+                    <div class="liqdet-line">
+                        <span>Aguinaldo proporcional</span>
+                        <strong>{{ liquidacion.aguinaldo_proporcional_monto|guaranies }}</strong>
+                    </div>
+                    <div class="liqdet-line">
+                        <span>Indemnización</span>
+                        <strong>{{ liquidacion.indemnizacion_dias }} día(s) · {{ liquidacion.indemnizacion_monto|guaranies }}</strong>
+                    </div>
+                    <div class="liqdet-line">
+                        <span>Preaviso</span>
+                        <strong>{{ liquidacion.preaviso_monto|guaranies }}</strong>
+                    </div>
+                    <div class="liqdet-line">
+                        <span>Total haberes</span>
+                        <strong>{{ liquidacion.total_haberes|guaranies }}</strong>
+                    </div>
+                </div>
+            </div>
+
+            <div class="liqdet-panel">
+                <div class="liqdet-panel-title">Descuentos</div>
+                <div class="liqdet-list">
+                    <div class="liqdet-line">
+                        <span>IPS</span>
+                        <strong>{{ liquidacion.ips_monto|guaranies }}</strong>
+                    </div>
+                    <div class="liqdet-line">
+                        <span>Deudas</span>
+                        <strong>{{ liquidacion.deudas_monto|guaranies }}</strong>
+                    </div>
+                    <div class="liqdet-line">
+                        <span>Otros descuentos</span>
+                        <strong>{{ liquidacion.otros_descuentos|guaranies }}</strong>
+                    </div>
+                    <div class="liqdet-line">
+                        <span>Total descuentos</span>
+                        <strong>{{ liquidacion.total_descuentos|guaranies }}</strong>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="liqdet-block">
+            <h3>Resumen técnico</h3>
+
+            <div class="liqdet-panel">
+                <div class="liqdet-panel-title">Datos del caso</div>
+                <div class="liqdet-list">
+                    <div class="liqdet-line">
+                        <span>Funcionario</span>
+                        <strong>{{ liquidacion.funcionario.nombre_completo }}</strong>
+                    </div>
+                    <div class="liqdet-line">
+                        <span>Cédula</span>
+                        <strong>{{ liquidacion.funcionario.cedula|millares }}</strong>
+                    </div>
+                    <div class="liqdet-line">
+                        <span>Tipo de salida</span>
+                        <strong>{{ liquidacion.get_tipo_salida_display }}</strong>
+                    </div>
+                    <div class="liqdet-line">
+                        <span>Fecha de salida</span>
+                        <strong>{{ liquidacion.fecha_salida|date:"d/m/Y" }}</strong>
+                    </div>
+                    <div class="liqdet-line">
+                        <span>Fecha de cálculo</span>
+                        <strong>{{ liquidacion.fecha_calculo|date:"d/m/Y" }}</strong>
+                    </div>
+                </div>
+            </div>
+
+            <div class="liqdet-panel">
+                <div class="liqdet-panel-title">Antigüedad y preaviso</div>
+                <div class="liqdet-list">
+                    <div class="liqdet-line">
+                        <span>Antigüedad</span>
+                        <strong>{{ liquidacion.antiguedad_anios }} año(s), {{ liquidacion.antiguedad_meses }} mes(es), {{ liquidacion.antiguedad_dias }} día(s)</strong>
+                    </div>
+                    <div class="liqdet-line">
+                        <span>Preaviso que corresponde</span>
+                        <strong>{{ liquidacion.preaviso_dias_corresponde }} día(s)</strong>
+                    </div>
+                    <div class="liqdet-line">
+                        <span>Días realmente cumplidos / avisados</span>
+                        <strong>{{ liquidacion.preaviso_dias_otorgados }} día(s)</strong>
+                    </div>
+                    <div class="liqdet-line">
+                        <span>Preaviso cumplido</span>
+                        <strong>{% if liquidacion.preaviso_cumplido %}Sí{% else %}No{% endif %}</strong>
+                    </div>
+                    <div class="liqdet-line">
+                        <span>Descontar preaviso</span>
+                        <strong>{% if liquidacion.descontar_preaviso %}Sí{% else %}No{% endif %}</strong>
+                    </div>
+                </div>
+            </div>
+
+            <div class="liqdet-panel">
+                <div class="liqdet-panel-title">Base salarial</div>
+                <div class="liqdet-list">
+                    <div class="liqdet-line">
+                        <span>Salario base snapshot</span>
+                        <strong>{{ liquidacion.salario_base_snapshot|guaranies }}</strong>
+                    </div>
+                    <div class="liqdet-line">
+                        <span>Bono base snapshot</span>
+                        <strong>{{ liquidacion.bono_base_snapshot|guaranies }}</strong>
+                    </div>
+                </div>
+            </div>
+
+            {% if liquidacion.motivo_observacion %}
+            <div class="liqdet-panel">
+                <div class="liqdet-panel-title">Observación / motivo</div>
+                <div class="liqdet-note">{{ liquidacion.motivo_observacion|linebreaksbr }}</div>
+            </div>
+            {% endif %}
+
+            {% if liquidacion.requiere_revision_juridica %}
+            <div class="liqdet-alert">
+                {{ liquidacion.alerta_revision }}
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endblock %}

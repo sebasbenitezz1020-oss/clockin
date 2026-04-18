@@ -1,0 +1,177 @@
+{% extends "base.html" %}
+
+{% block title %}{{ titulo_form }} | ClockIn{% endblock %}
+
+{% block content %}
+<style>
+    .dlf-card {
+        max-width: 950px;
+        background: linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
+        border: 1px solid rgba(255,255,255,.06);
+        border-radius: 24px;
+        padding: 22px;
+        box-shadow: 0 12px 36px rgba(0,0,0,.22);
+    }
+
+    .dlf-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+    }
+
+    .dlf-field {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .dlf-field.full {
+        grid-column: 1 / -1;
+    }
+
+    .dlf-field label {
+        color: #e5e7eb;
+        font-size: 13px;
+        font-weight: 700;
+    }
+
+    .dlf-field input,
+    .dlf-field select,
+    .dlf-field textarea {
+        width: 100%;
+        border: 1px solid rgba(255,255,255,.08);
+        background: #0f1722;
+        color: #fff;
+        border-radius: 14px;
+        padding: 13px 14px;
+        font-size: 14px;
+        outline: none;
+    }
+
+    .dlf-check {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 18px;
+        background: rgba(255,255,255,.03);
+        border: 1px solid rgba(255,255,255,.05);
+        border-radius: 14px;
+        padding: 12px 14px;
+        width: fit-content;
+    }
+
+    .dlf-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+        margin-top: 20px;
+        flex-wrap: wrap;
+    }
+
+    .dlf-btn-soft,
+    .dlf-btn-main {
+        padding: 13px 18px;
+        border-radius: 14px;
+        font-size: 14px;
+        font-weight: 800;
+        text-decoration: none;
+        border: none;
+        cursor: pointer;
+    }
+
+    .dlf-btn-soft {
+        background: rgba(255,255,255,.05);
+        color: #fff;
+        border: 1px solid rgba(255,255,255,.08);
+    }
+
+    .dlf-btn-main {
+        background: linear-gradient(135deg, var(--brand-primary), var(--brand-primary-dark));
+        color: #fff;
+        box-shadow: 0 10px 24px var(--brand-shadow);
+    }
+
+    @media (max-width: 720px) {
+        .dlf-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<div class="page-header">
+    <h2>🗓️ {{ titulo_form }}</h2>
+    <p>Asigna el día libre semanal del funcionario. Este día no deberá afectar asistencia ni ICL.</p>
+</div>
+
+<div class="dlf-card">
+    <form method="post">
+        {% csrf_token %}
+
+        {% if form.errors %}
+            <div class="alert-box error-box-strong" style="margin-bottom:16px;">
+                Revisa los campos marcados.
+            </div>
+        {% endif %}
+
+        <div class="dlf-grid">
+            <div class="dlf-field">
+                <label>Funcionario</label>
+                {{ form.funcionario }}
+                {{ form.funcionario.errors }}
+            </div>
+
+            <div class="dlf-field">
+                <label>Día libre</label>
+                {{ form.dia_semana }}
+                {{ form.dia_semana.errors }}
+            </div>
+
+            <div class="dlf-field">
+                <label>Empresa</label>
+                {{ form.empresa }}
+                {{ form.empresa.errors }}
+            </div>
+
+            <div class="dlf-field">
+                <label>Sucursal</label>
+                {{ form.sucursal }}
+                {{ form.sucursal.errors }}
+            </div>
+
+            <div class="dlf-field">
+                <label>Sector</label>
+                {{ form.sector }}
+                {{ form.sector.errors }}
+            </div>
+
+            <div class="dlf-field">
+                <label>Fecha inicio</label>
+                {{ form.fecha_inicio }}
+                {{ form.fecha_inicio.errors }}
+            </div>
+
+            <div class="dlf-field">
+                <label>Fecha fin</label>
+                {{ form.fecha_fin }}
+                {{ form.fecha_fin.errors }}
+            </div>
+
+            <div class="dlf-field full">
+                <label>Observación</label>
+                {{ form.observacion }}
+                {{ form.observacion.errors }}
+            </div>
+        </div>
+
+        <label class="dlf-check">
+            {{ form.activo }}
+            <span>Día libre activo</span>
+        </label>
+
+        <div class="dlf-actions">
+            <a href="{% url 'dias_libres_lista' %}" class="dlf-btn-soft">Volver</a>
+            <button type="submit" class="dlf-btn-main">{{ boton_texto }}</button>
+        </div>
+    </form>
+</div>
+{% endblock %}

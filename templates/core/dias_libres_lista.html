@@ -1,0 +1,289 @@
+{% extends "base.html" %}
+
+{% block title %}Días Libres | ClockIn{% endblock %}
+
+{% block content %}
+<style>
+    .dl-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        gap: 16px;
+        flex-wrap: wrap;
+        margin-bottom: 20px;
+    }
+
+    .dl-head h2 {
+        margin: 0;
+        color: #fff;
+        font-size: 34px;
+        font-weight: 800;
+    }
+
+    .dl-head p {
+        margin: 8px 0 0;
+        color: #94a3b8;
+    }
+
+    .dl-btn {
+        padding: 13px 18px;
+        border-radius: 14px;
+        text-decoration: none;
+        font-size: 14px;
+        font-weight: 800;
+        background: linear-gradient(135deg, var(--brand-primary), var(--brand-primary-dark));
+        color: #fff;
+        box-shadow: 0 10px 24px var(--brand-shadow);
+    }
+
+    .dl-stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        margin-bottom: 18px;
+    }
+
+    .dl-stat {
+        background: linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
+        border: 1px solid rgba(255,255,255,.06);
+        border-radius: 22px;
+        padding: 18px;
+        box-shadow: 0 12px 36px rgba(0,0,0,.22);
+    }
+
+    .dl-stat .lab {
+        color: #94a3b8;
+        font-size: 13px;
+        margin-bottom: 10px;
+    }
+
+    .dl-stat .val {
+        color: #fff;
+        font-size: 30px;
+        font-weight: 900;
+    }
+
+    .dl-card {
+        background: linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
+        border: 1px solid rgba(255,255,255,.06);
+        border-radius: 24px;
+        padding: 18px;
+        box-shadow: 0 12px 36px rgba(0,0,0,.22);
+    }
+
+    .dl-filter {
+        display: grid;
+        grid-template-columns: 1fr 1fr 1fr 1.2fr 160px;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+    .dl-filter input,
+    .dl-filter select {
+        width: 100%;
+        border: 1px solid rgba(255,255,255,.08);
+        background: #0f1722;
+        color: #fff;
+        border-radius: 14px;
+        padding: 13px 14px;
+    }
+
+    .dl-filter button {
+        border: none;
+        border-radius: 14px;
+        background: linear-gradient(135deg, var(--brand-primary), var(--brand-primary-dark));
+        color: #fff;
+        font-weight: 800;
+    }
+
+    .dl-table-wrap {
+        overflow-x: auto;
+    }
+
+    .dl-table {
+        width: 100%;
+        min-width: 900px;
+        border-collapse: separate;
+        border-spacing: 0 8px;
+    }
+
+    .dl-table thead th {
+        color: #dbe6f3;
+        font-size: 11px;
+        font-weight: 800;
+        text-transform: uppercase;
+        padding: 0 10px 4px;
+    }
+
+    .dl-table tbody td {
+        padding: 12px 10px;
+        background: rgba(255,255,255,.02);
+        border-top: 1px solid rgba(255,255,255,.04);
+        border-bottom: 1px solid rgba(255,255,255,.04);
+        color: #fff;
+        font-size: 13px;
+    }
+
+    .dl-table tbody td:first-child {
+        border-left: 1px solid rgba(255,255,255,.04);
+        border-top-left-radius: 16px;
+        border-bottom-left-radius: 16px;
+    }
+
+    .dl-table tbody td:last-child {
+        border-right: 1px solid rgba(255,255,255,.04);
+        border-top-right-radius: 16px;
+        border-bottom-right-radius: 16px;
+    }
+
+    .dl-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    .dl-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 8px 12px;
+        border-radius: 10px;
+        font-size: 12px;
+        font-weight: 800;
+        text-decoration: none;
+        background: rgba(59,130,246,.14);
+        color: #bfdbfe;
+        border: 1px solid rgba(59,130,246,.22);
+    }
+
+    .dl-link-soft {
+        background: rgba(255,255,255,.05);
+        color: #e5e7eb;
+        border: 1px solid rgba(255,255,255,.08);
+    }
+
+    .dl-badge-ok {
+        display: inline-flex;
+        padding: 6px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 800;
+        background: rgba(34,197,94,.14);
+        color: #bbf7d0;
+        border: 1px solid rgba(34,197,94,.22);
+    }
+
+    .dl-badge-off {
+        display: inline-flex;
+        padding: 6px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 800;
+        background: rgba(239,68,68,.14);
+        color: #fecaca;
+        border: 1px solid rgba(239,68,68,.22);
+    }
+</style>
+
+<div class="dl-head">
+    <div>
+        <h2>🗓️ Días Libres</h2>
+        <p>Planificación semanal de días libres por funcionario, sector y sucursal.</p>
+    </div>
+    <a href="{% url 'dia_libre_nuevo' %}" class="dl-btn">➕ Nuevo día libre</a>
+</div>
+
+<div class="dl-stats">
+    <div class="dl-stat">
+        <div class="lab">Funcionarios activos</div>
+        <div class="val">{{ total_funcionarios }}</div>
+    </div>
+    <div class="dl-stat">
+        <div class="lab">Con día libre asignado</div>
+        <div class="val">{{ total_asignados }}</div>
+    </div>
+    <div class="dl-stat">
+        <div class="lab">Pendientes de asignar</div>
+        <div class="val">{{ total_pendientes }}</div>
+    </div>
+</div>
+
+<div class="dl-card">
+    <form method="get" class="dl-filter">
+        <select name="empresa">
+            <option value="">Todas las empresas</option>
+            {% for empresa in empresas %}
+                <option value="{{ empresa.id }}" {% if empresa_id == empresa.id|stringformat:"s" %}selected{% endif %}>
+                    {{ empresa.nombre }}
+                </option>
+            {% endfor %}
+        </select>
+
+        <select name="sucursal">
+            <option value="">Todas las sucursales</option>
+            {% for sucursal in sucursales %}
+                <option value="{{ sucursal.id }}" {% if sucursal_id == sucursal.id|stringformat:"s" %}selected{% endif %}>
+                    {{ sucursal.nombre }}
+                </option>
+            {% endfor %}
+        </select>
+
+        <select name="sector">
+            <option value="">Todos los sectores</option>
+            {% for s in sectores %}
+                <option value="{{ s }}" {% if sector == s %}selected{% endif %}>{{ s }}</option>
+            {% endfor %}
+        </select>
+
+        <input type="text" name="q" value="{{ q }}" placeholder="Buscar por funcionario, cédula o sector">
+
+        <button type="submit">Filtrar</button>
+    </form>
+
+    <div class="dl-table-wrap">
+        <table class="dl-table">
+            <thead>
+                <tr>
+                    <th>Funcionario</th>
+                    <th>Empresa</th>
+                    <th>Sucursal</th>
+                    <th>Sector</th>
+                    <th>Día libre</th>
+                    <th>Estado</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for item in dias_libres %}
+                <tr>
+                    <td>{{ item.funcionario.nombre_completo }}</td>
+                    <td>{{ item.empresa.nombre|default:"-" }}</td>
+                    <td>{{ item.sucursal.nombre|default:"-" }}</td>
+                    <td>{{ item.sector|default:"-" }}</td>
+                    <td>{{ item.get_dia_semana_display }}</td>
+                    <td>
+                        {% if item.activo %}
+                            <span class="dl-badge-ok">Activo</span>
+                        {% else %}
+                            <span class="dl-badge-off">Inactivo</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="dl-actions">
+                            <a href="{% url 'dia_libre_editar' item.id %}" class="dl-link">Editar</a>
+                            <a href="{% url 'dia_libre_toggle_activo' item.id %}" class="dl-link dl-link-soft">
+                                {% if item.activo %}Inactivar{% else %}Activar{% endif %}
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="7" style="text-align:center; color:#94a3b8; padding:22px;">No hay días libres cargados.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

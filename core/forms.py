@@ -7,6 +7,9 @@ from .models import (
     Deuda,
     PermisoLicencia,
     Vacacion,
+    ConfiguracionGeneral,
+    Liquidacion,
+    DiaLibre,
 )
 
 
@@ -87,11 +90,179 @@ class TurnoForm(forms.ModelForm):
         return cleaned_data
 
 
+class ConfiguracionGeneralForm(forms.ModelForm):
+    class Meta:
+        model = ConfiguracionGeneral
+        fields = [
+            "nombre_sistema",
+            "subtitulo_sistema",
+            "color_primario",
+            "logo_url",
+
+            "salario_base_default",
+            "porcentaje_limite_deuda_default",
+            "tolerancia_minutos_default",
+
+            "bancos_personalizados",
+            "cargos_personalizados",
+            "sectores_personalizados",
+
+            "biometrico_segundos_lectura",
+            "biometrico_pausa_exito_ms",
+            "biometrico_pausa_aviso_ms",
+            "biometrico_pausa_error_ms",
+            "biometrico_sonidos_activos",
+            "biometrico_fullscreen_auto",
+
+            "observacion_general",
+        ]
+        widgets = {
+            "nombre_sistema": forms.TextInput(attrs={"class": "form-control"}),
+            "subtitulo_sistema": forms.TextInput(attrs={"class": "form-control"}),
+            "color_primario": forms.Select(attrs={"class": "form-control"}),
+            "logo_url": forms.URLInput(attrs={"class": "form-control", "placeholder": "https://..."}),
+
+            "salario_base_default": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
+            "porcentaje_limite_deuda_default": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
+            "tolerancia_minutos_default": forms.NumberInput(attrs={"class": "form-control", "min": "0"}),
+
+            "bancos_personalizados": forms.Textarea(attrs={"class": "form-control", "rows": 8}),
+            "cargos_personalizados": forms.Textarea(attrs={"class": "form-control", "rows": 12}),
+            "sectores_personalizados": forms.Textarea(attrs={"class": "form-control", "rows": 10}),
+
+            "biometrico_segundos_lectura": forms.NumberInput(attrs={"class": "form-control", "min": "1"}),
+            "biometrico_pausa_exito_ms": forms.NumberInput(attrs={"class": "form-control", "min": "500"}),
+            "biometrico_pausa_aviso_ms": forms.NumberInput(attrs={"class": "form-control", "min": "500"}),
+            "biometrico_pausa_error_ms": forms.NumberInput(attrs={"class": "form-control", "min": "500"}),
+
+            "biometrico_sonidos_activos": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "biometrico_fullscreen_auto": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+
+            "observacion_general": forms.Textarea(attrs={"class": "form-control", "rows": 4}),
+        }
+        labels = {
+            "nombre_sistema": "Nombre del sistema",
+            "subtitulo_sistema": "Subtítulo del sistema",
+            "color_primario": "Tema visual",
+            "logo_url": "URL del logo",
+
+            "salario_base_default": "Salario base global",
+            "porcentaje_limite_deuda_default": "Límite de deuda global (%)",
+            "tolerancia_minutos_default": "Tolerancia global (minutos)",
+
+            "bancos_personalizados": "Bancos personalizados",
+            "cargos_personalizados": "Cargos personalizados",
+            "sectores_personalizados": "Sectores personalizados",
+
+            "biometrico_segundos_lectura": "Lectura biométrica (segundos)",
+            "biometrico_pausa_exito_ms": "Pausa éxito (ms)",
+            "biometrico_pausa_aviso_ms": "Pausa aviso (ms)",
+            "biometrico_pausa_error_ms": "Pausa error (ms)",
+            "biometrico_sonidos_activos": "Activar sonidos del biométrico",
+            "biometrico_fullscreen_auto": "Activar fullscreen automático",
+
+            "observacion_general": "Observación general",
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.fields["color_primario"].choices = list(ConfiguracionGeneral.TEMAS_CHOICES)
+
+        mapa_hex_a_tema = {
+            "#2563eb": ConfiguracionGeneral.TEMA_AZUL,
+            "#16a34a": ConfiguracionGeneral.TEMA_VERDE,
+            "#dc2626": ConfiguracionGeneral.TEMA_ROJO,
+            "#ea580c": ConfiguracionGeneral.TEMA_NARANJA,
+            "#7c3aed": ConfiguracionGeneral.TEMA_MORADO,
+            "#0891b2": ConfiguracionGeneral.TEMA_TURQUESA,
+            "#475569": ConfiguracionGeneral.TEMA_GRIS,
+        }
+
+        valores_validos = {item[0] for item in ConfiguracionGeneral.TEMAS_CHOICES}
+        valor_actual = getattr(self.instance, "color_primario", None)
+
+        if valor_actual in mapa_hex_a_tema:
+            valor_actual = mapa_hex_a_tema[valor_actual]
+
+        if valor_actual not in valores_validos:
+            valor_actual = ConfiguracionGeneral.TEMA_AZUL
+
+        self.initial["color_primario"] = valor_actual
+
+    def _validar_lista(self, valor, nombre, minimo=1):
+        items = [x.strip() for x in (valor or "").splitlines() if x.strip()]
+        items_unicos = []
+        for item in items:
+            if item not in items_unicos:
+                items_unicos.append(item)
+
+        if len(items_unicos) < minimo:
+            raise forms.ValidationError(f"Debes cargar al menos {minimo} opción(es) en {nombre}.")
+
+        if len(items_unicos) > 150:
+            raise forms.ValidationError(f"{nombre} tiene demasiadas opciones. Reduce la lista.")
+
+        return "\n".join(items_unicos)
+
+    def clean_biometrico_segundos_lectura(self):
+        valor = self.cleaned_data["biometrico_segundos_lectura"]
+        if valor < 1:
+            raise forms.ValidationError("La lectura biométrica debe ser de al menos 1 segundo.")
+        return valor
+
+    def clean_porcentaje_limite_deuda_default(self):
+        valor = self.cleaned_data["porcentaje_limite_deuda_default"]
+        if valor < 0:
+            raise forms.ValidationError("El porcentaje no puede ser negativo.")
+        return valor
+
+    def clean_tolerancia_minutos_default(self):
+        valor = self.cleaned_data["tolerancia_minutos_default"]
+        if valor < 0:
+            raise forms.ValidationError("La tolerancia no puede ser negativa.")
+        return valor
+
+    def clean_color_primario(self):
+        valor = (self.cleaned_data.get("color_primario") or "").strip()
+        valores_validos = {item[0] for item in ConfiguracionGeneral.TEMAS_CHOICES}
+        if valor not in valores_validos:
+            return ConfiguracionGeneral.TEMA_AZUL
+        return valor
+
+    def clean_bancos_personalizados(self):
+        return self._validar_lista(
+            self.cleaned_data.get("bancos_personalizados"),
+            "bancos personalizados"
+        )
+
+    def clean_cargos_personalizados(self):
+        return self._validar_lista(
+            self.cleaned_data.get("cargos_personalizados"),
+            "cargos personalizados"
+        )
+
+    def clean_sectores_personalizados(self):
+        return self._validar_lista(
+            self.cleaned_data.get("sectores_personalizados"),
+            "sectores personalizados"
+        )
+
+
 class FuncionarioForm(forms.ModelForm):
     empresa = forms.ModelChoiceField(
         queryset=Empresa.objects.filter(activo=True).order_by("nombre"),
         required=False,
         widget=forms.Select(attrs={"class": "form-control"})
+    )
+
+    salario_base_fijo = forms.CharField(
+        required=False,
+        label="Salario base",
+        widget=forms.TextInput(attrs={
+            "class": "form-control",
+            "readonly": "readonly",
+        })
     )
 
     fecha_ingreso = forms.DateField(
@@ -111,9 +282,7 @@ class FuncionarioForm(forms.ModelForm):
             "cargo",
             "sector",
             "ips",
-            "salario_base",
             "bono",
-            "porcentaje_limite_deuda",
             "modalidad_cobro",
             "banco",
             "tipo_cuenta",
@@ -128,11 +297,9 @@ class FuncionarioForm(forms.ModelForm):
             "cedula": forms.TextInput(attrs={"class": "form-control"}),
             "turno": forms.Select(attrs={"class": "form-control"}),
             "sucursal_rel": forms.Select(attrs={"class": "form-control"}),
-            "cargo": forms.TextInput(attrs={"class": "form-control"}),
-            "sector": forms.TextInput(attrs={"class": "form-control"}),
-            "salario_base": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
+            "cargo": forms.Select(attrs={"class": "form-control"}),
+            "sector": forms.Select(attrs={"class": "form-control"}),
             "bono": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
-            "porcentaje_limite_deuda": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
             "modalidad_cobro": forms.Select(attrs={"class": "form-control"}),
             "banco": forms.Select(attrs={"class": "form-control"}),
             "tipo_cuenta": forms.Select(attrs={"class": "form-control"}),
@@ -142,7 +309,6 @@ class FuncionarioForm(forms.ModelForm):
         }
         labels = {
             "sucursal_rel": "Sucursal",
-            "porcentaje_limite_deuda": "Límite de deuda (%)",
             "modalidad_cobro": "Modalidad de cobro",
             "tipo_cuenta": "Tipo de cuenta",
             "numero_cuenta": "Número de cuenta",
@@ -150,6 +316,8 @@ class FuncionarioForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+        config = ConfiguracionGeneral.obtener()
 
         self.fields["turno"].queryset = Turno.objects.filter(activo=True).order_by("nombre")
         self.fields["turno"].required = False
@@ -161,6 +329,10 @@ class FuncionarioForm(forms.ModelForm):
         self.fields["sucursal_rel"].required = False
         self.fields["sucursal_rel"].queryset = Sucursal.objects.none()
         self.fields["sucursal_rel"].empty_label = "Seleccionar sucursal"
+
+        self.fields["cargo"].choices = [("", "Seleccionar cargo")] + config.cargos_choices
+        self.fields["sector"].choices = [("", "Seleccionar sector")] + config.sectores_choices
+        self.fields["banco"].choices = [("", "Seleccionar banco")] + config.bancos_choices
 
         empresa_id = None
 
@@ -178,6 +350,13 @@ class FuncionarioForm(forms.ModelForm):
                 ).order_by("nombre")
             except (ValueError, TypeError):
                 self.fields["sucursal_rel"].queryset = Sucursal.objects.none()
+
+        if self.instance.pk:
+            valor_salario = self.instance.salario_base
+        else:
+            valor_salario = config.salario_base_default
+
+        self.fields["salario_base_fijo"].initial = f"{int(valor_salario):,}".replace(",", ".")
 
     def clean_cedula(self):
         cedula = self.cleaned_data["cedula"].strip()
@@ -217,6 +396,10 @@ class FuncionarioForm(forms.ModelForm):
 
     def save(self, commit=True):
         obj = super().save(commit=False)
+        config = ConfiguracionGeneral.obtener()
+
+        obj.salario_base = config.salario_base_default
+        obj.porcentaje_limite_deuda = config.porcentaje_limite_deuda_default
 
         if obj.sucursal_rel:
             obj.sucursal = obj.sucursal_rel.nombre
@@ -407,3 +590,145 @@ class VacacionForm(forms.ModelForm):
                 )
 
         return cleaned_data
+    
+class LiquidacionForm(forms.ModelForm):
+    fecha_salida = forms.DateField(
+        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"})
+    )
+    fecha_calculo = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"})
+    )
+
+    class Meta:
+        model = Liquidacion
+        fields = [
+            "funcionario",
+            "tipo_salida",
+            "fecha_salida",
+            "fecha_calculo",
+            "dias_trabajados_pendientes",
+            "vacaciones_causadas_pendientes_dias",
+            "preaviso_dias_otorgados",
+            "preaviso_cumplido",
+            "descontar_preaviso",
+            "otros_descuentos",
+            "motivo_observacion",
+        ]
+        widgets = {
+            "funcionario": forms.Select(attrs={"class": "form-control"}),
+            "tipo_salida": forms.Select(attrs={"class": "form-control"}),
+            "dias_trabajados_pendientes": forms.NumberInput(attrs={
+                "class": "form-control",
+                "min": "0",
+                "placeholder": "Automático según fecha de salida"
+            }),
+            "vacaciones_causadas_pendientes_dias": forms.NumberInput(attrs={
+                "class": "form-control",
+                "min": "0",
+                "placeholder": "0"
+            }),
+            "preaviso_dias_otorgados": forms.NumberInput(attrs={
+                "class": "form-control",
+                "min": "0",
+                "placeholder": "0"
+            }),
+            "preaviso_cumplido": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "descontar_preaviso": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "otros_descuentos": forms.NumberInput(attrs={
+                "class": "form-control",
+                "step": "0.01",
+                "min": "0",
+                "placeholder": "0"
+            }),
+            "motivo_observacion": forms.Textarea(attrs={
+                "class": "form-control",
+                "rows": 4,
+                "placeholder": "Observación interna, causal o nota administrativa"
+            }),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["funcionario"].queryset = Funcionario.objects.filter(activo=True).order_by("apellido", "nombre")
+        self.fields["funcionario"].empty_label = "Seleccionar funcionario"
+        self.fields["tipo_salida"].choices = [("", "Seleccionar tipo de salida")] + list(Liquidacion.TiposSalida.choices)
+
+    def clean(self):
+        cleaned = super().clean()
+        funcionario = cleaned.get("funcionario")
+        fecha_salida = cleaned.get("fecha_salida")
+
+        if funcionario and fecha_salida and funcionario.fecha_ingreso and fecha_salida < funcionario.fecha_ingreso:
+            raise forms.ValidationError("La fecha de salida no puede ser menor a la fecha de ingreso del funcionario.")
+
+        return cleaned
+    
+class DiaLibreForm(forms.ModelForm):
+    class Meta:
+        model = DiaLibre
+        fields = [
+            "funcionario",
+            "empresa",
+            "sucursal",
+            "sector",
+            "dia_semana",
+            "fecha_inicio",
+            "fecha_fin",
+            "activo",
+            "observacion",
+        ]
+        widgets = {
+            "funcionario": forms.Select(attrs={"class": "form-control"}),
+            "empresa": forms.Select(attrs={"class": "form-control"}),
+            "sucursal": forms.Select(attrs={"class": "form-control"}),
+            "sector": forms.TextInput(attrs={"class": "form-control", "readonly": "readonly"}),
+            "dia_semana": forms.Select(attrs={"class": "form-control"}),
+            "fecha_inicio": forms.DateInput(attrs={"type": "date", "class": "form-control"}),
+            "fecha_fin": forms.DateInput(attrs={"type": "date", "class": "form-control"}),
+            "activo": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "observacion": forms.TextInput(attrs={"class": "form-control"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.fields["funcionario"].queryset = Funcionario.objects.filter(activo=True).order_by("apellido", "nombre")
+        self.fields["empresa"].queryset = Empresa.objects.filter(activo=True).order_by("nombre")
+        self.fields["empresa"].required = False
+        self.fields["sucursal"].required = False
+        self.fields["sucursal"].queryset = Sucursal.objects.filter(activo=True).order_by("nombre")
+
+        if self.instance and self.instance.pk:
+            self.fields["sector"].initial = self.instance.funcionario.sector
+            if self.instance.funcionario.sucursal_rel:
+                self.fields["empresa"].initial = self.instance.funcionario.sucursal_rel.empresa
+                self.fields["sucursal"].initial = self.instance.funcionario.sucursal_rel
+
+    def clean(self):
+        cleaned = super().clean()
+        funcionario = cleaned.get("funcionario")
+        empresa = cleaned.get("empresa")
+        sucursal = cleaned.get("sucursal")
+        fecha_inicio = cleaned.get("fecha_inicio")
+        fecha_fin = cleaned.get("fecha_fin")
+
+        if fecha_inicio and fecha_fin and fecha_fin < fecha_inicio:
+            raise forms.ValidationError("La fecha fin no puede ser menor que la fecha inicio.")
+
+        if funcionario:
+            if funcionario.sucursal_rel:
+                empresa_real = funcionario.sucursal_rel.empresa
+                sucursal_real = funcionario.sucursal_rel
+
+                if empresa and empresa != empresa_real:
+                    raise forms.ValidationError("La empresa no coincide con la del funcionario.")
+                if sucursal and sucursal != sucursal_real:
+                    raise forms.ValidationError("La sucursal no coincide con la del funcionario.")
+
+                cleaned["empresa"] = empresa_real
+                cleaned["sucursal"] = sucursal_real
+
+            cleaned["sector"] = funcionario.sector or ""
+
+        return cleaned    

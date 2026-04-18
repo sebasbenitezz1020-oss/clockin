@@ -33,11 +33,22 @@
     }
 
     .dash-stat {
+        position: relative;
         background: linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
         border: 1px solid rgba(255,255,255,.06);
         border-radius: 22px;
         padding: 22px;
         box-shadow: 0 12px 36px rgba(0,0,0,.22);
+        overflow: hidden;
+    }
+
+    .dash-stat::before {
+        content: "";
+        position: absolute;
+        inset: 0 0 auto 0;
+        height: 3px;
+        background: linear-gradient(90deg, var(--brand-primary), var(--brand-primary-dark));
+        opacity: .95;
     }
 
     .dash-stat .lab {
@@ -61,11 +72,22 @@
     }
 
     .dash-payroll-card {
+        position: relative;
         background: linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
         border: 1px solid rgba(255,255,255,.06);
         border-radius: 22px;
         padding: 20px;
         box-shadow: 0 12px 36px rgba(0,0,0,.20);
+        overflow: hidden;
+    }
+
+    .dash-payroll-card::before {
+        content: "";
+        position: absolute;
+        inset: 0 0 auto 0;
+        height: 3px;
+        background: linear-gradient(90deg, var(--brand-primary), var(--brand-primary-dark));
+        opacity: .95;
     }
 
     .dash-payroll-card .top {
@@ -82,7 +104,16 @@
     }
 
     .dash-payroll-card .icon {
-        font-size: 24px;
+        width: 42px;
+        height: 42px;
+        border-radius: 14px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 22px;
+        background: var(--brand-soft);
+        border: 1px solid var(--brand-border);
+        box-shadow: 0 8px 20px var(--brand-shadow);
     }
 
     .dash-payroll-card .number {
@@ -92,9 +123,11 @@
         line-height: 1.2;
     }
 
-    .bruto .icon { color: #93c5fd; }
-    .neto .icon { color: #86efac; }
-    .deudas .icon { color: #fcd34d; }
+    .bruto .icon,
+    .neto .icon,
+    .deudas .icon {
+        color: var(--brand-text-soft);
+    }
 
     .dash-resumen {
         display: grid;
@@ -104,11 +137,22 @@
     }
 
     .dash-resumen-card {
+        position: relative;
         background: linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
         border: 1px solid rgba(255,255,255,.06);
         border-radius: 22px;
         padding: 20px;
         box-shadow: 0 12px 36px rgba(0,0,0,.20);
+        overflow: hidden;
+    }
+
+    .dash-resumen-card::before {
+        content: "";
+        position: absolute;
+        inset: 0 0 auto 0;
+        height: 3px;
+        background: linear-gradient(90deg, var(--brand-primary), var(--brand-primary-dark));
+        opacity: .95;
     }
 
     .dash-resumen-card .top {
@@ -120,7 +164,17 @@
     }
 
     .dash-resumen-card .icon {
-        font-size: 24px;
+        width: 42px;
+        height: 42px;
+        border-radius: 14px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 21px;
+        background: var(--brand-soft);
+        border: 1px solid var(--brand-border);
+        color: var(--brand-text-soft);
+        box-shadow: 0 8px 20px var(--brand-shadow);
     }
 
     .dash-resumen-card .title {
@@ -135,11 +189,6 @@
         font-weight: 800;
         line-height: 1;
     }
-
-    .trabajando .icon { color: #86efac; }
-    .almuerzo .icon { color: #fcd34d; }
-    .finalizados .icon { color: #93c5fd; }
-    .pendientes .icon { color: #fca5a5; }
 
     .dash-grid {
         display: grid;
@@ -156,7 +205,19 @@
     }
 
     .dash-card-header {
+        position: relative;
         padding: 20px 22px 10px;
+    }
+
+    .dash-card-header::after {
+        content: "";
+        display: block;
+        width: 70px;
+        height: 3px;
+        margin-top: 12px;
+        border-radius: 999px;
+        background: linear-gradient(90deg, var(--brand-primary), var(--brand-primary-dark));
+        opacity: .95;
     }
 
     .dash-card-header h3 {
@@ -199,6 +260,11 @@
 
     .dash-table tbody tr {
         background: rgba(255,255,255,.02);
+        transition: .18s ease;
+    }
+
+    .dash-table tbody tr:hover {
+        background: var(--brand-soft);
     }
 
     .dash-table tbody td {
@@ -235,6 +301,12 @@
         border-radius: 18px;
         background: rgba(255,255,255,.03);
         border: 1px solid rgba(255,255,255,.05);
+        transition: .18s ease;
+    }
+
+    .mini-item:hover {
+        background: var(--brand-soft);
+        border-color: var(--brand-border);
     }
 
     .mini-item strong {
@@ -261,9 +333,9 @@
     }
 
     .badge-ok {
-        background: rgba(34,197,94,.12);
-        color: #86efac;
-        border-color: rgba(34,197,94,.24);
+        background: var(--brand-soft);
+        color: var(--brand-text-soft);
+        border-color: var(--brand-border);
     }
 
     .badge-tarde {
@@ -344,7 +416,7 @@
                 <div class="title">Total Salario Bruto</div>
                 <div class="icon">💼</div>
             </div>
-            <div class="number"> {{ total_salario_bruto|guaranies }}</div>
+            <div class="number">{{ total_salario_bruto|guaranies }}</div>
         </div>
 
         <div class="dash-payroll-card neto">
@@ -352,7 +424,7 @@
                 <div class="title">Total Salario Neto</div>
                 <div class="icon">💵</div>
             </div>
-            <div class="number"> {{ total_salario_neto|guaranies }}</div>
+            <div class="number">{{ total_salario_neto|guaranies }}</div>
         </div>
 
         <div class="dash-payroll-card deudas">
@@ -360,7 +432,7 @@
                 <div class="title">Total Deudas Funcionarios</div>
                 <div class="icon">💳</div>
             </div>
-            <div class="number"> {{ total_deudas_funcionarios|guaranies }}</div>
+            <div class="number">{{ total_deudas_funcionarios|guaranies }}</div>
         </div>
     </div>
 

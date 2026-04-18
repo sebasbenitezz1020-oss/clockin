@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path, include
 from .views import (
     dashboard,
 
@@ -44,6 +44,21 @@ from .views import (
     icl_lista,
     reportes,
     historial_lista,
+    configuracion_general,
+
+    liquidaciones_lista,
+    liquidacion_nueva,
+    liquidacion_detalle,
+    liquidacion_preview,
+    liquidacion_confirmar,
+    liquidacion_marcar_pagada,
+    liquidacion_anular,
+    liquidacion_pdf,
+
+    dias_libres_lista,
+    dia_libre_nuevo,
+    dia_libre_editar,
+    dia_libre_toggle_activo,
 )
 
 urlpatterns = [
@@ -91,4 +106,20 @@ urlpatterns = [
     path("icl/", icl_lista, name="icl_lista"),
     path("reportes/", reportes, name="reportes"),
     path("historial/", historial_lista, name="historial_lista"),
+    path("configuracion/", configuracion_general, name="configuracion_general"),
+
+    path("liquidaciones/", liquidaciones_lista, name="liquidaciones_lista"),
+    path("liquidaciones/nueva/", liquidacion_nueva, name="liquidacion_nueva"),
+    path("liquidaciones/<int:pk>/", liquidacion_detalle, name="liquidacion_detalle"),
+    path("liquidaciones/preview/", liquidacion_preview, name="liquidacion_preview"),
+    path("liquidaciones/<int:pk>/confirmar/", liquidacion_confirmar, name="liquidacion_confirmar"),
+    path("liquidaciones/<int:pk>/pagada/", liquidacion_marcar_pagada, name="liquidacion_marcar_pagada"),
+    path("liquidaciones/<int:pk>/anular/", liquidacion_anular, name="liquidacion_anular"),
+    path("liquidaciones/<int:pk>/pdf/", liquidacion_pdf, name="liquidacion_pdf"),
+
+    path("dias-libres/", dias_libres_lista, name="dias_libres_lista"),
+    path("dias-libres/nuevo/", dia_libre_nuevo, name="dia_libre_nuevo"),
+    path("dias-libres/<int:pk>/editar/", dia_libre_editar, name="dia_libre_editar"),
+    path("dias-libres/<int:pk>/toggle-activo/", dia_libre_toggle_activo, name="dia_libre_toggle_activo"),
+    path("usuarios/", include("usuarios.urls")),
 ]

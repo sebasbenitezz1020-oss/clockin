@@ -3,6 +3,7 @@ from django.db import models
 from django.utils import timezone
 from datetime import datetime, timedelta
 from decimal import Decimal
+from calendar import monthrange
 
 
 class Empresa(models.Model):
@@ -39,6 +40,209 @@ class Sucursal(models.Model):
 
     def __str__(self):
         return f"{self.empresa.nombre} - {self.nombre}"
+
+
+class ConfiguracionGeneral(models.Model):
+    TEMA_AZUL = "azul"
+    TEMA_VERDE = "verde"
+    TEMA_ROJO = "rojo"
+    TEMA_NARANJA = "naranja"
+    TEMA_MORADO = "morado"
+    TEMA_TURQUESA = "turquesa"
+    TEMA_GRIS = "gris"
+
+    TEMAS_CHOICES = [
+        (TEMA_AZUL, "Azul corporativo"),
+        (TEMA_VERDE, "Verde premium"),
+        (TEMA_ROJO, "Rojo ejecutivo"),
+        (TEMA_NARANJA, "Naranja energético"),
+        (TEMA_MORADO, "Morado moderno"),
+        (TEMA_TURQUESA, "Turquesa tecnológico"),
+        (TEMA_GRIS, "Gris oscuro elegante"),
+    ]
+
+    salario_base_default = models.DecimalField(max_digits=12, decimal_places=2, default=2899048)
+    porcentaje_limite_deuda_default = models.DecimalField(max_digits=5, decimal_places=2, default=30.00)
+    tolerancia_minutos_default = models.PositiveIntegerField(default=1)
+
+    observacion_general = models.TextField(blank=True, default="")
+
+    nombre_sistema = models.CharField(max_length=100, default="ClockIn")
+    subtitulo_sistema = models.CharField(max_length=150, default="Sistema Web")
+    color_primario = models.CharField(max_length=20, default=TEMA_AZUL)
+    logo_url = models.URLField(blank=True, default="")
+
+    bancos_personalizados = models.TextField(
+        blank=True,
+        default=(
+            "Itaú\n"
+            "Continental\n"
+            "Sudameris\n"
+            "Basa\n"
+            "GNB\n"
+            "Familiar\n"
+            "Ueno\n"
+            "Visión\n"
+            "Atlas\n"
+            "Banco Río\n"
+            "Otro"
+        )
+    )
+
+    cargos_personalizados = models.TextField(
+        blank=True,
+        default=(
+            "Cajera/o\n"
+            "Encargado/a\n"
+            "Marketing\n"
+            "Digitación\n"
+            "Cierre de Compras\n"
+            "Compras\n"
+            "Tesorería\n"
+            "Pagos\n"
+            "RRHH\n"
+            "Contabilidad\n"
+            "Financiero\n"
+            "Repositor/a\n"
+            "Recepcionista\n"
+            "Balconista\n"
+            "Carnicero\n"
+            "Auxiliar\n"
+            "Auxiliar RRHH\n"
+            "Delivery\n"
+            "Pizzero\n"
+            "Chapero\n"
+            "Ayudante\n"
+            "Limpiadora\n"
+            "Mozo\n"
+            "Bartender\n"
+            "Churrasquero\n"
+            "Pasador\n"
+            "Panadero/a\n"
+            "Confitero/a\n"
+            "Saladero/a\n"
+            "Buffet\n"
+            "Cocinera\n"
+            "Ayudante de Cocina\n"
+            "Depositero\n"
+            "Recepcionista de Mercaderías\n"
+            "Gerente\n"
+            "Informático\n"
+            "Técnico de Mantenimiento"
+        )
+    )
+
+    sectores_personalizados = models.TextField(
+        blank=True,
+        default=(
+            "Administración\n"
+            "RRHH\n"
+            "Panadería\n"
+            "Financiero\n"
+            "Caja\n"
+            "Salón\n"
+            "Carnicería\n"
+            "Hortifrut\n"
+            "Depósito\n"
+            "Recepción\n"
+            "Mantenimiento\n"
+            "Limpieza\n"
+            "Cocina\n"
+            "Copa\n"
+            "Churrasquería"
+        )
+    )
+
+    biometrico_segundos_lectura = models.PositiveIntegerField(default=1)
+    biometrico_pausa_exito_ms = models.PositiveIntegerField(default=4000)
+    biometrico_pausa_aviso_ms = models.PositiveIntegerField(default=3000)
+    biometrico_pausa_error_ms = models.PositiveIntegerField(default=2200)
+    biometrico_sonidos_activos = models.BooleanField(default=True)
+    biometrico_fullscreen_auto = models.BooleanField(default=True)
+
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Configuración general"
+        verbose_name_plural = "Configuraciones generales"
+
+    def __str__(self):
+        return "Configuración general ClockIn"
+
+    @classmethod
+    def obtener(cls):
+        obj, created = cls.objects.get_or_create(
+            pk=1,
+            defaults={
+                "salario_base_default": Decimal("2899048.00"),
+                "porcentaje_limite_deuda_default": Decimal("30.00"),
+                "tolerancia_minutos_default": 1,
+                "observacion_general": "",
+                "nombre_sistema": "ClockIn",
+                "subtitulo_sistema": "Sistema Web",
+                "color_primario": cls.TEMA_AZUL,
+                "logo_url": "",
+                "bancos_personalizados": (
+                    "Itaú\nContinental\nSudameris\nBasa\nGNB\nFamiliar\nUeno\nVisión\nAtlas\nBanco Río\nOtro"
+                ),
+                "cargos_personalizados": (
+                    "Cajera/o\nEncargado/a\nMarketing\nDigitación\nCierre de Compras\nCompras\nTesorería\nPagos\n"
+                    "RRHH\nContabilidad\nFinanciero\nRepositor/a\nRecepcionista\nBalconista\nCarnicero\nAuxiliar\n"
+                    "Auxiliar RRHH\nDelivery\nPizzero\nChapero\nAyudante\nLimpiadora\nMozo\nBartender\n"
+                    "Churrasquero\nPasador\nPanadero/a\nConfitero/a\nSaladero/a\nBuffet\nCocinera\n"
+                    "Ayudante de Cocina\nDepositero\nRecepcionista de Mercaderías\nGerente\nInformático\n"
+                    "Técnico de Mantenimiento"
+                ),
+                "sectores_personalizados": (
+                    "Administración\nRRHH\nPanadería\nFinanciero\nCaja\nSalón\nCarnicería\nHortifrut\n"
+                    "Depósito\nRecepción\nMantenimiento\nLimpieza\nCocina\nCopa\nChurrasquería"
+                ),
+                "biometrico_segundos_lectura": 1,
+                "biometrico_pausa_exito_ms": 4000,
+                "biometrico_pausa_aviso_ms": 3000,
+                "biometrico_pausa_error_ms": 2200,
+                "biometrico_sonidos_activos": True,
+                "biometrico_fullscreen_auto": True,
+            }
+        )
+        return obj
+
+    def _parse_lista(self, texto):
+        items = []
+        for linea in (texto or "").splitlines():
+            valor = linea.strip()
+            if valor and valor not in items:
+                items.append(valor)
+        return items
+
+    @property
+    def bancos_lista(self):
+        return self._parse_lista(self.bancos_personalizados)
+
+    @property
+    def cargos_lista(self):
+        return self._parse_lista(self.cargos_personalizados)
+
+    @property
+    def sectores_lista(self):
+        return self._parse_lista(self.sectores_personalizados)
+
+    @property
+    def bancos_choices(self):
+        return [(item, item) for item in self.bancos_lista]
+
+    @property
+    def cargos_choices(self):
+        return [(item, item) for item in self.cargos_lista]
+
+    @property
+    def sectores_choices(self):
+        return [(item, item) for item in self.sectores_lista]
+
+    @property
+    def tema_nombre(self):
+        mapa = dict(self.TEMAS_CHOICES)
+        return mapa.get(self.color_primario, "Azul corporativo")
 
 
 class Turno(models.Model):
@@ -88,6 +292,62 @@ class Funcionario(models.Model):
         AHORRO = "ahorro", "Caja de ahorro"
         CORRIENTE = "corriente", "Cuenta corriente"
 
+    class Sectores(models.TextChoices):
+        ADMINISTRACION = "Administración", "Administración"
+        RRHH = "RRHH", "RRHH"
+        PANADERIA = "Panadería", "Panadería"
+        FINANCIERO = "Financiero", "Financiero"
+        CAJA = "Caja", "Caja"
+        SALON = "Salón", "Salón"
+        CARNICERIA = "Carnicería", "Carnicería"
+        HORTIFRUT = "Hortifrut", "Hortifrut"
+        DEPOSITO = "Depósito", "Depósito"
+        RECEPCION = "Recepción", "Recepción"
+        MANTENIMIENTO = "Mantenimiento", "Mantenimiento"
+        LIMPIEZA = "Limpieza", "Limpieza"
+        COCINA = "Cocina", "Cocina"
+        COPA = "Copa", "Copa"
+        CHURRASQUERIA = "Churrasquería", "Churrasquería"
+
+    class Cargos(models.TextChoices):
+        CAJERA = "Cajera/o", "Cajera/o"
+        ENCARGADO = "Encargado/a", "Encargado/a"
+        MARKETING = "Marketing", "Marketing"
+        DIGITACION = "Digitación", "Digitación"
+        CIERRE_COMPRAS = "Cierre de Compras", "Cierre de Compras"
+        COMPRAS = "Compras", "Compras"
+        TESORERIA = "Tesorería", "Tesorería"
+        PAGOS = "Pagos", "Pagos"
+        RRHH = "RRHH", "RRHH"
+        CONTABILIDAD = "Contabilidad", "Contabilidad"
+        FINANCIERO = "Financiero", "Financiero"
+        REPOSITOR = "Repositor/a", "Repositor/a"
+        RECEPCIONISTA = "Recepcionista", "Recepcionista"
+        BALCONISTA = "Balconista", "Balconista"
+        CARNICERO = "Carnicero", "Carnicero"
+        AUXILIAR = "Auxiliar", "Auxiliar"
+        AUXILIAR_RRHH = "Auxiliar RRHH", "Auxiliar RRHH"
+        DELIVERY = "Delivery", "Delivery"
+        PIZZERO = "Pizzero", "Pizzero"
+        CHAPERO = "Chapero", "Chapero"
+        AYUDANTE = "Ayudante", "Ayudante"
+        LIMPIADORA = "Limpiadora", "Limpiadora"
+        MOZO = "Mozo", "Mozo"
+        BARTENDER = "Bartender", "Bartender"
+        CHURRASQUERO = "Churrasquero", "Churrasquero"
+        PASADOR = "Pasador", "Pasador"
+        PANADERO = "Panadero/a", "Panadero/a"
+        CONFITERO = "Confitero/a", "Confitero/a"
+        SALADERO = "Saladero/a", "Saladero/a"
+        BUFFET = "Buffet", "Buffet"
+        COCINERA = "Cocinera", "Cocinera"
+        AYUDANTE_COCINA = "Ayudante de Cocina", "Ayudante de Cocina"
+        DEPOSITERO = "Depositero", "Depositero"
+        RECEPCIONISTA_MERCADERIAS = "Recepcionista de Mercaderías", "Recepcionista de Mercaderías"
+        GERENTE = "Gerente", "Gerente"
+        INFORMATICO = "Informático", "Informático"
+        TECNICO_MANTENIMIENTO = "Técnico de Mantenimiento", "Técnico de Mantenimiento"
+
     nombre = models.CharField(max_length=100)
     apellido = models.CharField(max_length=100)
     cedula = models.CharField(max_length=30, unique=True)
@@ -101,8 +361,8 @@ class Funcionario(models.Model):
         blank=True,
         related_name="funcionarios"
     )
-    cargo = models.CharField(max_length=100, blank=True, default="")
-    sector = models.CharField(max_length=100, blank=True, default="")
+    cargo = models.CharField(max_length=100, choices=Cargos.choices, blank=True, default="")
+    sector = models.CharField(max_length=100, choices=Sectores.choices, blank=True, default="")
     sucursal = models.CharField(max_length=100, blank=True, default="")
     sucursal_rel = models.ForeignKey(
         Sucursal,
@@ -113,7 +373,7 @@ class Funcionario(models.Model):
     )
 
     ips = models.BooleanField(default=False)
-    salario_base = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    salario_base = models.DecimalField(max_digits=12, decimal_places=2, default=2899048)
     bono = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
     porcentaje_limite_deuda = models.DecimalField(
@@ -209,11 +469,10 @@ class Funcionario(models.Model):
 
     @property
     def salario_bruto(self):
-        """
-        Salario bruto teórico sin aplicar ICL.
-        Se mantiene para referencia general.
-        En nómina mensual debe usarse el salario_bruto calculado del período.
-        """
+        return (Decimal(self.salario_base or 0) + Decimal(self.bono or 0)).quantize(Decimal("0.01"))
+
+    @property
+    def neto_referencial(self):
         return (Decimal(self.salario_base or 0) + Decimal(self.bono or 0)).quantize(Decimal("0.01"))
 
     @property
@@ -570,3 +829,139 @@ class HistorialAccion(models.Model):
 
     def __str__(self):
         return f"{self.modulo} - {self.accion} - {self.creado_en:%d/%m/%Y %H:%M}"
+    
+class Liquidacion(models.Model):
+    class TiposSalida(models.TextChoices):
+        DESPIDO_JUSTA_CAUSA = "despido_justa_causa", "Despido por Justa Causa"
+        DESPIDO_SIN_JUSTA_CAUSA = "despido_sin_justa_causa", "Despido sin Justa Causa"
+        RENUNCIA = "renuncia", "Renuncia"
+        ABANDONO = "abandono", "Abandono"
+
+    class Estados(models.TextChoices):
+        BORRADOR = "borrador", "Borrador"
+        CONFIRMADA = "confirmada", "Confirmada"
+        PAGADA = "pagada", "Pagada"
+        ANULADA = "anulada", "Anulada"
+
+    funcionario = models.ForeignKey(
+        Funcionario,
+        on_delete=models.CASCADE,
+        related_name="liquidaciones"
+    )
+
+    fecha_salida = models.DateField()
+    fecha_calculo = models.DateField(default=timezone.localdate)
+
+    tipo_salida = models.CharField(max_length=40, choices=TiposSalida.choices)
+    motivo_observacion = models.TextField(blank=True, default="")
+
+    salario_base_snapshot = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    bono_base_snapshot = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    antiguedad_anios = models.PositiveIntegerField(default=0)
+    antiguedad_meses = models.PositiveIntegerField(default=0)
+    antiguedad_dias = models.PositiveIntegerField(default=0)
+
+    dias_trabajados_pendientes = models.PositiveIntegerField(default=0)
+    salario_pendiente_monto = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    vacaciones_causadas_pendientes_dias = models.PositiveIntegerField(default=0)
+    vacaciones_causadas_monto = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    vacaciones_proporcionales_dias = models.PositiveIntegerField(default=0)
+    vacaciones_proporcionales_monto = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    aguinaldo_proporcional_monto = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    preaviso_dias_corresponde = models.PositiveIntegerField(default=0)
+    preaviso_dias_otorgados = models.PositiveIntegerField(default=0)
+    preaviso_cumplido = models.BooleanField(default=False)
+    descontar_preaviso = models.BooleanField(default=False)
+    preaviso_monto = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    indemnizacion_dias = models.PositiveIntegerField(default=0)
+    indemnizacion_monto = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    ips_monto = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    deudas_monto = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    otros_descuentos = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    total_haberes = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_descuentos = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_liquidacion = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
+    requiere_revision_juridica = models.BooleanField(default=False)
+    alerta_revision = models.CharField(max_length=255, blank=True, default="")
+
+    estado = models.CharField(max_length=20, choices=Estados.choices, default=Estados.BORRADOR)
+
+    creado_en = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-fecha_calculo", "-creado_en"]
+
+    def __str__(self):
+        return f"{self.funcionario.nombre_completo} - {self.get_tipo_salida_display()} - {self.fecha_salida:%d/%m/%Y}"
+    
+class DiaLibre(models.Model):
+    class DiasSemana(models.IntegerChoices):
+        LUNES = 0, "Lunes"
+        MARTES = 1, "Martes"
+        MIERCOLES = 2, "Miércoles"
+        JUEVES = 3, "Jueves"
+        VIERNES = 4, "Viernes"
+        SABADO = 5, "Sábado"
+        DOMINGO = 6, "Domingo"
+
+    funcionario = models.ForeignKey(
+        Funcionario,
+        on_delete=models.CASCADE,
+        related_name="dias_libres"
+    )
+
+    empresa = models.ForeignKey(
+        Empresa,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="dias_libres"
+    )
+
+    sucursal = models.ForeignKey(
+        Sucursal,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="dias_libres"
+    )
+
+    sector = models.CharField(max_length=100, blank=True, default="")
+    dia_semana = models.PositiveSmallIntegerField(choices=DiasSemana.choices)
+
+    fecha_inicio = models.DateField(default=timezone.localdate)
+    fecha_fin = models.DateField(null=True, blank=True)
+
+    activo = models.BooleanField(default=True)
+    observacion = models.CharField(max_length=255, blank=True, default="")
+
+    creado_en = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["sector", "dia_semana", "funcionario__apellido", "funcionario__nombre"]
+        unique_together = ("funcionario", "activo")
+
+    def __str__(self):
+        return f"{self.funcionario.nombre_completo} - {self.get_dia_semana_display()}"
+
+    @property
+    def vigente(self):
+        hoy = timezone.localdate()
+        if not self.activo:
+            return False
+        if self.fecha_inicio and self.fecha_inicio > hoy:
+            return False
+        if self.fecha_fin and self.fecha_fin < hoy:
+            return False
+        return True    

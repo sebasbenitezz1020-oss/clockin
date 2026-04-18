@@ -1,35 +1,52 @@
 from calendar import monthrange
 from datetime import date, datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
+from io import BytesIO
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.db.models import Q, Sum
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 
+from reportlab.lib import colors
+from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from reportlab.lib.pagesizes import A4
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.units import mm
+from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+
+from usuarios.utils import validar_permiso_o_redirigir
+
 from .forms import (
-    EmpresaForm,
-    SucursalForm,
-    FuncionarioForm,
-    TurnoForm,
+    ConfiguracionGeneralForm,
     DeudaForm,
+    DiaLibreForm,
+    EmpresaForm,
+    FuncionarioForm,
+    LiquidacionForm,
     MarcacionForm,
     PermisoLicenciaForm,
+    SucursalForm,
+    TurnoForm,
     VacacionForm,
 )
+from .liquidacion_utils import calcular_liquidacion_funcionario
 from .models import (
-    Empresa,
-    Sucursal,
-    Funcionario,
-    Turno,
-    Deuda,
-    NominaMensual,
     Asistencia,
-    PermisoLicencia,
-    Vacacion,
+    ConfiguracionGeneral,
+    Deuda,
+    DiaLibre,
+    Empresa,
+    Funcionario,
     HistorialAccion,
+    Liquidacion,
+    NominaMensual,
+    PermisoLicencia,
+    Sucursal,
+    Turno,
+    Vacacion,
 )
 
 
@@ -40,12 +57,42 @@ def registrar_historial(request, modulo, accion, descripcion):
         accion=accion,
         descripcion=descripcion,
     )
+
+
+def funcionario_tiene_dia_libre(funcionario, fecha=None):
+    fecha = fecha or timezone.localdate()
+    dia_semana = fecha.weekday()
+
+    return DiaLibre.objects.filter(
+        funcionario=funcionario,
+        activo=True,
+        dia_semana=dia_semana,
+    ).filter(
+        Q(fecha_inicio__isnull=True) | Q(fecha_inicio__lte=fecha),
+        Q(fecha_fin__isnull=True) | Q(fecha_fin__gte=fecha),
+    ).exists()
+
+
+def contar_dias_libres_mes(funcionario, mes, anio):
+    total = 0
+    dias_mes = monthrange(anio, mes)[1]
+
+    for dia in range(1, dias_mes + 1):
+        fecha = date(anio, mes, dia)
+        if funcionario_tiene_dia_libre(funcionario, fecha):
+            total += 1
+
+    return total
+
+
 def calcular_icl_funcionario_mes(funcionario, mes, anio):
     dias_mes = monthrange(anio, mes)[1]
     total_dias_laborales_estimados = sum(
         1 for dia in range(1, dias_mes + 1)
         if date(anio, mes, dia).weekday() != 6
     )
+
+    dias_libres_mes = contar_dias_libres_mes(funcionario, mes, anio)
 
     asistencias = Asistencia.objects.filter(
         funcionario=funcionario,
@@ -71,7 +118,8 @@ def calcular_icl_funcionario_mes(funcionario, mes, anio):
         fecha_desde__month=mes,
     ).count()
 
-    ausencias_estimadas = max(total_dias_laborales_estimados - asistencias_count, 0)
+    total_dias_laborales_reales = max(total_dias_laborales_estimados - dias_libres_mes, 0)
+    ausencias_estimadas = max(total_dias_laborales_reales - asistencias_count, 0)
     ausencias_justificadas = permisos_aprobados + vacaciones_aprobadas
     ausencias_no_justificadas = max(ausencias_estimadas - ausencias_justificadas, 0)
 
@@ -84,6 +132,8 @@ def calcular_icl_funcionario_mes(funcionario, mes, anio):
         "atrasos": atrasos_count,
         "ausencias_estimadas": ausencias_estimadas,
         "ausencias_no_justificadas": ausencias_no_justificadas,
+        "dias_libres_mes": dias_libres_mes,
+        "total_dias_laborales_reales": total_dias_laborales_reales,
     }
 
 
@@ -124,8 +174,13 @@ def generar_nomina_funcionario(funcionario, mes, anio):
     )
     return nomina
 
+
 @login_required
 def dashboard(request):
+    permiso = validar_permiso_o_redirigir(request, "dashboard", "puede_ver")
+    if permiso:
+        return permiso
+
     hoy = timezone.localdate()
 
     total_funcionarios = Funcionario.objects.filter(activo=True).count()
@@ -138,18 +193,9 @@ def dashboard(request):
         funcionario__activo=True
     )
 
-    presentes_hoy = asistencias_hoy_qs.filter(
-        hora_entrada__isnull=False
-    ).count()
-
-    llegadas_tarde_hoy = asistencias_hoy_qs.filter(
-        llego_tarde=True
-    ).count()
-
-    salidas_hoy = asistencias_hoy_qs.filter(
-        hora_salida__isnull=False
-    ).count()
-
+    presentes_hoy = asistencias_hoy_qs.filter(hora_entrada__isnull=False).count()
+    llegadas_tarde_hoy = asistencias_hoy_qs.filter(llego_tarde=True).count()
+    salidas_hoy = asistencias_hoy_qs.filter(hora_salida__isnull=False).count()
     pendientes_hoy = max(total_funcionarios - presentes_hoy, 0)
 
     trabajando_hoy = 0
@@ -209,8 +255,11 @@ def dashboard(request):
 
 @login_required
 def empresas_lista(request):
-    q = request.GET.get("q", "").strip()
+    permiso = validar_permiso_o_redirigir(request, "empresas", "puede_ver")
+    if permiso:
+        return permiso
 
+    q = request.GET.get("q", "").strip()
     empresas = Empresa.objects.all()
 
     if q:
@@ -227,6 +276,10 @@ def empresas_lista(request):
 
 @login_required
 def empresa_nueva(request):
+    permiso = validar_permiso_o_redirigir(request, "empresas", "puede_crear")
+    if permiso:
+        return permiso
+
     if request.method == "POST":
         form = EmpresaForm(request.POST)
         if form.is_valid():
@@ -251,6 +304,10 @@ def empresa_nueva(request):
 
 @login_required
 def empresa_editar(request, pk):
+    permiso = validar_permiso_o_redirigir(request, "empresas", "puede_editar")
+    if permiso:
+        return permiso
+
     empresa = get_object_or_404(Empresa, pk=pk)
 
     if request.method == "POST":
@@ -278,6 +335,10 @@ def empresa_editar(request, pk):
 
 @login_required
 def empresa_toggle_activo(request, pk):
+    permiso = validar_permiso_o_redirigir(request, "empresas", "puede_editar")
+    if permiso:
+        return permiso
+
     empresa = get_object_or_404(Empresa, pk=pk)
     empresa.activo = not empresa.activo
     empresa.save()
@@ -295,6 +356,10 @@ def empresa_toggle_activo(request, pk):
 
 @login_required
 def sucursales_lista(request):
+    permiso = validar_permiso_o_redirigir(request, "sucursales", "puede_ver")
+    if permiso:
+        return permiso
+
     q = request.GET.get("q", "").strip()
     empresa_id = request.GET.get("empresa", "").strip()
 
@@ -322,6 +387,10 @@ def sucursales_lista(request):
 
 @login_required
 def sucursal_nueva(request):
+    permiso = validar_permiso_o_redirigir(request, "sucursales", "puede_crear")
+    if permiso:
+        return permiso
+
     if request.method == "POST":
         form = SucursalForm(request.POST)
         if form.is_valid():
@@ -346,6 +415,10 @@ def sucursal_nueva(request):
 
 @login_required
 def sucursal_editar(request, pk):
+    permiso = validar_permiso_o_redirigir(request, "sucursales", "puede_editar")
+    if permiso:
+        return permiso
+
     sucursal = get_object_or_404(Sucursal, pk=pk)
 
     if request.method == "POST":
@@ -373,6 +446,10 @@ def sucursal_editar(request, pk):
 
 @login_required
 def sucursal_toggle_activo(request, pk):
+    permiso = validar_permiso_o_redirigir(request, "sucursales", "puede_editar")
+    if permiso:
+        return permiso
+
     sucursal = get_object_or_404(Sucursal, pk=pk)
     sucursal.activo = not sucursal.activo
     sucursal.save()
@@ -390,6 +467,10 @@ def sucursal_toggle_activo(request, pk):
 
 @login_required
 def obtener_sucursales_por_empresa(request):
+    permiso = validar_permiso_o_redirigir(request, "funcionarios", "puede_ver")
+    if permiso:
+        return JsonResponse({"sucursales": []}, status=403)
+
     empresa_id = request.GET.get("empresa_id", "").strip()
 
     if not empresa_id:
@@ -406,6 +487,10 @@ def obtener_sucursales_por_empresa(request):
 
 @login_required
 def deudas_lista(request):
+    permiso = validar_permiso_o_redirigir(request, "deudas", "puede_ver")
+    if permiso:
+        return permiso
+
     q = request.GET.get("q", "").strip()
     funcionario_id = request.GET.get("funcionario", "").strip()
 
@@ -435,6 +520,10 @@ def deudas_lista(request):
 
 @login_required
 def deuda_nueva(request):
+    permiso = validar_permiso_o_redirigir(request, "deudas", "puede_crear")
+    if permiso:
+        return permiso
+
     if request.method == "POST":
         form = DeudaForm(request.POST)
         if form.is_valid():
@@ -459,6 +548,10 @@ def deuda_nueva(request):
 
 @login_required
 def deuda_editar(request, pk):
+    permiso = validar_permiso_o_redirigir(request, "deudas", "puede_editar")
+    if permiso:
+        return permiso
+
     deuda = get_object_or_404(Deuda, pk=pk)
 
     if request.method == "POST":
@@ -486,6 +579,10 @@ def deuda_editar(request, pk):
 
 @login_required
 def deuda_toggle_activa(request, pk):
+    permiso = validar_permiso_o_redirigir(request, "deudas", "puede_editar")
+    if permiso:
+        return permiso
+
     deuda = get_object_or_404(Deuda, pk=pk)
     deuda.activa = not deuda.activa
     deuda.save()
@@ -503,6 +600,10 @@ def deuda_toggle_activa(request, pk):
 
 @login_required
 def funcionarios_lista(request):
+    permiso = validar_permiso_o_redirigir(request, "funcionarios", "puede_ver")
+    if permiso:
+        return permiso
+
     q = request.GET.get("q", "").strip()
     empresa_id = request.GET.get("empresa", "").strip()
     sucursal_id = request.GET.get("sucursal", "").strip()
@@ -551,6 +652,10 @@ def funcionarios_lista(request):
 
 @login_required
 def funcionario_nuevo(request):
+    permiso = validar_permiso_o_redirigir(request, "funcionarios", "puede_crear")
+    if permiso:
+        return permiso
+
     if request.method == "POST":
         form = FuncionarioForm(request.POST, request.FILES)
         if form.is_valid():
@@ -575,6 +680,10 @@ def funcionario_nuevo(request):
 
 @login_required
 def funcionario_editar(request, pk):
+    permiso = validar_permiso_o_redirigir(request, "funcionarios", "puede_editar")
+    if permiso:
+        return permiso
+
     funcionario = get_object_or_404(Funcionario, pk=pk)
 
     if request.method == "POST":
@@ -602,6 +711,10 @@ def funcionario_editar(request, pk):
 
 @login_required
 def funcionario_toggle_activo(request, pk):
+    permiso = validar_permiso_o_redirigir(request, "funcionarios", "puede_editar")
+    if permiso:
+        return permiso
+
     funcionario = get_object_or_404(Funcionario, pk=pk)
     funcionario.activo = not funcionario.activo
     funcionario.save()
@@ -619,22 +732,28 @@ def funcionario_toggle_activo(request, pk):
 
 @login_required
 def turnos_lista(request):
-    q = request.GET.get("q", "").strip()
+    permiso = validar_permiso_o_redirigir(request, "turnos", "puede_ver")
+    if permiso:
+        return permiso
 
+    q = request.GET.get("q", "").strip()
     turnos = Turno.objects.all()
 
     if q:
         turnos = turnos.filter(nombre__icontains=q)
 
-    context = {
+    return render(request, "core/turnos_lista.html", {
         "turnos": turnos.order_by("nombre"),
         "q": q,
-    }
-    return render(request, "core/turnos_lista.html", context)
+    })
 
 
 @login_required
 def turno_nuevo(request):
+    permiso = validar_permiso_o_redirigir(request, "turnos", "puede_crear")
+    if permiso:
+        return permiso
+
     if request.method == "POST":
         form = TurnoForm(request.POST)
         if form.is_valid():
@@ -659,6 +778,10 @@ def turno_nuevo(request):
 
 @login_required
 def turno_editar(request, pk):
+    permiso = validar_permiso_o_redirigir(request, "turnos", "puede_editar")
+    if permiso:
+        return permiso
+
     turno = get_object_or_404(Turno, pk=pk)
 
     if request.method == "POST":
@@ -686,6 +809,10 @@ def turno_editar(request, pk):
 
 @login_required
 def turno_toggle_activo(request, pk):
+    permiso = validar_permiso_o_redirigir(request, "turnos", "puede_editar")
+    if permiso:
+        return permiso
+
     turno = get_object_or_404(Turno, pk=pk)
     turno.activo = not turno.activo
     turno.save()
@@ -703,10 +830,18 @@ def turno_toggle_activo(request, pk):
 
 @login_required
 def asistencia_marcar(request):
+    permiso = validar_permiso_o_redirigir(request, "asistencia", "puede_ver")
+    if permiso:
+        return permiso
+
     hoy = timezone.localdate()
     resultado = None
 
     if request.method == "POST":
+        permiso_post = validar_permiso_o_redirigir(request, "asistencia", "puede_crear")
+        if permiso_post:
+            return permiso_post
+
         form = MarcacionForm(request.POST)
         if form.is_valid():
             cedula = form.cleaned_data["cedula"].strip()
@@ -721,120 +856,134 @@ def asistencia_marcar(request):
                 funcionario = None
 
             if funcionario:
-                asistencia, creada = Asistencia.objects.get_or_create(
-                    funcionario=funcionario,
-                    fecha=hoy
-                )
-
-                ahora = timezone.localtime()
-
-                if not funcionario.turno:
-                    messages.error(request, "El funcionario no tiene un turno asignado.")
+                if funcionario_tiene_dia_libre(funcionario, hoy):
+                    messages.info(
+                        request,
+                        f"{funcionario.nombre_completo} tiene día libre hoy. No corresponde asistencia."
+                    )
+                    resultado = {
+                        "tipo": "dia_libre",
+                        "funcionario": funcionario,
+                        "hora": timezone.localtime(),
+                        "turno": funcionario.turno.nombre if funcionario.turno else "-",
+                        "atraso": 0,
+                        "llego_tarde": False,
+                    }
                 else:
-                    siguiente = asistencia.siguiente_marcacion
+                    asistencia, creada = Asistencia.objects.get_or_create(
+                        funcionario=funcionario,
+                        fecha=hoy
+                    )
 
-                    if siguiente == "entrada":
-                        asistencia.hora_entrada = ahora
-                        asistencia.calcular_atraso()
+                    ahora = timezone.localtime()
 
-                        if asistencia.llego_tarde:
-                            asistencia.observacion = f"Llegó con {asistencia.minutos_atraso} minuto(s) de atraso."
-                        else:
-                            asistencia.observacion = "Entrada registrada en horario."
-
-                        asistencia.save()
-
-                        registrar_historial(
-                            request,
-                            "Asistencia",
-                            "Entrada",
-                            f"Se registró entrada de {funcionario.nombre_completo} a las {ahora.strftime('%H:%M:%S')}."
-                        )
-
-                        resultado = {
-                            "tipo": "entrada",
-                            "funcionario": funcionario,
-                            "hora": ahora,
-                            "turno": funcionario.turno.nombre,
-                            "atraso": asistencia.minutos_atraso,
-                            "llego_tarde": asistencia.llego_tarde,
-                        }
-                        messages.success(request, "Entrada registrada correctamente.")
-
-                    elif siguiente == "salida_almuerzo":
-                        asistencia.hora_salida_almuerzo = ahora
-                        asistencia.observacion = "Salida a almuerzo registrada correctamente."
-                        asistencia.save()
-
-                        registrar_historial(
-                            request,
-                            "Asistencia",
-                            "Salida a almuerzo",
-                            f"Se registró salida a almuerzo de {funcionario.nombre_completo} a las {ahora.strftime('%H:%M:%S')}."
-                        )
-
-                        resultado = {
-                            "tipo": "salida_almuerzo",
-                            "funcionario": funcionario,
-                            "hora": ahora,
-                            "turno": funcionario.turno.nombre,
-                            "atraso": asistencia.minutos_atraso,
-                            "llego_tarde": asistencia.llego_tarde,
-                        }
-                        messages.success(request, "Salida a almuerzo registrada correctamente.")
-
-                    elif siguiente == "regreso_almuerzo":
-                        asistencia.hora_regreso_almuerzo = ahora
-                        if asistencia.observacion:
-                            asistencia.observacion += " Regreso de almuerzo registrado correctamente."
-                        else:
-                            asistencia.observacion = "Regreso de almuerzo registrado correctamente."
-                        asistencia.save()
-
-                        registrar_historial(
-                            request,
-                            "Asistencia",
-                            "Regreso de almuerzo",
-                            f"Se registró regreso de almuerzo de {funcionario.nombre_completo} a las {ahora.strftime('%H:%M:%S')}."
-                        )
-
-                        resultado = {
-                            "tipo": "regreso_almuerzo",
-                            "funcionario": funcionario,
-                            "hora": ahora,
-                            "turno": funcionario.turno.nombre,
-                            "atraso": asistencia.minutos_atraso,
-                            "llego_tarde": asistencia.llego_tarde,
-                        }
-                        messages.success(request, "Regreso de almuerzo registrado correctamente.")
-
-                    elif siguiente == "salida":
-                        asistencia.hora_salida = ahora
-                        if asistencia.observacion:
-                            asistencia.observacion += " Salida final registrada correctamente."
-                        else:
-                            asistencia.observacion = "Salida final registrada correctamente."
-                        asistencia.save()
-
-                        registrar_historial(
-                            request,
-                            "Asistencia",
-                            "Salida final",
-                            f"Se registró salida final de {funcionario.nombre_completo} a las {ahora.strftime('%H:%M:%S')}."
-                        )
-
-                        resultado = {
-                            "tipo": "salida",
-                            "funcionario": funcionario,
-                            "hora": ahora,
-                            "turno": funcionario.turno.nombre,
-                            "atraso": asistencia.minutos_atraso,
-                            "llego_tarde": asistencia.llego_tarde,
-                        }
-                        messages.success(request, "Salida final registrada correctamente.")
-
+                    if not funcionario.turno:
+                        messages.error(request, "El funcionario no tiene un turno asignado.")
                     else:
-                        messages.warning(request, "El funcionario ya completó todas sus marcaciones del día.")
+                        siguiente = asistencia.siguiente_marcacion
+
+                        if siguiente == "entrada":
+                            asistencia.hora_entrada = ahora
+                            asistencia.calcular_atraso()
+
+                            if asistencia.llego_tarde:
+                                asistencia.observacion = f"Llegó con {asistencia.minutos_atraso} minuto(s) de atraso."
+                            else:
+                                asistencia.observacion = "Entrada registrada en horario."
+
+                            asistencia.save()
+
+                            registrar_historial(
+                                request,
+                                "Asistencia",
+                                "Entrada",
+                                f"Se registró entrada de {funcionario.nombre_completo} a las {ahora.strftime('%H:%M:%S')}."
+                            )
+
+                            resultado = {
+                                "tipo": "entrada",
+                                "funcionario": funcionario,
+                                "hora": ahora,
+                                "turno": funcionario.turno.nombre,
+                                "atraso": asistencia.minutos_atraso,
+                                "llego_tarde": asistencia.llego_tarde,
+                            }
+                            messages.success(request, "Entrada registrada correctamente.")
+
+                        elif siguiente == "salida_almuerzo":
+                            asistencia.hora_salida_almuerzo = ahora
+                            asistencia.observacion = "Salida a almuerzo registrada correctamente."
+                            asistencia.save()
+
+                            registrar_historial(
+                                request,
+                                "Asistencia",
+                                "Salida a almuerzo",
+                                f"Se registró salida a almuerzo de {funcionario.nombre_completo} a las {ahora.strftime('%H:%M:%S')}."
+                            )
+
+                            resultado = {
+                                "tipo": "salida_almuerzo",
+                                "funcionario": funcionario,
+                                "hora": ahora,
+                                "turno": funcionario.turno.nombre,
+                                "atraso": asistencia.minutos_atraso,
+                                "llego_tarde": asistencia.llego_tarde,
+                            }
+                            messages.success(request, "Salida a almuerzo registrada correctamente.")
+
+                        elif siguiente == "regreso_almuerzo":
+                            asistencia.hora_regreso_almuerzo = ahora
+                            if asistencia.observacion:
+                                asistencia.observacion += " Regreso de almuerzo registrado correctamente."
+                            else:
+                                asistencia.observacion = "Regreso de almuerzo registrado correctamente."
+                            asistencia.save()
+
+                            registrar_historial(
+                                request,
+                                "Asistencia",
+                                "Regreso de almuerzo",
+                                f"Se registró regreso de almuerzo de {funcionario.nombre_completo} a las {ahora.strftime('%H:%M:%S')}."
+                            )
+
+                            resultado = {
+                                "tipo": "regreso_almuerzo",
+                                "funcionario": funcionario,
+                                "hora": ahora,
+                                "turno": funcionario.turno.nombre,
+                                "atraso": asistencia.minutos_atraso,
+                                "llego_tarde": asistencia.llego_tarde,
+                            }
+                            messages.success(request, "Regreso de almuerzo registrado correctamente.")
+
+                        elif siguiente == "salida":
+                            asistencia.hora_salida = ahora
+                            if asistencia.observacion:
+                                asistencia.observacion += " Salida final registrada correctamente."
+                            else:
+                                asistencia.observacion = "Salida final registrada correctamente."
+                            asistencia.save()
+
+                            registrar_historial(
+                                request,
+                                "Asistencia",
+                                "Salida final",
+                                f"Se registró salida final de {funcionario.nombre_completo} a las {ahora.strftime('%H:%M:%S')}."
+                            )
+
+                            resultado = {
+                                "tipo": "salida",
+                                "funcionario": funcionario,
+                                "hora": ahora,
+                                "turno": funcionario.turno.nombre,
+                                "atraso": asistencia.minutos_atraso,
+                                "llego_tarde": asistencia.llego_tarde,
+                            }
+                            messages.success(request, "Salida final registrada correctamente.")
+
+                        else:
+                            messages.warning(request, "El funcionario ya completó todas sus marcaciones del día.")
     else:
         form = MarcacionForm()
 
@@ -852,6 +1001,10 @@ def asistencia_marcar(request):
 
 @login_required
 def permisos_lista(request):
+    permiso = validar_permiso_o_redirigir(request, "permisos", "puede_ver")
+    if permiso:
+        return permiso
+
     q = request.GET.get("q", "").strip()
 
     permisos = PermisoLicencia.objects.select_related("funcionario").all()
@@ -873,15 +1026,19 @@ def permisos_lista(request):
 
 @login_required
 def permiso_nuevo(request):
+    permiso_acc = validar_permiso_o_redirigir(request, "permisos", "puede_crear")
+    if permiso_acc:
+        return permiso_acc
+
     if request.method == "POST":
         form = PermisoLicenciaForm(request.POST, request.FILES)
         if form.is_valid():
-            permiso = form.save()
+            permiso_obj = form.save()
             registrar_historial(
                 request,
                 "Permisos/Licencias",
                 "Crear",
-                f"Se creó {permiso.get_tipo_display()} para {permiso.funcionario.nombre_completo} del {permiso.fecha_desde} al {permiso.fecha_hasta}."
+                f"Se creó {permiso_obj.get_tipo_display()} para {permiso_obj.funcionario.nombre_completo} del {permiso_obj.fecha_desde} al {permiso_obj.fecha_hasta}."
             )
             messages.success(request, "Permiso/licencia creado correctamente.")
             return redirect("permisos_lista")
@@ -897,33 +1054,41 @@ def permiso_nuevo(request):
 
 @login_required
 def permiso_editar(request, pk):
-    permiso = get_object_or_404(PermisoLicencia, pk=pk)
+    permiso_acc = validar_permiso_o_redirigir(request, "permisos", "puede_editar")
+    if permiso_acc:
+        return permiso_acc
+
+    permiso_obj = get_object_or_404(PermisoLicencia, pk=pk)
 
     if request.method == "POST":
-        form = PermisoLicenciaForm(request.POST, request.FILES, instance=permiso)
+        form = PermisoLicenciaForm(request.POST, request.FILES, instance=permiso_obj)
         if form.is_valid():
             form.save()
             registrar_historial(
                 request,
                 "Permisos/Licencias",
                 "Editar",
-                f"Se editó {permiso.get_tipo_display()} de {permiso.funcionario.nombre_completo}. Estado actual: {permiso.get_estado_display()}."
+                f"Se editó {permiso_obj.get_tipo_display()} de {permiso_obj.funcionario.nombre_completo}. Estado actual: {permiso_obj.get_estado_display()}."
             )
             messages.success(request, "Permiso/licencia actualizado correctamente.")
             return redirect("permisos_lista")
     else:
-        form = PermisoLicenciaForm(instance=permiso)
+        form = PermisoLicenciaForm(instance=permiso_obj)
 
     return render(request, "core/permiso_form.html", {
         "form": form,
         "titulo_form": "Editar permiso / licencia",
         "boton_texto": "Guardar cambios",
-        "permiso": permiso,
+        "permiso": permiso_obj,
     })
 
 
 @login_required
 def vacaciones_lista(request):
+    permiso = validar_permiso_o_redirigir(request, "vacaciones", "puede_ver")
+    if permiso:
+        return permiso
+
     q = request.GET.get("q", "").strip()
 
     vacaciones = Vacacion.objects.select_related("funcionario").all()
@@ -947,6 +1112,10 @@ def vacaciones_lista(request):
 
 @login_required
 def vacacion_nueva(request):
+    permiso_acc = validar_permiso_o_redirigir(request, "vacaciones", "puede_crear")
+    if permiso_acc:
+        return permiso_acc
+
     if request.method == "POST":
         form = VacacionForm(request.POST)
         if form.is_valid():
@@ -971,6 +1140,10 @@ def vacacion_nueva(request):
 
 @login_required
 def vacacion_editar(request, pk):
+    permiso_acc = validar_permiso_o_redirigir(request, "vacaciones", "puede_editar")
+    if permiso_acc:
+        return permiso_acc
+
     vacacion = get_object_or_404(Vacacion, pk=pk)
 
     if request.method == "POST":
@@ -998,8 +1171,11 @@ def vacacion_editar(request, pk):
 
 @login_required
 def icl_lista(request):
-    hoy = timezone.localdate()
+    permiso = validar_permiso_o_redirigir(request, "icl", "puede_ver")
+    if permiso:
+        return permiso
 
+    hoy = timezone.localdate()
     mes = int(request.GET.get("mes", hoy.month))
     anio = int(request.GET.get("anio", hoy.year))
 
@@ -1040,7 +1216,9 @@ def icl_lista(request):
             fecha_desde__month=mes,
         ).count()
 
-        ausencias_estimadas = max(total_dias_laborales_estimados - asistencias_count, 0)
+        dias_libres_mes = contar_dias_libres_mes(funcionario, mes, anio)
+        total_dias_laborales_reales = max(total_dias_laborales_estimados - dias_libres_mes, 0)
+        ausencias_estimadas = max(total_dias_laborales_reales - asistencias_count, 0)
         ausencias_justificadas = permisos_aprobados + vacaciones_aprobadas
         ausencias_no_justificadas = max(ausencias_estimadas - ausencias_justificadas, 0)
 
@@ -1065,6 +1243,7 @@ def icl_lista(request):
             "permisos_aprobados": permisos_aprobados,
             "vacaciones_aprobadas": vacaciones_aprobadas,
             "ausencias_no_justificadas": ausencias_no_justificadas,
+            "dias_libres_mes": dias_libres_mes,
             "icl": icl,
             "bono_base": bono_base,
             "bono_pagable_icl": bono_pagable_icl,
@@ -1105,6 +1284,10 @@ def icl_lista(request):
 
 @login_required
 def reportes(request):
+    permiso = validar_permiso_o_redirigir(request, "reportes", "puede_ver")
+    if permiso:
+        return permiso
+
     hoy = timezone.localdate()
 
     fecha_str = request.GET.get("fecha", str(hoy))
@@ -1152,7 +1335,10 @@ def reportes(request):
 
         asistencias_count = asistencias_mes.count()
         atrasos_count = asistencias_mes.filter(llego_tarde=True).count()
-        ausencias_estimadas = max(total_dias_laborales_estimados - asistencias_count, 0)
+
+        dias_libres_mes = contar_dias_libres_mes(funcionario, mes, anio)
+        total_dias_laborales_reales = max(total_dias_laborales_estimados - dias_libres_mes, 0)
+        ausencias_estimadas = max(total_dias_laborales_reales - asistencias_count, 0)
 
         permisos_aprobados = PermisoLicencia.objects.filter(
             funcionario=funcionario,
@@ -1168,7 +1354,12 @@ def reportes(request):
             fecha_desde__month=mes,
         ).count()
 
-        icl = 100 - (atrasos_count * 2) - (ausencias_estimadas * 5)
+        ausencias_no_justificadas = max(
+            ausencias_estimadas - (permisos_aprobados + vacaciones_aprobadas),
+            0
+        )
+
+        icl = 100 - (atrasos_count * 2) - (ausencias_no_justificadas * 5)
         icl = max(0, min(100, icl))
 
         resultados_mensuales.append({
@@ -1178,6 +1369,7 @@ def reportes(request):
             "ausencias": ausencias_estimadas,
             "permisos_aprobados": permisos_aprobados,
             "vacaciones_aprobadas": vacaciones_aprobadas,
+            "dias_libres_mes": dias_libres_mes,
             "icl": icl,
             "salario_bruto": funcionario.salario_bruto,
             "deudas_mes": funcionario.descuento_deudas_mes,
@@ -1209,6 +1401,10 @@ def reportes(request):
 
 @login_required
 def historial_lista(request):
+    permiso = validar_permiso_o_redirigir(request, "historial", "puede_ver")
+    if permiso:
+        return permiso
+
     q = request.GET.get("q", "").strip()
     historial = HistorialAccion.objects.select_related("usuario").all()
 
@@ -1226,14 +1422,24 @@ def historial_lista(request):
         "historial": historial[:300],
         "q": q,
     })
+
+
 @login_required
 def nomina_lista(request):
+    permiso = validar_permiso_o_redirigir(request, "nomina", "puede_ver")
+    if permiso:
+        return permiso
+
     hoy = timezone.localdate()
     mes = int(request.GET.get("mes", hoy.month))
     anio = int(request.GET.get("anio", hoy.year))
     estado = request.GET.get("estado", "").strip()
 
     if request.method == "POST":
+        permiso_post = validar_permiso_o_redirigir(request, "nomina", "puede_crear")
+        if permiso_post:
+            return permiso_post
+
         funcionarios = Funcionario.objects.filter(activo=True).order_by("apellido", "nombre")
         for funcionario in funcionarios:
             generar_nomina_funcionario(funcionario, mes, anio)
@@ -1305,6 +1511,10 @@ def nomina_lista(request):
 
 @login_required
 def nomina_toggle_pagado(request, pk):
+    permiso = validar_permiso_o_redirigir(request, "nomina", "puede_pagar")
+    if permiso:
+        return permiso
+
     nomina = get_object_or_404(NominaMensual, pk=pk)
 
     if nomina.estado_pago == NominaMensual.EstadosPago.PAGADO:
@@ -1326,3 +1536,700 @@ def nomina_toggle_pagado(request, pk):
     )
     messages.success(request, "Estado de nómina actualizado correctamente.")
     return redirect(f"/nomina/?mes={nomina.mes}&anio={nomina.anio}")
+
+
+@login_required
+def configuracion_general(request):
+    permiso = validar_permiso_o_redirigir(request, "configuracion", "puede_ver")
+    if permiso:
+        return permiso
+
+    config = ConfiguracionGeneral.obtener()
+
+    mapa_hex_a_tema = {
+        "#2563eb": ConfiguracionGeneral.TEMA_AZUL,
+        "#16a34a": ConfiguracionGeneral.TEMA_VERDE,
+        "#dc2626": ConfiguracionGeneral.TEMA_ROJO,
+        "#ea580c": ConfiguracionGeneral.TEMA_NARANJA,
+        "#7c3aed": ConfiguracionGeneral.TEMA_MORADO,
+        "#0891b2": ConfiguracionGeneral.TEMA_TURQUESA,
+        "#475569": ConfiguracionGeneral.TEMA_GRIS,
+    }
+
+    valores_validos = {item[0] for item in ConfiguracionGeneral.TEMAS_CHOICES}
+
+    if config.color_primario in mapa_hex_a_tema:
+        config.color_primario = mapa_hex_a_tema[config.color_primario]
+        config.save(update_fields=["color_primario"])
+    elif config.color_primario not in valores_validos:
+        config.color_primario = ConfiguracionGeneral.TEMA_AZUL
+        config.save(update_fields=["color_primario"])
+
+    if request.method == "POST":
+        permiso_post = validar_permiso_o_redirigir(request, "configuracion", "puede_editar")
+        if permiso_post:
+            return permiso_post
+
+        form = ConfiguracionGeneralForm(request.POST, instance=config)
+        if form.is_valid():
+            config = form.save()
+
+            Funcionario.objects.all().update(
+                salario_base=config.salario_base_default,
+                porcentaje_limite_deuda=config.porcentaje_limite_deuda_default,
+            )
+
+            registrar_historial(
+                request,
+                "Configuraciones",
+                "Editar",
+                f"Configuración PRO Plus actualizada. "
+                f"Salario base: {config.salario_base_default}, "
+                f"Límite deuda: {config.porcentaje_limite_deuda_default}%, "
+                f"Tolerancia: {config.tolerancia_minutos_default} min, "
+                f"Lectura biométrica: {config.biometrico_segundos_lectura}s, "
+                f"Tema: {config.color_primario}."
+            )
+
+            messages.success(request, "Configuración PRO Plus actualizada correctamente.")
+            return redirect("configuracion_general")
+    else:
+        form = ConfiguracionGeneralForm(instance=config)
+
+    return render(request, "core/configuracion_general.html", {
+        "form": form,
+        "config": config,
+    })
+
+
+@login_required
+def liquidaciones_lista(request):
+    permiso = validar_permiso_o_redirigir(request, "liquidacion", "puede_ver")
+    if permiso:
+        return permiso
+
+    q = request.GET.get("q", "").strip()
+    liquidaciones = Liquidacion.objects.select_related("funcionario").all()
+
+    if q:
+        liquidaciones = liquidaciones.filter(
+            Q(funcionario__nombre__icontains=q) |
+            Q(funcionario__apellido__icontains=q) |
+            Q(funcionario__cedula__icontains=q) |
+            Q(tipo_salida__icontains=q) |
+            Q(estado__icontains=q)
+        )
+
+    return render(request, "core/liquidaciones_lista.html", {
+        "liquidaciones": liquidaciones,
+        "q": q,
+    })
+
+
+@login_required
+def liquidacion_nueva(request):
+    permiso = validar_permiso_o_redirigir(request, "liquidacion", "puede_crear")
+    if permiso:
+        return permiso
+
+    resumen = None
+
+    if request.method == "POST":
+        form = LiquidacionForm(request.POST)
+        if form.is_valid():
+            liquidacion = form.save(commit=False)
+
+            resumen = calcular_liquidacion_funcionario(
+                funcionario=liquidacion.funcionario,
+                tipo_salida=liquidacion.tipo_salida,
+                fecha_salida=liquidacion.fecha_salida,
+                dias_trabajados_pendientes=liquidacion.dias_trabajados_pendientes,
+                vacaciones_causadas_pendientes_dias=liquidacion.vacaciones_causadas_pendientes_dias,
+                preaviso_dias_otorgados=liquidacion.preaviso_dias_otorgados,
+                preaviso_cumplido=liquidacion.preaviso_cumplido,
+                descontar_preaviso=liquidacion.descontar_preaviso,
+                otros_descuentos=liquidacion.otros_descuentos,
+            )
+
+            for campo, valor in resumen.items():
+                setattr(liquidacion, campo, valor)
+
+            if not liquidacion.fecha_calculo:
+                liquidacion.fecha_calculo = timezone.localdate()
+
+            liquidacion.save()
+
+            registrar_historial(
+                request,
+                "Liquidaciones",
+                "Crear",
+                f"Se creó liquidación para {liquidacion.funcionario.nombre_completo} - {liquidacion.get_tipo_salida_display()}."
+            )
+
+            messages.success(request, "Liquidación generada correctamente.")
+            return redirect("liquidacion_detalle", pk=liquidacion.pk)
+    else:
+        form = LiquidacionForm(initial={"fecha_calculo": timezone.localdate()})
+
+    return render(request, "core/liquidacion_form.html", {
+        "form": form,
+        "resumen": resumen,
+        "titulo_form": "Nueva liquidación",
+    })
+
+
+@login_required
+def liquidacion_preview(request):
+    permiso = validar_permiso_o_redirigir(request, "liquidacion", "puede_crear")
+    if permiso:
+        return JsonResponse({"ok": False, "error": "Sin permiso."}, status=403)
+
+    funcionario_id = request.GET.get("funcionario")
+    tipo_salida = request.GET.get("tipo_salida")
+    fecha_salida = request.GET.get("fecha_salida")
+
+    dias_trabajados_pendientes = request.GET.get("dias_trabajados_pendientes")
+    vacaciones_causadas_pendientes_dias = request.GET.get("vacaciones_causadas_pendientes_dias")
+    preaviso_dias_otorgados = request.GET.get("preaviso_dias_otorgados", "0")
+    preaviso_cumplido = request.GET.get("preaviso_cumplido") == "true"
+    descontar_preaviso = request.GET.get("descontar_preaviso") == "true"
+    otros_descuentos = request.GET.get("otros_descuentos", "0")
+
+    if not funcionario_id or not tipo_salida or not fecha_salida:
+        return JsonResponse({"ok": False, "error": "Faltan datos para calcular."})
+
+    try:
+        funcionario = Funcionario.objects.get(pk=funcionario_id, activo=True)
+    except Funcionario.DoesNotExist:
+        return JsonResponse({"ok": False, "error": "Funcionario no encontrado."})
+
+    try:
+        fecha_salida_obj = datetime.strptime(fecha_salida, "%Y-%m-%d").date()
+    except ValueError:
+        return JsonResponse({"ok": False, "error": "Fecha de salida inválida."})
+
+    try:
+        if dias_trabajados_pendientes in [None, ""]:
+            dias_trabajados_pendientes = None
+        else:
+            dias_trabajados_pendientes = int(dias_trabajados_pendientes)
+
+        if vacaciones_causadas_pendientes_dias in [None, ""]:
+            vacaciones_causadas_pendientes_dias = None
+        else:
+            vacaciones_causadas_pendientes_dias = int(vacaciones_causadas_pendientes_dias)
+
+        preaviso_dias_otorgados = int(preaviso_dias_otorgados or 0)
+        otros_descuentos = Decimal(otros_descuentos or 0)
+    except (ValueError, InvalidOperation):
+        return JsonResponse({"ok": False, "error": "Hay valores numéricos inválidos."})
+
+    resumen = calcular_liquidacion_funcionario(
+        funcionario=funcionario,
+        tipo_salida=tipo_salida,
+        fecha_salida=fecha_salida_obj,
+        dias_trabajados_pendientes=dias_trabajados_pendientes,
+        vacaciones_causadas_pendientes_dias=vacaciones_causadas_pendientes_dias,
+        preaviso_dias_otorgados=preaviso_dias_otorgados,
+        preaviso_cumplido=preaviso_cumplido,
+        descontar_preaviso=descontar_preaviso,
+        otros_descuentos=otros_descuentos,
+    )
+
+    return JsonResponse({
+        "ok": True,
+        "funcionario": funcionario.nombre_completo,
+        "tipo_salida": tipo_salida,
+        "antiguedad": {
+            "anios": resumen["antiguedad_anios"],
+            "meses": resumen["antiguedad_meses"],
+            "dias": resumen["antiguedad_dias"],
+        },
+        "salario_base_snapshot": str(resumen["salario_base_snapshot"]),
+        "bono_base_snapshot": str(resumen["bono_base_snapshot"]),
+        "dias_trabajados_pendientes": resumen["dias_trabajados_pendientes"],
+        "salario_pendiente_monto": str(resumen["salario_pendiente_monto"]),
+        "vacaciones_causadas_pendientes_dias": resumen["vacaciones_causadas_pendientes_dias"],
+        "vacaciones_causadas_monto": str(resumen["vacaciones_causadas_monto"]),
+        "vacaciones_proporcionales_dias": resumen["vacaciones_proporcionales_dias"],
+        "vacaciones_proporcionales_monto": str(resumen["vacaciones_proporcionales_monto"]),
+        "aguinaldo_proporcional_monto": str(resumen["aguinaldo_proporcional_monto"]),
+        "preaviso_dias_corresponde": resumen["preaviso_dias_corresponde"],
+        "preaviso_dias_otorgados": resumen["preaviso_dias_otorgados"],
+        "preaviso_cumplido": resumen["preaviso_cumplido"],
+        "preaviso_monto": str(resumen["preaviso_monto"]),
+        "indemnizacion_dias": resumen["indemnizacion_dias"],
+        "indemnizacion_monto": str(resumen["indemnizacion_monto"]),
+        "ips_monto": str(resumen["ips_monto"]),
+        "deudas_monto": str(resumen["deudas_monto"]),
+        "otros_descuentos": str(resumen["otros_descuentos"]),
+        "total_haberes": str(resumen["total_haberes"]),
+        "total_descuentos": str(resumen["total_descuentos"]),
+        "total_liquidacion": str(resumen["total_liquidacion"]),
+        "requiere_revision_juridica": resumen["requiere_revision_juridica"],
+        "alerta_revision": resumen["alerta_revision"],
+    })
+
+
+@login_required
+def liquidacion_detalle(request, pk):
+    permiso = validar_permiso_o_redirigir(request, "liquidacion", "puede_ver")
+    if permiso:
+        return permiso
+
+    liquidacion = get_object_or_404(Liquidacion.objects.select_related("funcionario"), pk=pk)
+
+    return render(request, "core/liquidacion_detalle.html", {
+        "liquidacion": liquidacion,
+    })
+
+
+@login_required
+def liquidacion_confirmar(request, pk):
+    permiso = validar_permiso_o_redirigir(request, "liquidacion", "puede_confirmar")
+    if permiso:
+        return permiso
+
+    liquidacion = get_object_or_404(Liquidacion, pk=pk)
+
+    if liquidacion.estado == Liquidacion.Estados.ANULADA:
+        messages.error(request, "No puedes confirmar una liquidación anulada.")
+        return redirect("liquidacion_detalle", pk=pk)
+
+    liquidacion.estado = Liquidacion.Estados.CONFIRMADA
+    liquidacion.save(update_fields=["estado", "actualizado_en"])
+
+    registrar_historial(
+        request,
+        "Liquidaciones",
+        "Confirmar",
+        f"Se confirmó la liquidación de {liquidacion.funcionario.nombre_completo}."
+    )
+
+    messages.success(request, "Liquidación confirmada correctamente.")
+    return redirect("liquidacion_detalle", pk=pk)
+
+
+@login_required
+def liquidacion_marcar_pagada(request, pk):
+    permiso = validar_permiso_o_redirigir(request, "liquidacion", "puede_pagar")
+    if permiso:
+        return permiso
+
+    liquidacion = get_object_or_404(Liquidacion, pk=pk)
+
+    if liquidacion.estado == Liquidacion.Estados.ANULADA:
+        messages.error(request, "No puedes marcar como pagada una liquidación anulada.")
+        return redirect("liquidacion_detalle", pk=pk)
+
+    liquidacion.estado = Liquidacion.Estados.PAGADA
+    liquidacion.save(update_fields=["estado", "actualizado_en"])
+
+    registrar_historial(
+        request,
+        "Liquidaciones",
+        "Pagar",
+        f"Se marcó como pagada la liquidación de {liquidacion.funcionario.nombre_completo}."
+    )
+
+    messages.success(request, "Liquidación marcada como pagada.")
+    return redirect("liquidacion_detalle", pk=pk)
+
+
+@login_required
+def liquidacion_anular(request, pk):
+    permiso = validar_permiso_o_redirigir(request, "liquidacion", "puede_anular")
+    if permiso:
+        return permiso
+
+    liquidacion = get_object_or_404(Liquidacion, pk=pk)
+
+    if liquidacion.estado == Liquidacion.Estados.PAGADA:
+        messages.error(request, "No puedes anular una liquidación ya pagada.")
+        return redirect("liquidacion_detalle", pk=pk)
+
+    liquidacion.estado = Liquidacion.Estados.ANULADA
+    liquidacion.save(update_fields=["estado", "actualizado_en"])
+
+    registrar_historial(
+        request,
+        "Liquidaciones",
+        "Anular",
+        f"Se anuló la liquidación de {liquidacion.funcionario.nombre_completo}."
+    )
+
+    messages.success(request, "Liquidación anulada correctamente.")
+    return redirect("liquidacion_detalle", pk=pk)
+
+
+@login_required
+def liquidacion_pdf(request, pk):
+    permiso = validar_permiso_o_redirigir(request, "liquidacion", "puede_ver")
+    if permiso:
+        return permiso
+
+    liquidacion = get_object_or_404(Liquidacion.objects.select_related("funcionario"), pk=pk)
+
+    funcionario = liquidacion.funcionario
+    config = ConfiguracionGeneral.obtener()
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        leftMargin=18 * mm,
+        rightMargin=18 * mm,
+        topMargin=18 * mm,
+        bottomMargin=18 * mm,
+    )
+
+    styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle(
+        name="TituloClockIn",
+        parent=styles["Heading1"],
+        fontName="Helvetica-Bold",
+        fontSize=18,
+        leading=22,
+        alignment=TA_CENTER,
+        textColor=colors.HexColor("#111827"),
+        spaceAfter=8,
+    ))
+    styles.add(ParagraphStyle(
+        name="SubtituloClockIn",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=9,
+        leading=12,
+        alignment=TA_CENTER,
+        textColor=colors.HexColor("#475569"),
+        spaceAfter=12,
+    ))
+    styles.add(ParagraphStyle(
+        name="SeccionClockIn",
+        parent=styles["Heading3"],
+        fontName="Helvetica-Bold",
+        fontSize=11,
+        leading=14,
+        alignment=TA_LEFT,
+        textColor=colors.HexColor("#1d4ed8"),
+        spaceAfter=6,
+    ))
+    styles.add(ParagraphStyle(
+        name="TextoClockIn",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=9,
+        leading=12,
+        textColor=colors.HexColor("#111827"),
+    ))
+    styles.add(ParagraphStyle(
+        name="TextoBoldClockIn",
+        parent=styles["Normal"],
+        fontName="Helvetica-Bold",
+        fontSize=9,
+        leading=12,
+        textColor=colors.HexColor("#111827"),
+    ))
+
+    elementos = []
+
+    nombre_sistema = config.nombre_sistema if config and config.nombre_sistema else "ClockIn"
+    subtitulo = config.subtitulo_sistema if config and config.subtitulo_sistema else "Sistema Web RRHH"
+
+    elementos.append(Paragraph(f"{nombre_sistema}", styles["TituloClockIn"]))
+    elementos.append(Paragraph(f"{subtitulo}", styles["SubtituloClockIn"]))
+    elementos.append(Paragraph("LIQUIDACIÓN FINAL", styles["TituloClockIn"]))
+    elementos.append(Spacer(1, 4))
+
+    datos_superiores = [
+        ["Funcionario", funcionario.nombre_completo],
+        ["Cédula", funcionario.cedula],
+        ["Tipo de salida", liquidacion.get_tipo_salida_display()],
+        ["Estado", liquidacion.get_estado_display()],
+        ["Fecha de salida", liquidacion.fecha_salida.strftime("%d/%m/%Y") if liquidacion.fecha_salida else "-"],
+        ["Fecha de cálculo", liquidacion.fecha_calculo.strftime("%d/%m/%Y") if liquidacion.fecha_calculo else "-"],
+        ["Antigüedad", f"{liquidacion.antiguedad_anios} año(s), {liquidacion.antiguedad_meses} mes(es), {liquidacion.antiguedad_dias} día(s)"],
+    ]
+
+    tabla_datos = Table(datos_superiores, colWidths=[55 * mm, 105 * mm])
+    tabla_datos.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#eff6ff")),
+        ("TEXTCOLOR", (0, 0), (0, -1), colors.HexColor("#1d4ed8")),
+        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+        ("FONTNAME", (1, 0), (1, -1), "Helvetica"),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#cbd5e1")),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+    ]))
+    elementos.append(tabla_datos)
+    elementos.append(Spacer(1, 12))
+
+    elementos.append(Paragraph("1. HABERES", styles["SeccionClockIn"]))
+
+    tabla_haberes = Table([
+        ["Concepto", "Detalle", "Monto"],
+        ["Salario pendiente", f"{liquidacion.dias_trabajados_pendientes} día(s)", f"Gs. {liquidacion.salario_pendiente_monto:,.0f}".replace(",", ".")],
+        ["Vacaciones causadas pendientes", f"{liquidacion.vacaciones_causadas_pendientes_dias} día(s)", f"Gs. {liquidacion.vacaciones_causadas_monto:,.0f}".replace(",", ".")],
+        ["Vacaciones proporcionales", f"{liquidacion.vacaciones_proporcionales_dias} día(s)", f"Gs. {liquidacion.vacaciones_proporcionales_monto:,.0f}".replace(",", ".")],
+        ["Aguinaldo proporcional", "-", f"Gs. {liquidacion.aguinaldo_proporcional_monto:,.0f}".replace(",", ".")],
+        ["Preaviso", f"{liquidacion.preaviso_dias_corresponde} día(s) corresponde / {liquidacion.preaviso_dias_otorgados} día(s) otorgado(s)", f"Gs. {liquidacion.preaviso_monto:,.0f}".replace(",", ".")],
+        ["Indemnización", f"{liquidacion.indemnizacion_dias} día(s)", f"Gs. {liquidacion.indemnizacion_monto:,.0f}".replace(",", ".")],
+        ["TOTAL HABERES", "", f"Gs. {liquidacion.total_haberes:,.0f}".replace(",", ".")],
+    ], colWidths=[70 * mm, 65 * mm, 25 * mm])
+
+    tabla_haberes.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#dbeafe")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#1e3a8a")),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTNAME", (0, 1), (-1, -2), "Helvetica"),
+        ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+        ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#eff6ff")),
+        ("ALIGN", (2, 0), (2, -1), "RIGHT"),
+        ("FONTSIZE", (0, 0), (-1, -1), 8.5),
+        ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#cbd5e1")),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 5),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ]))
+    elementos.append(tabla_haberes)
+    elementos.append(Spacer(1, 12))
+
+    elementos.append(Paragraph("2. DESCUENTOS", styles["SeccionClockIn"]))
+
+    tabla_desc = Table([
+        ["Concepto", "Monto"],
+        ["IPS", f"Gs. {liquidacion.ips_monto:,.0f}".replace(",", ".")],
+        ["Deudas", f"Gs. {liquidacion.deudas_monto:,.0f}".replace(",", ".")],
+        ["Otros descuentos", f"Gs. {liquidacion.otros_descuentos:,.0f}".replace(",", ".")],
+        ["TOTAL DESCUENTOS", f"Gs. {liquidacion.total_descuentos:,.0f}".replace(",", ".")],
+    ], colWidths=[135 * mm, 25 * mm])
+
+    tabla_desc.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#fee2e2")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#991b1b")),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+        ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#fef2f2")),
+        ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+        ("FONTSIZE", (0, 0), (-1, -1), 8.5),
+        ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#fecaca")),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("LEFTPADDING", (0, 0), (-1, -1), 5),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 5),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ]))
+    elementos.append(tabla_desc)
+    elementos.append(Spacer(1, 12))
+
+    elementos.append(Paragraph("3. TOTAL FINAL", styles["SeccionClockIn"]))
+
+    tabla_total = Table([
+        ["TOTAL LIQUIDACIÓN", f"Gs. {liquidacion.total_liquidacion:,.0f}".replace(",", ".")]
+    ], colWidths=[135 * mm, 25 * mm])
+
+    tabla_total.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#dcfce7")),
+        ("TEXTCOLOR", (0, 0), (-1, -1), colors.HexColor("#166534")),
+        ("FONTNAME", (0, 0), (-1, -1), "Helvetica-Bold"),
+        ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+        ("FONTSIZE", (0, 0), (-1, -1), 10),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#86efac")),
+        ("LEFTPADDING", (0, 0), (-1, -1), 6),
+        ("RIGHTPADDING", (0, 0), (-1, -1), 6),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    elementos.append(tabla_total)
+    elementos.append(Spacer(1, 14))
+
+    if liquidacion.motivo_observacion:
+        elementos.append(Paragraph("4. OBSERVACIÓN", styles["SeccionClockIn"]))
+        elementos.append(Paragraph(liquidacion.motivo_observacion.replace("\n", "<br/>"), styles["TextoClockIn"]))
+        elementos.append(Spacer(1, 12))
+
+    if liquidacion.requiere_revision_juridica and liquidacion.alerta_revision:
+        elementos.append(Paragraph("5. ALERTA DE REVISIÓN", styles["SeccionClockIn"]))
+        elementos.append(Paragraph(liquidacion.alerta_revision, styles["TextoBoldClockIn"]))
+        elementos.append(Spacer(1, 12))
+
+    elementos.append(Spacer(1, 22))
+
+    firmas = Table([
+        ["_______________________________", "_______________________________"],
+        ["Firma del empleador / responsable", "Firma del funcionario"],
+        ["", ""],
+        ["Aclaración: ____________________", "Aclaración: ____________________"],
+    ], colWidths=[80 * mm, 80 * mm])
+
+    firmas.setStyle(TableStyle([
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("FONTNAME", (0, 1), (-1, 1), "Helvetica"),
+        ("FONTNAME", (0, 3), (-1, 3), "Helvetica"),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    elementos.append(firmas)
+
+    doc.build(elementos)
+
+    pdf = buffer.getvalue()
+    buffer.close()
+
+    response = HttpResponse(content_type="application/pdf")
+    response["Content-Disposition"] = f'inline; filename="liquidacion_{funcionario.cedula}_{liquidacion.id}.pdf"'
+    response.write(pdf)
+    return response
+
+
+@login_required
+def dias_libres_lista(request):
+    permiso = validar_permiso_o_redirigir(request, "dias_libres", "puede_ver")
+    if permiso:
+        return permiso
+
+    empresa_id = request.GET.get("empresa", "").strip()
+    sucursal_id = request.GET.get("sucursal", "").strip()
+    sector = request.GET.get("sector", "").strip()
+    q = request.GET.get("q", "").strip()
+
+    dias_libres = DiaLibre.objects.select_related(
+        "funcionario",
+        "empresa",
+        "sucursal",
+    ).filter(activo=True)
+
+    if empresa_id:
+        dias_libres = dias_libres.filter(empresa_id=empresa_id)
+
+    if sucursal_id:
+        dias_libres = dias_libres.filter(sucursal_id=sucursal_id)
+
+    if sector:
+        dias_libres = dias_libres.filter(sector=sector)
+
+    if q:
+        dias_libres = dias_libres.filter(
+            Q(funcionario__nombre__icontains=q) |
+            Q(funcionario__apellido__icontains=q) |
+            Q(funcionario__cedula__icontains=q) |
+            Q(sector__icontains=q)
+        )
+
+    empresas = Empresa.objects.filter(activo=True).order_by("nombre")
+    sucursales = Sucursal.objects.filter(activo=True).order_by("nombre")
+
+    sectores = (
+        Funcionario.objects.filter(activo=True)
+        .exclude(sector="")
+        .values_list("sector", flat=True)
+        .distinct()
+        .order_by("sector")
+    )
+
+    funcionarios_activos = Funcionario.objects.filter(activo=True)
+    total_funcionarios = funcionarios_activos.count()
+    total_asignados = DiaLibre.objects.filter(activo=True).values("funcionario").distinct().count()
+    total_pendientes = max(total_funcionarios - total_asignados, 0)
+
+    return render(request, "core/dias_libres_lista.html", {
+        "dias_libres": dias_libres,
+        "empresas": empresas,
+        "sucursales": sucursales,
+        "sectores": sectores,
+        "empresa_id": empresa_id,
+        "sucursal_id": sucursal_id,
+        "sector": sector,
+        "q": q,
+        "total_funcionarios": total_funcionarios,
+        "total_asignados": total_asignados,
+        "total_pendientes": total_pendientes,
+    })
+
+
+@login_required
+def dia_libre_nuevo(request):
+    permiso = validar_permiso_o_redirigir(request, "dias_libres", "puede_crear")
+    if permiso:
+        return permiso
+
+    if request.method == "POST":
+        form = DiaLibreForm(request.POST)
+        if form.is_valid():
+            dia_libre = form.save()
+
+            registrar_historial(
+                request,
+                "Días Libres",
+                "Crear",
+                f"Se asignó día libre {dia_libre.get_dia_semana_display()} a {dia_libre.funcionario.nombre_completo}."
+            )
+            messages.success(request, "Día libre asignado correctamente.")
+            return redirect("dias_libres_lista")
+    else:
+        form = DiaLibreForm()
+
+    return render(request, "core/dia_libre_form.html", {
+        "form": form,
+        "titulo_form": "Nuevo día libre",
+        "boton_texto": "Guardar día libre",
+    })
+
+
+@login_required
+def dia_libre_editar(request, pk):
+    permiso = validar_permiso_o_redirigir(request, "dias_libres", "puede_editar")
+    if permiso:
+        return permiso
+
+    dia_libre = get_object_or_404(DiaLibre, pk=pk)
+
+    if request.method == "POST":
+        form = DiaLibreForm(request.POST, instance=dia_libre)
+        if form.is_valid():
+            dia_libre = form.save()
+
+            registrar_historial(
+                request,
+                "Días Libres",
+                "Editar",
+                f"Se editó día libre de {dia_libre.funcionario.nombre_completo}."
+            )
+            messages.success(request, "Día libre actualizado correctamente.")
+            return redirect("dias_libres_lista")
+    else:
+        form = DiaLibreForm(instance=dia_libre)
+
+    return render(request, "core/dia_libre_form.html", {
+        "form": form,
+        "titulo_form": "Editar día libre",
+        "boton_texto": "Actualizar día libre",
+    })
+
+
+@login_required
+def dia_libre_toggle_activo(request, pk):
+    permiso = validar_permiso_o_redirigir(request, "dias_libres", "puede_editar")
+    if permiso:
+        return permiso
+
+    dia_libre = get_object_or_404(DiaLibre, pk=pk)
+    dia_libre.activo = not dia_libre.activo
+    dia_libre.save(update_fields=["activo", "actualizado_en"])
+
+    registrar_historial(
+        request,
+        "Días Libres",
+        "Estado",
+        f"Se cambió estado de día libre de {dia_libre.funcionario.nombre_completo} a {'Activo' if dia_libre.activo else 'Inactivo'}."
+    )
+
+    messages.success(request, "Estado del día libre actualizado correctamente.")
+    return redirect("dias_libres_lista")

@@ -1,0 +1,175 @@
+{% extends "base.html" %}
+
+{% block title %}Permisos de Usuario | ClockIn{% endblock %}
+
+{% block content %}
+<style>
+    .up-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        gap: 16px;
+        flex-wrap: wrap;
+        margin-bottom: 20px;
+    }
+
+    .up-head h2 {
+        margin: 0;
+        color: #fff;
+        font-size: 34px;
+        font-weight: 800;
+    }
+
+    .up-head p {
+        margin: 8px 0 0;
+        color: #94a3b8;
+    }
+
+    .up-card {
+        background: linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
+        border: 1px solid rgba(255,255,255,.06);
+        border-radius: 24px;
+        padding: 18px;
+        box-shadow: 0 12px 36px rgba(0,0,0,.22);
+    }
+
+    .up-tools {
+        display: flex;
+        justify-content: flex-end;
+        margin-bottom: 14px;
+    }
+
+    .up-btn {
+        border: none;
+        border-radius: 14px;
+        padding: 12px 16px;
+        font-weight: 800;
+        color: #fff;
+        background: linear-gradient(135deg, var(--brand-primary), var(--brand-primary-dark));
+        cursor: pointer;
+    }
+
+    .up-table-wrap {
+        overflow-x: auto;
+    }
+
+    .up-table {
+        width: 100%;
+        min-width: 1100px;
+        border-collapse: separate;
+        border-spacing: 0 8px;
+    }
+
+    .up-table thead th {
+        color: #dbe6f3;
+        font-size: 11px;
+        font-weight: 800;
+        text-transform: uppercase;
+        padding: 0 10px 4px;
+        text-align: center;
+    }
+
+    .up-table thead th:first-child,
+    .up-table tbody td:first-child {
+        text-align: left;
+    }
+
+    .up-table tbody td {
+        padding: 12px 10px;
+        background: rgba(255,255,255,.02);
+        border-top: 1px solid rgba(255,255,255,.04);
+        border-bottom: 1px solid rgba(255,255,255,.04);
+        color: #fff;
+        font-size: 13px;
+        text-align: center;
+    }
+
+    .up-table tbody td:first-child {
+        border-left: 1px solid rgba(255,255,255,.04);
+        border-top-left-radius: 16px;
+        border-bottom-left-radius: 16px;
+        font-weight: 700;
+    }
+
+    .up-table tbody td:last-child {
+        border-right: 1px solid rgba(255,255,255,.04);
+        border-top-right-radius: 16px;
+        border-bottom-right-radius: 16px;
+    }
+
+    .up-table input[type="checkbox"] {
+        width: 18px;
+        height: 18px;
+        accent-color: #2563eb;
+        cursor: pointer;
+    }
+
+    .up-back {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 10px 14px;
+        border-radius: 12px;
+        text-decoration: none;
+        background: rgba(255,255,255,.05);
+        color: #fff;
+        border: 1px solid rgba(255,255,255,.08);
+        font-weight: 800;
+    }
+</style>
+
+<div class="up-head">
+    <div>
+        <h2>🔐 Permisos de {{ usuario_obj.username }}</h2>
+        <p>
+            {{ usuario_obj.get_full_name|default:"Sin nombre" }} ·
+            Rol base: {{ usuario_obj.get_rol_display }}
+        </p>
+    </div>
+
+    <a href="{% url 'usuarios_lista' %}" class="up-back">← Volver a usuarios</a>
+</div>
+
+<form method="post">
+    {% csrf_token %}
+
+    <div class="up-card">
+        <div class="up-tools">
+            <button type="submit" class="up-btn">💾 Guardar permisos</button>
+        </div>
+
+        <div class="up-table-wrap">
+            <table class="up-table">
+                <thead>
+                    <tr>
+                        <th>Módulo</th>
+                        <th>Ver</th>
+                        <th>Crear</th>
+                        <th>Editar</th>
+                        <th>Eliminar</th>
+                        <th>Aprobar</th>
+                        <th>Confirmar</th>
+                        <th>Pagar</th>
+                        <th>Anular</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for fila in filas %}
+                    <tr>
+                        <td>{{ fila.modulo_label }}</td>
+                        <td><input type="checkbox" name="{{ fila.modulo_valor }}_puede_ver" {% if fila.puede_ver %}checked{% endif %}></td>
+                        <td><input type="checkbox" name="{{ fila.modulo_valor }}_puede_crear" {% if fila.puede_crear %}checked{% endif %}></td>
+                        <td><input type="checkbox" name="{{ fila.modulo_valor }}_puede_editar" {% if fila.puede_editar %}checked{% endif %}></td>
+                        <td><input type="checkbox" name="{{ fila.modulo_valor }}_puede_eliminar" {% if fila.puede_eliminar %}checked{% endif %}></td>
+                        <td><input type="checkbox" name="{{ fila.modulo_valor }}_puede_aprobar" {% if fila.puede_aprobar %}checked{% endif %}></td>
+                        <td><input type="checkbox" name="{{ fila.modulo_valor }}_puede_confirmar" {% if fila.puede_confirmar %}checked{% endif %}></td>
+                        <td><input type="checkbox" name="{{ fila.modulo_valor }}_puede_pagar" {% if fila.puede_pagar %}checked{% endif %}></td>
+                        <td><input type="checkbox" name="{{ fila.modulo_valor }}_puede_anular" {% if fila.puede_anular %}checked{% endif %}></td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</form>
+{% endblock %}

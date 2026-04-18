@@ -1,0 +1,246 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block content %}
+
+<style>
+.container-config {
+    max-width: 1100px;
+    margin: auto;
+}
+
+.card-config {
+    background: linear-gradient(145deg, #0f1722, #0b111a);
+    border-radius: 16px;
+    padding: 25px;
+    box-shadow: 0 0 30px rgba(0,0,0,.6);
+}
+
+.title {
+    font-size: 26px;
+    font-weight: 700;
+    margin-bottom: 20px;
+}
+
+.section-title {
+    color: #3b82f6;
+    font-weight: 600;
+    margin-bottom: 15px;
+}
+
+.config-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 20px;
+}
+
+.config-field {
+    display: flex;
+    flex-direction: column;
+    margin-bottom: 15px;
+}
+
+.config-field label {
+    margin-bottom: 6px;
+    font-weight: 500;
+}
+
+.config-field input,
+.config-field textarea,
+.config-field select {
+    background: #0f1722;
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 10px;
+    padding: 10px;
+    color: white;
+}
+
+.config-field select option {
+    background: #0f1722;
+    color: white;
+}
+
+.color-preview-box {
+    height: 40px;
+    border-radius: 10px;
+    margin-top: 10px;
+}
+
+.theme-help {
+    font-size: 12px;
+    opacity: 0.7;
+    margin-top: 5px;
+}
+
+.btn-guardar {
+    background: linear-gradient(90deg, #3b82f6, #06b6d4);
+    border: none;
+    padding: 12px;
+    border-radius: 10px;
+    color: white;
+    font-weight: 600;
+    width: 100%;
+    margin-top: 20px;
+}
+
+.error-box {
+    margin-top: 16px;
+    background: rgba(220,38,38,0.15);
+    border: 1px solid rgba(220,38,38,0.35);
+    color: #fecaca;
+    padding: 12px;
+    border-radius: 12px;
+    text-align: center;
+}
+
+@media (max-width: 900px) {
+    .config-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
+<div class="container-config">
+    <div class="card-config">
+
+        <div class="title">Configuración</div>
+
+        <form method="POST">
+            {% csrf_token %}
+
+            {% if form.errors %}
+                <div class="error-box" style="margin-bottom:15px;">
+                    No se pudo guardar la configuración. Revisa los campos requeridos.
+                </div>
+            {% endif %}
+
+            <div class="section-title">Branding</div>
+
+            <div class="config-grid">
+
+                <div class="config-field">
+                    <label>Nombre sistema</label>
+                    {{ form.nombre_sistema }}
+                </div>
+
+                <div class="config-field">
+                    <label>Subtítulo</label>
+                    {{ form.subtitulo_sistema }}
+                </div>
+
+                <div class="config-field">
+                    <label>Tema visual</label>
+
+                    <select name="color_primario" id="id_color_primario" class="form-control">
+                        <option value="azul" {% if config.color_primario == "azul" %}selected{% endif %}>Azul corporativo</option>
+                        <option value="verde" {% if config.color_primario == "verde" %}selected{% endif %}>Verde premium</option>
+                        <option value="rojo" {% if config.color_primario == "rojo" %}selected{% endif %}>Rojo ejecutivo</option>
+                        <option value="naranja" {% if config.color_primario == "naranja" %}selected{% endif %}>Naranja energético</option>
+                        <option value="morado" {% if config.color_primario == "morado" %}selected{% endif %}>Morado moderno</option>
+                        <option value="turquesa" {% if config.color_primario == "turquesa" %}selected{% endif %}>Turquesa tecnológico</option>
+                        <option value="gris" {% if config.color_primario == "gris" %}selected{% endif %}>Gris elegante</option>
+                    </select>
+
+                    {% if form.color_primario.errors %}
+                        <ul class="errorlist">
+                            {% for error in form.color_primario.errors %}
+                                <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+
+                    <div class="color-preview-box" id="themePreview"></div>
+                    <div class="theme-help">Selecciona un color estándar sin usar códigos HEX.</div>
+                </div>
+
+                <div class="config-field">
+                    <label>Logo URL</label>
+                    {{ form.logo_url }}
+                </div>
+
+            </div>
+
+            <div class="section-title" style="margin-top:20px;">Parámetros globales</div>
+
+            <div class="config-grid">
+
+                <div class="config-field">
+                    <label>Salario base global</label>
+                    {{ form.salario_base_default }}
+                </div>
+
+                <div class="config-field">
+                    <label>Límite deuda global (%)</label>
+                    {{ form.porcentaje_limite_deuda_default }}
+                </div>
+
+                <div class="config-field">
+                    <label>Tolerancia global</label>
+                    {{ form.tolerancia_minutos_default }}
+                </div>
+
+            </div>
+
+            <!-- Campos ocultos para que el form siga siendo válido y guarde completo -->
+            <input type="hidden" name="bancos_personalizados" value="{{ config.bancos_personalizados }}">
+            <input type="hidden" name="cargos_personalizados" value="{{ config.cargos_personalizados }}">
+            <input type="hidden" name="sectores_personalizados" value="{{ config.sectores_personalizados }}">
+
+            <input type="hidden" name="biometrico_segundos_lectura" value="{{ config.biometrico_segundos_lectura }}">
+            <input type="hidden" name="biometrico_pausa_exito_ms" value="{{ config.biometrico_pausa_exito_ms }}">
+            <input type="hidden" name="biometrico_pausa_aviso_ms" value="{{ config.biometrico_pausa_aviso_ms }}">
+            <input type="hidden" name="biometrico_pausa_error_ms" value="{{ config.biometrico_pausa_error_ms }}">
+
+            {% if config.biometrico_sonidos_activos %}
+                <input type="hidden" name="biometrico_sonidos_activos" value="on">
+            {% endif %}
+
+            {% if config.biometrico_fullscreen_auto %}
+                <input type="hidden" name="biometrico_fullscreen_auto" value="on">
+            {% endif %}
+
+            <input type="hidden" name="observacion_general" value="{{ config.observacion_general }}">
+
+            <button type="submit" class="btn-guardar">
+                Guardar Configuración
+            </button>
+
+        </form>
+
+    </div>
+</div>
+
+<script>
+(function () {
+    const selectTema = document.getElementById("id_color_primario");
+    const preview = document.getElementById("themePreview");
+
+    if (!selectTema || !preview) return;
+
+    const mapa = {
+        azul: "#2563eb",
+        verde: "#16a34a",
+        rojo: "#dc2626",
+        naranja: "#ea580c",
+        morado: "#7c3aed",
+        turquesa: "#0891b2",
+        gris: "#475569"
+    };
+
+    function actualizarPreview() {
+        let valor = selectTema.value;
+
+        if (!mapa[valor]) {
+            valor = "azul";
+            selectTema.value = "azul";
+        }
+
+        preview.style.backgroundColor = mapa[valor];
+    }
+
+    selectTema.addEventListener("change", actualizarPreview);
+    actualizarPreview();
+})();
+</script>
+
+{% endblock %}

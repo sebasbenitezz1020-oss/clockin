@@ -3,140 +3,392 @@
 {% block title %}{{ titulo_form }} | ClockIn{% endblock %}
 
 {% block content %}
-<div class="page-header">
-    <h2>📝 {{ titulo_form }}</h2>
-    <p>Completa la información principal, salarial y bancaria del funcionario.</p>
-</div>
+<style>
+    .func-form-page {
+        padding: 24px 0;
+    }
 
-<div class="card form-card">
-    <form method="post" enctype="multipart/form-data">
-        {% csrf_token %}
+    .func-form-header {
+        margin-bottom: 20px;
+    }
 
-        {% if form.errors %}
-            <div class="alert-box error-box-strong">
-                Revisa los campos marcados. Hay datos pendientes o inválidos.
+    .func-form-header .kicker {
+        display: inline-block;
+        margin-bottom: 8px;
+        color: var(--brand-primary);
+        font-size: 12px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: .4px;
+    }
+
+    .func-form-header h2 {
+        margin: 0;
+        font-size: 32px;
+        font-weight: 800;
+        color: #fff;
+    }
+
+    .func-form-header p {
+        margin: 8px 0 0;
+        color: #94a3b8;
+        font-size: 15px;
+    }
+
+    .func-form-card {
+        position: relative;
+        background: linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
+        border: 1px solid rgba(255,255,255,.06);
+        border-radius: 24px;
+        box-shadow: 0 12px 36px rgba(0,0,0,.28);
+        overflow: hidden;
+        padding: 22px;
+    }
+
+    .func-form-card::before {
+        content: "";
+        position: absolute;
+        inset: 0 0 auto 0;
+        height: 3px;
+        background: linear-gradient(90deg, var(--brand-primary), var(--brand-primary-dark));
+        opacity: .95;
+    }
+
+    .func-form-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+    }
+
+    .func-form-section {
+        grid-column: 1 / -1;
+        margin-top: 8px;
+        margin-bottom: -4px;
+        color: var(--brand-primary);
+        font-size: 13px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: .4px;
+    }
+
+    .func-form-field {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .func-form-field label {
+        color: #e5e7eb;
+        font-size: 13px;
+        font-weight: 700;
+    }
+
+    .func-input-shell {
+        position: relative;
+    }
+
+    .func-input-shell .icon {
+        position: absolute;
+        left: 14px;
+        top: 50%;
+        transform: translateY(-50%);
+        color: #7c8798;
+        font-size: 14px;
+        pointer-events: none;
+    }
+
+    .func-input-shell input,
+    .func-input-shell select,
+    .func-input-shell textarea {
+        width: 100%;
+        border: 1px solid rgba(255,255,255,.08);
+        background: #0f1722;
+        color: #fff;
+        border-radius: 14px;
+        padding: 13px 14px;
+        font-size: 14px;
+        outline: none;
+    }
+
+    .func-input-shell.with-icon input,
+    .func-input-shell.with-icon select,
+    .func-input-shell.with-icon textarea {
+        padding-left: 40px;
+    }
+
+    .func-form-field input[readonly] {
+        background: var(--brand-soft);
+        color: var(--brand-text-soft);
+        font-weight: 800;
+        border-color: var(--brand-border);
+    }
+
+    .checks-row {
+        display: flex;
+        gap: 20px;
+        flex-wrap: wrap;
+        margin-top: 20px;
+        margin-bottom: 20px;
+    }
+
+    .check-item {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: rgba(255,255,255,.03);
+        border: 1px solid rgba(255,255,255,.05);
+        border-radius: 14px;
+        padding: 12px 14px;
+        color: #fff;
+    }
+
+    .form-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+        margin-top: 22px;
+    }
+
+    .btn-main,
+    .btn-soft {
+        padding: 13px 18px;
+        border-radius: 14px;
+        text-decoration: none;
+        font-size: 14px;
+        font-weight: 800;
+    }
+
+    .btn-main {
+        border: none;
+        color: #fff;
+    }
+
+    .btn-soft {
+        background: rgba(255,255,255,.05);
+        color: #fff;
+        border: 1px solid rgba(255,255,255,.08);
+    }
+
+    .alert-box-strong {
+        margin-bottom: 18px;
+    }
+
+    .errorlist {
+        margin: 0;
+        padding: 0;
+        list-style: none;
+        color: #fca5a5;
+        font-size: 12px;
+    }
+
+    .helper-text {
+        font-size: 12px;
+        color: #94a3b8;
+        margin-top: 4px;
+    }
+
+    @media (max-width: 1100px) {
+        .func-form-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+    }
+
+    @media (max-width: 700px) {
+        .func-form-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .form-actions {
+            flex-direction: column;
+        }
+    }
+</style>
+
+<div class="container-fluid func-form-page">
+    <div class="func-form-header">
+        <span class="kicker">Gestión de personal</span>
+        <h2>📝 {{ titulo_form }}</h2>
+        <p>Completa la información principal, laboral y de cobro del funcionario.</p>
+    </div>
+
+    <div class="func-form-card">
+        <form method="post" enctype="multipart/form-data">
+            {% csrf_token %}
+
+            {% if form.errors %}
+                <div class="alert-box error-box-strong">
+                    Revisa los campos marcados. Hay datos pendientes o inválidos.
+                </div>
+            {% endif %}
+
+            <div class="func-form-grid">
+                <div class="func-form-section">Datos personales</div>
+
+                <div class="func-form-field">
+                    <label for="{{ form.nombre.id_for_label }}">Nombre</label>
+                    <div class="func-input-shell with-icon">
+                        <span class="icon">👤</span>
+                        {{ form.nombre }}
+                    </div>
+                    {{ form.nombre.errors }}
+                </div>
+
+                <div class="func-form-field">
+                    <label for="{{ form.apellido.id_for_label }}">Apellido</label>
+                    <div class="func-input-shell with-icon">
+                        <span class="icon">👤</span>
+                        {{ form.apellido }}
+                    </div>
+                    {{ form.apellido.errors }}
+                </div>
+
+                <div class="func-form-field">
+                    <label for="{{ form.cedula.id_for_label }}">Cédula</label>
+                    <div class="func-input-shell with-icon">
+                        <span class="icon">🪪</span>
+                        {{ form.cedula }}
+                    </div>
+                    {{ form.cedula.errors }}
+                </div>
+
+                <div class="func-form-section">Datos laborales</div>
+
+                <div class="func-form-field">
+                    <label for="{{ form.turno.id_for_label }}">Turno</label>
+                    <div class="func-input-shell with-icon">
+                        <span class="icon">🕓</span>
+                        {{ form.turno }}
+                    </div>
+                    {{ form.turno.errors }}
+                </div>
+
+                <div class="func-form-field">
+                    <label for="{{ form.empresa.id_for_label }}">Empresa</label>
+                    <div class="func-input-shell with-icon">
+                        <span class="icon">🏢</span>
+                        {{ form.empresa }}
+                    </div>
+                    {{ form.empresa.errors }}
+                </div>
+
+                <div class="func-form-field">
+                    <label for="{{ form.sucursal_rel.id_for_label }}">Sucursal</label>
+                    <div class="func-input-shell with-icon">
+                        <span class="icon">🏬</span>
+                        {{ form.sucursal_rel }}
+                    </div>
+                    {{ form.sucursal_rel.errors }}
+                </div>
+
+                <div class="func-form-field">
+                    <label for="{{ form.cargo.id_for_label }}">Cargo</label>
+                    <div class="func-input-shell with-icon">
+                        <span class="icon">💼</span>
+                        {{ form.cargo }}
+                    </div>
+                    {{ form.cargo.errors }}
+                </div>
+
+                <div class="func-form-field">
+                    <label for="{{ form.sector.id_for_label }}">Sector</label>
+                    <div class="func-input-shell with-icon">
+                        <span class="icon">🧩</span>
+                        {{ form.sector }}
+                    </div>
+                    {{ form.sector.errors }}
+                </div>
+
+                <div class="func-form-field">
+                    <label for="{{ form.fecha_ingreso.id_for_label }}">Fecha de ingreso</label>
+                    <div class="func-input-shell with-icon">
+                        <span class="icon">📅</span>
+                        {{ form.fecha_ingreso }}
+                    </div>
+                    {{ form.fecha_ingreso.errors }}
+                </div>
+
+                <div class="func-form-field">
+                    <label for="{{ form.salario_base_fijo.id_for_label }}">Salario base</label>
+                    <div class="func-input-shell with-icon">
+                        <span class="icon">💵</span>
+                        {{ form.salario_base_fijo }}
+                    </div>
+                    <div class="helper-text">Este valor se controla desde Configuración global.</div>
+                    {{ form.salario_base_fijo.errors }}
+                </div>
+
+                <div class="func-form-field">
+                    <label for="{{ form.bono.id_for_label }}">Bono base</label>
+                    <div class="func-input-shell with-icon">
+                        <span class="icon">✨</span>
+                        {{ form.bono }}
+                    </div>
+                    {{ form.bono.errors }}
+                </div>
+
+                <div class="func-form-field">
+                    <label for="{{ form.foto.id_for_label }}">Foto</label>
+                    <div class="func-input-shell">
+                        {{ form.foto }}
+                    </div>
+                    {{ form.foto.errors }}
+                </div>
+
+                <div class="func-form-section">Datos de cobro</div>
+
+                <div class="func-form-field">
+                    <label for="{{ form.modalidad_cobro.id_for_label }}">Modalidad de cobro</label>
+                    <div class="func-input-shell with-icon">
+                        <span class="icon">🏦</span>
+                        {{ form.modalidad_cobro }}
+                    </div>
+                    {{ form.modalidad_cobro.errors }}
+                </div>
+
+                <div class="func-form-field datos-bancarios">
+                    <label for="{{ form.banco.id_for_label }}">Banco</label>
+                    <div class="func-input-shell with-icon">
+                        <span class="icon">🏛️</span>
+                        {{ form.banco }}
+                    </div>
+                    {{ form.banco.errors }}
+                </div>
+
+                <div class="func-form-field datos-bancarios">
+                    <label for="{{ form.tipo_cuenta.id_for_label }}">Tipo de cuenta</label>
+                    <div class="func-input-shell with-icon">
+                        <span class="icon">📘</span>
+                        {{ form.tipo_cuenta }}
+                    </div>
+                    {{ form.tipo_cuenta.errors }}
+                </div>
+
+                <div class="func-form-field datos-bancarios">
+                    <label for="{{ form.numero_cuenta.id_for_label }}">Número de cuenta</label>
+                    <div class="func-input-shell with-icon">
+                        <span class="icon">🔢</span>
+                        {{ form.numero_cuenta }}
+                    </div>
+                    {{ form.numero_cuenta.errors }}
+                </div>
             </div>
-        {% endif %}
 
-        <div class="form-grid">
-            <div class="form-field">
-                <label for="{{ form.nombre.id_for_label }}">Nombre</label>
-                {{ form.nombre }}
-                {{ form.nombre.errors }}
+            <div class="checks-row">
+                <label class="check-item">
+                    {{ form.ips }} <span>Aporta IPS</span>
+                </label>
+
+                <label class="check-item">
+                    {{ form.activo }} <span>Funcionario activo</span>
+                </label>
             </div>
 
-            <div class="form-field">
-                <label for="{{ form.apellido.id_for_label }}">Apellido</label>
-                {{ form.apellido }}
-                {{ form.apellido.errors }}
+            <div class="form-actions">
+                <a href="{% url 'funcionarios_lista' %}" class="btn-soft">Volver</a>
+                <button type="submit" class="btn-main">{{ boton_texto }}</button>
             </div>
-
-            <div class="form-field">
-                <label for="{{ form.cedula.id_for_label }}">Cédula</label>
-                {{ form.cedula }}
-                {{ form.cedula.errors }}
-            </div>
-
-            <div class="form-field">
-                <label for="{{ form.turno.id_for_label }}">Turno</label>
-                {{ form.turno }}
-                {{ form.turno.errors }}
-            </div>
-
-            <div class="form-field">
-                <label for="{{ form.empresa.id_for_label }}">Empresa</label>
-                {{ form.empresa }}
-                {{ form.empresa.errors }}
-            </div>
-
-            <div class="form-field">
-                <label for="{{ form.sucursal_rel.id_for_label }}">Sucursal</label>
-                {{ form.sucursal_rel }}
-                {{ form.sucursal_rel.errors }}
-            </div>
-
-            <div class="form-field">
-                <label for="{{ form.cargo.id_for_label }}">Cargo</label>
-                {{ form.cargo }}
-                {{ form.cargo.errors }}
-            </div>
-
-            <div class="form-field">
-                <label for="{{ form.sector.id_for_label }}">Sector</label>
-                {{ form.sector }}
-                {{ form.sector.errors }}
-            </div>
-
-            <div class="form-field">
-                <label for="{{ form.fecha_ingreso.id_for_label }}">Fecha de ingreso</label>
-                {{ form.fecha_ingreso }}
-                {{ form.fecha_ingreso.errors }}
-            </div>
-
-            <div class="form-field">
-                <label for="{{ form.salario_base.id_for_label }}">Salario base</label>
-                {{ form.salario_base }}
-                {{ form.salario_base.errors }}
-            </div>
-
-            <div class="form-field">
-                <label for="{{ form.bono.id_for_label }}">Bono base</label>
-                {{ form.bono }}
-                {{ form.bono.errors }}
-            </div>
-
-            <div class="form-field">
-                <label for="{{ form.porcentaje_limite_deuda.id_for_label }}">Límite de deuda (%)</label>
-                {{ form.porcentaje_limite_deuda }}
-                {{ form.porcentaje_limite_deuda.errors }}
-            </div>
-
-            <div class="form-field">
-                <label for="{{ form.modalidad_cobro.id_for_label }}">Modalidad de cobro</label>
-                {{ form.modalidad_cobro }}
-                {{ form.modalidad_cobro.errors }}
-            </div>
-
-            <div class="form-field datos-bancarios">
-                <label for="{{ form.banco.id_for_label }}">Banco</label>
-                {{ form.banco }}
-                {{ form.banco.errors }}
-            </div>
-
-            <div class="form-field datos-bancarios">
-                <label for="{{ form.tipo_cuenta.id_for_label }}">Tipo de cuenta</label>
-                {{ form.tipo_cuenta }}
-                {{ form.tipo_cuenta.errors }}
-            </div>
-
-            <div class="form-field datos-bancarios">
-                <label for="{{ form.numero_cuenta.id_for_label }}">Número de cuenta</label>
-                {{ form.numero_cuenta }}
-                {{ form.numero_cuenta.errors }}
-            </div>
-
-            <div class="form-field">
-                <label for="{{ form.foto.id_for_label }}">Foto</label>
-                {{ form.foto }}
-                {{ form.foto.errors }}
-            </div>
-        </div>
-
-        <div class="checks-row">
-            <label class="check-item">
-                {{ form.ips }} <span>Aporta IPS</span>
-            </label>
-
-            <label class="check-item">
-                {{ form.activo }} <span>Funcionario activo</span>
-            </label>
-        </div>
-
-        <div class="form-actions">
-            <a href="{% url 'funcionarios_lista' %}" class="btn-secondary">Volver</a>
-            <button type="submit" class="btn-primary btn-link">{{ boton_texto }}</button>
-        </div>
-    </form>
+        </form>
+    </div>
 </div>
 
 <script>
@@ -150,7 +402,7 @@ document.addEventListener("DOMContentLoaded", function () {
         if (!modalidadCobro) return;
         const mostrar = modalidadCobro.value === "transferencia";
         camposBancarios.forEach(el => {
-            el.style.display = mostrar ? "block" : "none";
+            el.style.display = mostrar ? "flex" : "none";
         });
     }
 

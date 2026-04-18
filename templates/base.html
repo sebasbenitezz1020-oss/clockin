@@ -3,37 +3,417 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{% block title %}ClockIn{% endblock %}</title>
+    <title>
+        {% block title %}
+            {% if config_general and config_general.nombre_sistema %}
+                {{ config_general.nombre_sistema }}
+            {% else %}
+                ClockIn
+            {% endif %}
+        {% endblock %}
+    </title>
+
     <link rel="stylesheet" href="/static/css/styles.css">
+
+    <style>
+        :root {
+            --bg-main: #0b1118;
+            --bg-card: #111827;
+            --bg-soft: #0f1722;
+            --text-main: #f8fafc;
+            --text-soft: #94a3b8;
+            --border-soft: rgba(255,255,255,.06);
+            --shadow-soft: 0 12px 36px rgba(0,0,0,.22);
+
+            --brand-primary: #2563eb;
+            --brand-primary-dark: #1d4ed8;
+            --brand-soft: rgba(37, 99, 235, 0.14);
+            --brand-soft-strong: rgba(37, 99, 235, 0.22);
+            --brand-border: rgba(37, 99, 235, 0.30);
+            --brand-shadow: rgba(37, 99, 235, 0.24);
+            --brand-text-soft: #dbeafe;
+        }
+
+        body.theme-azul {
+            --brand-primary: #2563eb;
+            --brand-primary-dark: #1d4ed8;
+            --brand-soft: rgba(37, 99, 235, 0.14);
+            --brand-soft-strong: rgba(37, 99, 235, 0.22);
+            --brand-border: rgba(37, 99, 235, 0.30);
+            --brand-shadow: rgba(37, 99, 235, 0.24);
+            --brand-text-soft: #dbeafe;
+        }
+
+        body.theme-verde {
+            --brand-primary: #16a34a;
+            --brand-primary-dark: #15803d;
+            --brand-soft: rgba(22, 163, 74, 0.14);
+            --brand-soft-strong: rgba(22, 163, 74, 0.22);
+            --brand-border: rgba(22, 163, 74, 0.30);
+            --brand-shadow: rgba(22, 163, 74, 0.24);
+            --brand-text-soft: #dcfce7;
+        }
+
+        body.theme-rojo {
+            --brand-primary: #dc2626;
+            --brand-primary-dark: #b91c1c;
+            --brand-soft: rgba(220, 38, 38, 0.14);
+            --brand-soft-strong: rgba(220, 38, 38, 0.22);
+            --brand-border: rgba(220, 38, 38, 0.30);
+            --brand-shadow: rgba(220, 38, 38, 0.24);
+            --brand-text-soft: #fee2e2;
+        }
+
+        body.theme-naranja {
+            --brand-primary: #ea580c;
+            --brand-primary-dark: #c2410c;
+            --brand-soft: rgba(234, 88, 12, 0.14);
+            --brand-soft-strong: rgba(234, 88, 12, 0.22);
+            --brand-border: rgba(234, 88, 12, 0.30);
+            --brand-shadow: rgba(234, 88, 12, 0.24);
+            --brand-text-soft: #ffedd5;
+        }
+
+        body.theme-morado {
+            --brand-primary: #7c3aed;
+            --brand-primary-dark: #6d28d9;
+            --brand-soft: rgba(124, 58, 237, 0.14);
+            --brand-soft-strong: rgba(124, 58, 237, 0.22);
+            --brand-border: rgba(124, 58, 237, 0.30);
+            --brand-shadow: rgba(124, 58, 237, 0.24);
+            --brand-text-soft: #ede9fe;
+        }
+
+        body.theme-turquesa {
+            --brand-primary: #0891b2;
+            --brand-primary-dark: #0e7490;
+            --brand-soft: rgba(8, 145, 178, 0.14);
+            --brand-soft-strong: rgba(8, 145, 178, 0.22);
+            --brand-border: rgba(8, 145, 178, 0.30);
+            --brand-shadow: rgba(8, 145, 178, 0.24);
+            --brand-text-soft: #cffafe;
+        }
+
+        body.theme-gris {
+            --brand-primary: #475569;
+            --brand-primary-dark: #334155;
+            --brand-soft: rgba(71, 85, 105, 0.14);
+            --brand-soft-strong: rgba(71, 85, 105, 0.22);
+            --brand-border: rgba(71, 85, 105, 0.30);
+            --brand-shadow: rgba(71, 85, 105, 0.24);
+            --brand-text-soft: #e2e8f0;
+        }
+
+        body {
+            background:
+                radial-gradient(circle at top left, var(--brand-soft-strong), transparent 24%),
+                linear-gradient(180deg, #081018 0%, #0b1118 100%);
+        }
+
+        .brand-logo-sidebar {
+            width: 44px;
+            height: 44px;
+            border-radius: 14px;
+            overflow: hidden;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: rgba(255,255,255,.06);
+            border: 1px solid rgba(255,255,255,.06);
+            flex-shrink: 0;
+            box-shadow: 0 8px 18px rgba(0,0,0,.18);
+        }
+
+        .brand-logo-sidebar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .brand-title-wrap {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-fallback-emoji {
+            font-size: 22px;
+        }
+
+        .sidebar {
+            border-right: 1px solid var(--border-soft);
+        }
+
+        .brand h1 {
+            color: var(--text-main);
+        }
+
+        .brand p {
+            color: var(--text-soft);
+        }
+
+        .menu a {
+            transition: .18s ease;
+            border: 1px solid transparent;
+        }
+
+        .menu a:hover {
+            background: var(--brand-soft);
+            border-color: var(--brand-border);
+            box-shadow: 0 0 0 1px var(--brand-soft) inset;
+        }
+
+        .menu a.active,
+        .menu a[aria-current="page"] {
+            background: linear-gradient(135deg, var(--brand-primary), var(--brand-primary-dark));
+            color: #fff !important;
+            box-shadow: 0 10px 24px var(--brand-shadow);
+        }
+
+        .topbar {
+            position: relative;
+            overflow: hidden;
+        }
+
+        .topbar::before {
+            content: "";
+            position: absolute;
+            inset: 0 0 auto 0;
+            height: 3px;
+            background: linear-gradient(90deg, var(--brand-primary), var(--brand-primary-dark));
+            opacity: .95;
+        }
+
+        .topbar-inner {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .topbar-user strong {
+            display: block;
+            color: #fff;
+            font-size: 15px;
+            font-weight: 800;
+            line-height: 1.1;
+        }
+
+        .topbar-sub {
+            display: block;
+            color: #94a3b8;
+            font-size: 12px;
+            margin-top: 4px;
+        }
+
+        .role-badge {
+            background: var(--brand-soft);
+            color: var(--brand-text-soft);
+            border: 1px solid var(--brand-border);
+        }
+
+        .topbar-breadcrumb {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 9px 12px;
+            border-radius: 999px;
+            background: rgba(255,255,255,.03);
+            border: 1px solid rgba(255,255,255,.05);
+            color: #cbd5e1;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .topbar-breadcrumb .dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 999px;
+            background: var(--brand-primary);
+            box-shadow: 0 0 0 4px var(--brand-soft);
+        }
+
+        .btn-primary,
+        .btn-main,
+        .func-btn-main,
+        .btn-search,
+        .btn-save,
+        .logout-btn {
+            background: linear-gradient(135deg, var(--brand-primary), var(--brand-primary-dark)) !important;
+            color: #fff !important;
+            border: none !important;
+            box-shadow: 0 10px 24px var(--brand-shadow);
+        }
+
+        .btn-primary:hover,
+        .btn-main:hover,
+        .func-btn-main:hover,
+        .btn-search:hover,
+        .btn-save:hover,
+        .logout-btn:hover {
+            filter: brightness(1.05);
+            transform: translateY(-1px);
+        }
+
+        .btn-secondary,
+        .btn-soft {
+            border: 1px solid var(--brand-border);
+        }
+
+        input:focus,
+        select:focus,
+        textarea:focus {
+            border-color: var(--brand-border) !important;
+            box-shadow: 0 0 0 3px var(--brand-soft) !important;
+            outline: none !important;
+        }
+
+        .card,
+        .config-card,
+        .func-card,
+        .stat-card,
+        .resume-box,
+        .form-card {
+            box-shadow: var(--shadow-soft);
+        }
+
+        .highlight-brand,
+        .text-brand {
+            color: var(--brand-primary) !important;
+        }
+
+        .border-brand {
+            border-color: var(--brand-border) !important;
+        }
+
+        .bg-brand-soft {
+            background: var(--brand-soft) !important;
+        }
+
+        .badge-brand {
+            background: var(--brand-soft);
+            color: var(--brand-text-soft);
+            border: 1px solid var(--brand-border);
+        }
+
+        .color-preview-global {
+            background: var(--brand-primary);
+        }
+    </style>
 </head>
-<body>
+<body class="theme-{% if config_general and config_general.color_primario %}{{ config_general.color_primario }}{% else %}azul{% endif %}">
 
 <button id="menu-toggle">☰</button>
 
 <div class="layout">
     <aside class="sidebar" id="sidebar">
         <div class="brand">
-            <h1>🕒 ClockIn</h1>
-            <p>Sistema Web</p>
+            <div class="brand-title-wrap">
+                <div class="brand-logo-sidebar">
+                    {% if config_general and config_general.logo_url %}
+                        <img src="{{ config_general.logo_url }}" alt="Logo">
+                    {% else %}
+                        <span class="brand-fallback-emoji">🕒</span>
+                    {% endif %}
+                </div>
+
+                <div>
+                    <h1 style="margin:0;">
+                        {% if config_general and config_general.nombre_sistema %}
+                            {{ config_general.nombre_sistema }}
+                        {% else %}
+                            ClockIn
+                        {% endif %}
+                    </h1>
+                    <p style="margin:4px 0 0;">
+                        {% if config_general and config_general.subtitulo_sistema %}
+                            {{ config_general.subtitulo_sistema }}
+                        {% else %}
+                            Sistema Web
+                        {% endif %}
+                    </p>
+                </div>
+            </div>
         </div>
 
         {% if request.user.is_authenticated %}
         <nav class="menu">
+            {% if puede_ver_dashboard %}
             <a href="{% url 'dashboard' %}">📊 Dashboard</a>
+            {% endif %}
+
+            {% if puede_ver_empresas %}
             <a href="{% url 'empresas_lista' %}">🏢 Empresas</a>
+            {% endif %}
+
+            {% if puede_ver_sucursales %}
             <a href="{% url 'sucursales_lista' %}">🏬 Sucursales</a>
+            {% endif %}
+
+            {% if puede_ver_funcionarios %}
             <a href="{% url 'funcionarios_lista' %}">👥 Funcionarios</a>
+            {% endif %}
+
+            {% if puede_ver_turnos %}
             <a href="{% url 'turnos_lista' %}">🕓 Turnos</a>
+            {% endif %}
+
+            {% if puede_ver_asistencia %}
             <a href="{% url 'asistencia_marcar' %}">⏱️ Asistencia</a>
+            {% endif %}
+
+            {% if puede_ver_dias_libres %}
+            <a href="{% url 'dias_libres_lista' %}">🗓️ Días Libres</a>
+            {% endif %}
+
+            {% if puede_ver_deudas %}
             <a href="{% url 'deudas_lista' %}">💳 Deudas</a>
+            {% endif %}
+
+            {% if puede_ver_nomina %}
             <a href="{% url 'nomina_lista' %}">💰 Nómina</a>
+            {% endif %}
+
+            {% if puede_ver_biometrico %}
             <a href="{% url 'biometrico_inicio' %}">📸 Biométrico</a>
+            {% endif %}
+
+            {% if puede_ver_permisos %}
             <a href="{% url 'permisos_lista' %}">📄 Permisos / Licencias</a>
+            {% endif %}
+
+            {% if puede_ver_vacaciones %}
             <a href="{% url 'vacaciones_lista' %}">🏖️ Vacaciones</a>
+            {% endif %}
+
+            {% if puede_ver_icl %}
             <a href="{% url 'icl_lista' %}">📈 ICL</a>
+            {% endif %}
+
+            {% if puede_ver_reportes %}
             <a href="{% url 'reportes' %}">📑 Reportes</a>
+            {% endif %}
+
+            {% if puede_ver_historial %}
             <a href="{% url 'historial_lista' %}">🕘 Historial</a>
-            <a href="/admin/">⚙️ Admin</a>
+            {% endif %}
+
+            {% if puede_ver_liquidacion %}
+            <a href="{% url 'liquidaciones_lista' %}">📑 Liquidación</a>
+            {% endif %}
+
+            {% if puede_ver_configuracion %}
+            <a href="{% url 'configuracion_general' %}">⚙️ Configuración</a>
+            {% endif %}
+
+            {% if puede_ver_usuarios_permisos %}
+            <a href="{% url 'usuarios_lista' %}">👤 Usuarios y Permisos</a>
+            {% endif %}
+
+            {% if es_admin_total %}
+            <a href="/admin/">🛠️ Admin</a>
+            {% endif %}
 
             <form method="post" action="{% url 'logout' %}">
                 {% csrf_token %}
@@ -46,9 +426,26 @@
     <main class="content">
         <header class="topbar">
             {% if request.user.is_authenticated %}
-                <div>
-                    <strong>{{ request.user.get_full_name|default:request.user.username }}</strong>
-                    <span class="role-badge">{{ request.user.get_rol_display }}</span>
+                <div class="topbar-inner">
+                    <div class="topbar-user">
+                        <strong>{{ request.user.get_full_name|default:request.user.username }}</strong>
+                        <span class="topbar-sub">Panel administrativo activo</span>
+                    </div>
+
+                    <div class="topbar-breadcrumb">
+                        <span class="dot"></span>
+                        <span>
+                            {% if config_general and config_general.nombre_sistema %}
+                                {{ config_general.nombre_sistema }}
+                            {% else %}
+                                ClockIn
+                            {% endif %}
+                        </span>
+                    </div>
+
+                    <div>
+                        <span class="role-badge">{{ request.user.get_rol_display }}</span>
+                    </div>
                 </div>
             {% endif %}
         </header>
@@ -68,14 +465,28 @@ if (toggle && sidebar) {
         sidebar.classList.toggle("active");
         document.body.classList.toggle("menu-open", sidebar.classList.contains("active"));
     });
-
-    document.querySelectorAll(".sidebar .menu a").forEach(link => {
-        link.addEventListener("click", () => {
-            sidebar.classList.remove("active");
-            document.body.classList.remove("menu-open");
-        });
-    });
 }
+
+document.addEventListener("DOMContentLoaded", function () {
+    const currentPath = window.location.pathname;
+    document.querySelectorAll(".menu a").forEach(link => {
+        try {
+            const url = new URL(link.href, window.location.origin);
+            if (url.pathname === currentPath) {
+                link.classList.add("active");
+                link.setAttribute("aria-current", "page");
+            }
+        } catch (e) {}
+    });
+
+    document.addEventListener("click", function (e) {
+        if (window.innerWidth > 900) return;
+        if (!sidebar.classList.contains("active")) return;
+        if (sidebar.contains(e.target) || toggle.contains(e.target)) return;
+        sidebar.classList.remove("active");
+        document.body.classList.remove("menu-open");
+    });
+});
 </script>
 
 </body>

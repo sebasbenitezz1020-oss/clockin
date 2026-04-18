@@ -1,0 +1,247 @@
+{% extends "base.html" %}
+{% load number_filters %}
+
+{% block title %}Liquidaciones | ClockIn{% endblock %}
+
+{% block content %}
+<style>
+    .liqlist-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        gap: 16px;
+        flex-wrap: wrap;
+        margin-bottom: 20px;
+    }
+
+    .liqlist-head h2 {
+        margin: 0;
+        color: #fff;
+        font-size: 34px;
+        font-weight: 800;
+    }
+
+    .liqlist-head p {
+        margin: 8px 0 0;
+        color: #94a3b8;
+        font-size: 15px;
+    }
+
+    .liqlist-btn {
+        padding: 13px 18px;
+        border-radius: 14px;
+        text-decoration: none;
+        font-size: 14px;
+        font-weight: 800;
+        border: none;
+        background: linear-gradient(135deg, var(--brand-primary), var(--brand-primary-dark));
+        color: #fff;
+        box-shadow: 0 10px 24px var(--brand-shadow);
+    }
+
+    .liqlist-card {
+        background: linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
+        border: 1px solid rgba(255,255,255,.06);
+        border-radius: 24px;
+        padding: 18px;
+        box-shadow: 0 12px 36px rgba(0,0,0,.22);
+    }
+
+    .liqlist-filter {
+        display: grid;
+        grid-template-columns: 1fr 160px;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+    .liqlist-filter input {
+        width: 100%;
+        border: 1px solid rgba(255,255,255,.08);
+        background: #0f1722;
+        color: #fff;
+        border-radius: 14px;
+        padding: 13px 14px;
+        font-size: 14px;
+        outline: none;
+    }
+
+    .liqlist-filter button {
+        border: none;
+        border-radius: 14px;
+        background: linear-gradient(135deg, var(--brand-primary), var(--brand-primary-dark));
+        color: #fff;
+        font-weight: 800;
+    }
+
+    .liqlist-table-wrap {
+        overflow-x: auto;
+    }
+
+    .liqlist-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0 8px;
+        min-width: 980px;
+    }
+
+    .liqlist-table thead th {
+        color: #dbe6f3;
+        font-size: 11px;
+        font-weight: 800;
+        text-transform: uppercase;
+        letter-spacing: .25px;
+        padding: 0 10px 4px;
+    }
+
+    .liqlist-table tbody td {
+        padding: 12px 10px;
+        background: rgba(255,255,255,.02);
+        border-top: 1px solid rgba(255,255,255,.04);
+        border-bottom: 1px solid rgba(255,255,255,.04);
+        color: #fff;
+        font-size: 13px;
+        vertical-align: middle;
+    }
+
+    .liqlist-table tbody td:first-child {
+        border-left: 1px solid rgba(255,255,255,.04);
+        border-top-left-radius: 16px;
+        border-bottom-left-radius: 16px;
+    }
+
+    .liqlist-table tbody td:last-child {
+        border-right: 1px solid rgba(255,255,255,.04);
+        border-top-right-radius: 16px;
+        border-bottom-right-radius: 16px;
+    }
+
+    .liqlist-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 6px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 800;
+        border: 1px solid transparent;
+    }
+
+    .estado-borrador {
+        background: rgba(148,163,184,.14);
+        color: #cbd5e1;
+        border-color: rgba(148,163,184,.20);
+    }
+
+    .estado-confirmada {
+        background: rgba(59,130,246,.14);
+        color: #bfdbfe;
+        border-color: rgba(59,130,246,.22);
+    }
+
+    .estado-pagada {
+        background: rgba(34,197,94,.14);
+        color: #bbf7d0;
+        border-color: rgba(34,197,94,.22);
+    }
+
+    .estado-anulada {
+        background: rgba(239,68,68,.14);
+        color: #fecaca;
+        border-color: rgba(239,68,68,.22);
+    }
+
+    .liqlist-actions {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+    }
+
+    .liqlist-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 8px 12px;
+        border-radius: 10px;
+        font-size: 12px;
+        font-weight: 800;
+        text-decoration: none;
+        background: rgba(59,130,246,.14);
+        color: #bfdbfe;
+        border: 1px solid rgba(59,130,246,.22);
+    }
+
+    .liqlist-link-soft {
+        background: rgba(255,255,255,.05);
+        color: #e5e7eb;
+        border: 1px solid rgba(255,255,255,.08);
+    }
+
+    .liqlist-empty {
+        text-align: center;
+        color: #94a3b8;
+        padding: 26px 20px !important;
+    }
+</style>
+
+<div class="liqlist-head">
+    <div>
+        <h2>📑 Liquidaciones</h2>
+        <p>Consulta, controla, imprime y gestiona las liquidaciones generadas del personal.</p>
+    </div>
+
+    <a href="{% url 'liquidacion_nueva' %}" class="liqlist-btn">➕ Nueva liquidación</a>
+</div>
+
+<div class="liqlist-card">
+    <form method="get" class="liqlist-filter">
+        <input type="text" name="q" value="{{ q }}" placeholder="Buscar por funcionario, cédula, tipo de salida o estado">
+        <button type="submit">Buscar</button>
+    </form>
+
+    <div class="liqlist-table-wrap">
+        <table class="liqlist-table">
+            <thead>
+                <tr>
+                    <th>Funcionario</th>
+                    <th>Tipo salida</th>
+                    <th>Fecha salida</th>
+                    <th>Estado</th>
+                    <th>Total liquidación</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for liq in liquidaciones %}
+                <tr>
+                    <td>{{ liq.funcionario.nombre_completo }}</td>
+                    <td>{{ liq.get_tipo_salida_display }}</td>
+                    <td>{{ liq.fecha_salida|date:"d/m/Y" }}</td>
+                    <td>
+                        {% if liq.estado == "borrador" %}
+                            <span class="liqlist-badge estado-borrador">Borrador</span>
+                        {% elif liq.estado == "confirmada" %}
+                            <span class="liqlist-badge estado-confirmada">Confirmada</span>
+                        {% elif liq.estado == "pagada" %}
+                            <span class="liqlist-badge estado-pagada">Pagada</span>
+                        {% elif liq.estado == "anulada" %}
+                            <span class="liqlist-badge estado-anulada">Anulada</span>
+                        {% endif %}
+                    </td>
+                    <td>{{ liq.total_liquidacion|guaranies }}</td>
+                    <td>
+                        <div class="liqlist-actions">
+                            <a href="{% url 'liquidacion_detalle' liq.id %}" class="liqlist-link">Ver detalle</a>
+                            <a href="{% url 'liquidacion_pdf' liq.id %}" class="liqlist-link liqlist-link-soft" target="_blank">PDF</a>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="liqlist-empty">No hay liquidaciones cargadas.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}

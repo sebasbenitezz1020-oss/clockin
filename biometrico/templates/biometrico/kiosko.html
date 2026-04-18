@@ -3,12 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>ClockIn Biométrico</title>
+    <title>
+        {% if config_general and config_general.nombre_sistema %}
+            {{ config_general.nombre_sistema }} Biométrico
+        {% else %}
+            ClockIn Biométrico
+        {% endif %}
+    </title>
 
     <meta name="theme-color" content="#05070b">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="ClockIn">
+    <meta name="apple-mobile-web-app-title" content="{% if config_general and config_general.nombre_sistema %}{{ config_general.nombre_sistema }}{% else %}ClockIn{% endif %}">
 
     <style>
         :root {
@@ -21,8 +27,84 @@
             --ok: #22c55e;
             --warn: #f59e0b;
             --error: #ef4444;
-            --accent: #38bdf8;
-            --accent-2: #60a5fa;
+
+            --brand-primary: #2563eb;
+            --brand-primary-dark: #1d4ed8;
+            --brand-soft: rgba(37, 99, 235, 0.14);
+            --brand-soft-strong: rgba(37, 99, 235, 0.22);
+            --brand-border: rgba(37, 99, 235, 0.30);
+            --brand-shadow: rgba(37, 99, 235, 0.24);
+            --brand-text-soft: #dbeafe;
+        }
+
+        body.theme-azul {
+            --brand-primary: #2563eb;
+            --brand-primary-dark: #1d4ed8;
+            --brand-soft: rgba(37, 99, 235, 0.14);
+            --brand-soft-strong: rgba(37, 99, 235, 0.22);
+            --brand-border: rgba(37, 99, 235, 0.30);
+            --brand-shadow: rgba(37, 99, 235, 0.24);
+            --brand-text-soft: #dbeafe;
+        }
+
+        body.theme-verde {
+            --brand-primary: #16a34a;
+            --brand-primary-dark: #15803d;
+            --brand-soft: rgba(22, 163, 74, 0.14);
+            --brand-soft-strong: rgba(22, 163, 74, 0.22);
+            --brand-border: rgba(22, 163, 74, 0.30);
+            --brand-shadow: rgba(22, 163, 74, 0.24);
+            --brand-text-soft: #dcfce7;
+        }
+
+        body.theme-rojo {
+            --brand-primary: #dc2626;
+            --brand-primary-dark: #b91c1c;
+            --brand-soft: rgba(220, 38, 38, 0.14);
+            --brand-soft-strong: rgba(220, 38, 38, 0.22);
+            --brand-border: rgba(220, 38, 38, 0.30);
+            --brand-shadow: rgba(220, 38, 38, 0.24);
+            --brand-text-soft: #fee2e2;
+        }
+
+        body.theme-naranja {
+            --brand-primary: #ea580c;
+            --brand-primary-dark: #c2410c;
+            --brand-soft: rgba(234, 88, 12, 0.14);
+            --brand-soft-strong: rgba(234, 88, 12, 0.22);
+            --brand-border: rgba(234, 88, 12, 0.30);
+            --brand-shadow: rgba(234, 88, 12, 0.24);
+            --brand-text-soft: #ffedd5;
+        }
+
+        body.theme-morado {
+            --brand-primary: #7c3aed;
+            --brand-primary-dark: #6d28d9;
+            --brand-soft: rgba(124, 58, 237, 0.14);
+            --brand-soft-strong: rgba(124, 58, 237, 0.22);
+            --brand-border: rgba(124, 58, 237, 0.30);
+            --brand-shadow: rgba(124, 58, 237, 0.24);
+            --brand-text-soft: #ede9fe;
+        }
+
+        body.theme-turquesa {
+            --brand-primary: #0891b2;
+            --brand-primary-dark: #0e7490;
+            --brand-soft: rgba(8, 145, 178, 0.14);
+            --brand-soft-strong: rgba(8, 145, 178, 0.22);
+            --brand-border: rgba(8, 145, 178, 0.30);
+            --brand-shadow: rgba(8, 145, 178, 0.24);
+            --brand-text-soft: #cffafe;
+        }
+
+        body.theme-gris {
+            --brand-primary: #475569;
+            --brand-primary-dark: #334155;
+            --brand-soft: rgba(71, 85, 105, 0.14);
+            --brand-soft-strong: rgba(71, 85, 105, 0.22);
+            --brand-border: rgba(71, 85, 105, 0.30);
+            --brand-shadow: rgba(71, 85, 105, 0.24);
+            --brand-text-soft: #e2e8f0;
         }
 
         * {
@@ -42,8 +124,8 @@
 
         body {
             background:
-                radial-gradient(circle at top left, rgba(56, 189, 248, 0.10), transparent 26%),
-                radial-gradient(circle at top right, rgba(34, 197, 94, 0.08), transparent 24%),
+                radial-gradient(circle at top left, var(--brand-soft-strong), transparent 26%),
+                radial-gradient(circle at top right, rgba(255,255,255,0.04), transparent 24%),
                 linear-gradient(180deg, #05070b 0%, #09111a 100%);
         }
 
@@ -118,14 +200,15 @@
         }
 
         .mini-chip.accent {
-            background: rgba(56, 189, 248, 0.10);
-            border-color: rgba(56, 189, 248, 0.22);
-            color: #7dd3fc;
+            background: var(--brand-soft);
+            border-color: var(--brand-border);
+            color: var(--brand-text-soft);
+            box-shadow: 0 8px 20px var(--brand-shadow);
         }
 
         .fullscreen-btn {
-            border: 1px solid rgba(255,255,255,.08);
-            background: rgba(255,255,255,.05);
+            border: none;
+            background: linear-gradient(135deg, var(--brand-primary), var(--brand-primary-dark));
             color: #fff;
             border-radius: 14px;
             height: 42px;
@@ -134,6 +217,7 @@
             font-weight: 800;
             cursor: pointer;
             white-space: nowrap;
+            box-shadow: 0 10px 24px var(--brand-shadow);
         }
 
         .clock-box {
@@ -231,18 +315,12 @@
             transition: .2s ease;
         }
 
-        .mode-btn.active.entrada {
-            background: rgba(34, 197, 94, 0.16);
-            border-color: rgba(34, 197, 94, 0.45);
-            color: #86efac;
-            box-shadow: 0 0 0 3px rgba(34,197,94,0.08) inset;
-        }
-
+        .mode-btn.active.entrada,
         .mode-btn.active.salida {
-            background: rgba(245, 158, 11, 0.16);
-            border-color: rgba(245, 158, 11, 0.45);
-            color: #fcd34d;
-            box-shadow: 0 0 0 3px rgba(245,158,11,0.08) inset;
+            background: linear-gradient(135deg, var(--brand-primary), var(--brand-primary-dark));
+            border-color: var(--brand-border);
+            color: #fff;
+            box-shadow: 0 10px 24px var(--brand-shadow);
         }
 
         .video-wrap {
@@ -278,26 +356,26 @@
             content: "";
             width: 42%;
             height: 56%;
-            border: 3px solid rgba(56, 189, 248, 0.88);
+            border: 3px solid var(--brand-primary);
             border-radius: 30px;
             box-shadow:
                 0 0 0 9999px rgba(0,0,0,0.14) inset,
-                0 0 24px rgba(56, 189, 248, 0.22);
+                0 0 24px var(--brand-shadow);
             transition: all .18s ease;
         }
 
         .video-wrap.has-face .scan-frame::before {
-            border-color: rgba(245, 158, 11, 0.96);
+            border-color: var(--brand-primary);
             box-shadow:
                 0 0 0 9999px rgba(0,0,0,0.10) inset,
-                0 0 28px rgba(245, 158, 11, 0.30);
+                0 0 28px var(--brand-shadow);
         }
 
         .video-wrap.validating .scan-frame::before {
-            border-color: rgba(34, 197, 94, 0.96);
+            border-color: var(--brand-primary);
             box-shadow:
                 0 0 0 9999px rgba(0,0,0,0.08) inset,
-                0 0 30px rgba(34, 197, 94, 0.32);
+                0 0 30px var(--brand-shadow);
         }
 
         .face-pill-row {
@@ -318,22 +396,12 @@
             white-space: nowrap;
         }
 
-        .face-pill.waiting {
-            color: #7dd3fc;
-            border-color: rgba(56, 189, 248, 0.22);
-            background: rgba(56, 189, 248, 0.08);
-        }
-
-        .face-pill.detected {
-            color: #fcd34d;
-            border-color: rgba(245, 158, 11, 0.24);
-            background: rgba(245, 158, 11, 0.08);
-        }
-
+        .face-pill.waiting,
+        .face-pill.detected,
         .face-pill.ready {
-            color: #86efac;
-            border-color: rgba(34, 197, 94, 0.24);
-            background: rgba(34, 197, 94, 0.08);
+            background: var(--brand-soft);
+            border-color: var(--brand-border);
+            color: var(--brand-text-soft);
         }
 
         .camera-hint {
@@ -354,9 +422,9 @@
             font-size: 13px;
             font-weight: 700;
             letter-spacing: .4px;
-            background: rgba(255,255,255,.06);
-            color: #dbe7f3;
-            border: 1px solid rgba(255,255,255,.06);
+            background: var(--brand-soft);
+            color: var(--brand-text-soft);
+            border: 1px solid var(--brand-border);
         }
 
         .result-box {
@@ -371,6 +439,7 @@
             flex-direction: column;
             justify-content: center;
             transition: .22s ease;
+            box-shadow: 0 12px 36px rgba(0,0,0,.20);
         }
 
         .result-icon {
@@ -449,6 +518,7 @@
             border-radius: 18px;
             padding: 14px;
             min-width: 0;
+            box-shadow: 0 12px 36px rgba(0,0,0,.16);
         }
 
         .mini-box .label {
@@ -465,65 +535,35 @@
         }
 
         .ok-theme .status-badge,
-        .ok-theme .result-box {
-            border-color: rgba(34, 197, 94, 0.35);
+        .warn-theme .status-badge,
+        .error-theme .status-badge,
+        .idle-theme .status-badge {
+            background: var(--brand-soft);
+            color: var(--brand-text-soft);
+            border-color: var(--brand-border);
         }
 
-        .ok-theme .status-badge {
-            background: rgba(34, 197, 94, 0.12);
-            color: #86efac;
-        }
-
-        .ok-theme .result-box {
-            box-shadow: 0 0 0 1px rgba(34,197,94,.10), 0 0 36px rgba(34,197,94,.08);
+        .ok-theme .result-box,
+        .warn-theme .result-box,
+        .error-theme .result-box {
+            border-color: var(--brand-border);
+            box-shadow: 0 0 0 1px var(--brand-soft), 0 0 36px var(--brand-shadow);
         }
 
         .ok-theme .result-state,
         .ok-theme .result-icon,
-        .ok-theme .result-name {
-            color: var(--ok);
-        }
-
-        .warn-theme .status-badge,
-        .warn-theme .result-box {
-            border-color: rgba(245, 158, 11, 0.35);
-        }
-
-        .warn-theme .status-badge {
-            background: rgba(245, 158, 11, 0.12);
-            color: #fcd34d;
-        }
-
+        .ok-theme .result-name,
         .warn-theme .result-state,
-        .warn-theme .result-icon {
-            color: var(--warn);
-        }
-
-        .error-theme .status-badge,
-        .error-theme .result-box {
-            border-color: rgba(239, 68, 68, 0.35);
-        }
-
-        .error-theme .status-badge {
-            background: rgba(239, 68, 68, 0.12);
-            color: #fca5a5;
+        .warn-theme .result-icon,
+        .idle-theme .result-icon,
+        .idle-theme .result-state {
+            color: var(--brand-primary);
         }
 
         .error-theme .result-state,
         .error-theme .result-icon,
         .error-theme .result-name {
             color: var(--error);
-        }
-
-        .idle-theme .status-badge {
-            background: rgba(56, 189, 248, 0.10);
-            color: #7dd3fc;
-            border-color: rgba(56, 189, 248, 0.22);
-        }
-
-        .idle-theme .result-icon,
-        .idle-theme .result-state {
-            color: var(--accent);
         }
 
         .pulse-success {
@@ -540,7 +580,6 @@
             display: none;
         }
 
-        /* TABLET HORIZONTAL */
         @media (min-width: 700px) and (max-width: 1100px) and (orientation: landscape) {
             .screen {
                 gap: 12px;
@@ -669,7 +708,6 @@
             }
         }
 
-        /* TABLET VERTICAL Y CELULAR */
         @media (max-width: 1100px) {
             .content {
                 grid-template-columns: 1fr;
@@ -726,11 +764,19 @@
         }
     </style>
 </head>
-<body>
+<body class="theme-{% if config_general and config_general.color_primario %}{{ config_general.color_primario }}{% else %}azul{% endif %}">
     <div class="screen" id="appScreen">
         <div class="topbar">
             <div class="brand">
-                <h1>📸 ClockIn Biométrico</h1>
+                <h1>
+                    📸
+                    {% if config_general and config_general.nombre_sistema %}
+                        {{ config_general.nombre_sistema }}
+                    {% else %}
+                        ClockIn
+                    {% endif %}
+                    Biométrico
+                </h1>
                 <p>Modo kiosco premium para entrada, almuerzo, regreso y salida final</p>
             </div>
 
@@ -815,7 +861,7 @@
                         </div>
                         <div class="mini-box">
                             <div class="label">Lectura automática</div>
-                            <div class="value">Solo con rostro</div>
+                            <div class="value" id="footerLectura">Solo con rostro</div>
                         </div>
                     </div>
                 </div>
@@ -831,6 +877,7 @@
 
         const appScreen = document.getElementById("appScreen");
         const btnFullscreen = document.getElementById("btnFullscreen");
+        const chipTiempo = document.getElementById("chipTiempo");
 
         const clock = document.getElementById("clock");
         const dateText = document.getElementById("dateText");
@@ -855,15 +902,23 @@
         const cameraHint = document.getElementById("cameraHint");
         const cameraTopHint = document.getElementById("cameraTopHint");
         const footerModo = document.getElementById("footerModo");
+        const footerLectura = document.getElementById("footerLectura");
         const videoWrap = document.getElementById("videoWrap");
         const pillRostro = document.getElementById("pillRostro");
         const pillCuenta = document.getElementById("pillCuenta");
 
+        const CONFIG_SEGUNDOS_LECTURA = Number("{{ config_general.biometrico_segundos_lectura|default:1 }}");
+        const CONFIG_PAUSA_EXITO_MS = Number("{{ config_general.biometrico_pausa_exito_ms|default:4000 }}");
+        const CONFIG_PAUSA_AVISO_MS = Number("{{ config_general.biometrico_pausa_aviso_ms|default:3000 }}");
+        const CONFIG_PAUSA_ERROR_MS = Number("{{ config_general.biometrico_pausa_error_ms|default:2200 }}");
+        const CONFIG_SONIDOS_ACTIVOS = "{% if config_general and config_general.biometrico_sonidos_activos %}true{% else %}false{% endif %}" === "true";
+        const CONFIG_FULLSCREEN_AUTO = "{% if config_general and config_general.biometrico_fullscreen_auto %}true{% else %}false{% endif %}" === "true";
+
         const DETECCION_INTERVALO = 350;
-        const ESTABILIDAD_MS = 1000;
-        const PAUSA_EXITO_MS = 4000;
-        const PAUSA_AVISO_MS = 3000;
-        const PAUSA_ERROR_MS = 2200;
+        const ESTABILIDAD_MS = CONFIG_SEGUNDOS_LECTURA * 1000;
+        const PAUSA_EXITO_MS = CONFIG_PAUSA_EXITO_MS;
+        const PAUSA_AVISO_MS = CONFIG_PAUSA_AVISO_MS;
+        const PAUSA_ERROR_MS = CONFIG_PAUSA_ERROR_MS;
 
         let resetTimer = null;
         let pausaHasta = 0;
@@ -873,6 +928,9 @@
         let rostroDetectadoDesde = null;
         let ultimaDeteccion = 0;
         let streamReady = false;
+
+        chipTiempo.textContent = `Lectura en ${CONFIG_SEGUNDOS_LECTURA} segundo${CONFIG_SEGUNDOS_LECTURA === 1 ? "" : "s"}`;
+        footerLectura.textContent = CONFIG_SONIDOS_ACTIVOS ? "Solo con rostro" : "Solo con rostro / sin sonido";
 
         function actualizarReloj() {
             const ahora = new Date();
@@ -920,6 +978,7 @@
         });
 
         async function activarFullscreen() {
+            if (!CONFIG_FULLSCREEN_AUTO) return;
             try {
                 if (!document.fullscreenElement && appScreen.requestFullscreen) {
                     await appScreen.requestFullscreen();
@@ -927,7 +986,13 @@
             } catch (e) {}
         }
 
-        btnFullscreen.addEventListener("click", activarFullscreen);
+        btnFullscreen.addEventListener("click", async () => {
+            try {
+                if (!document.fullscreenElement && appScreen.requestFullscreen) {
+                    await appScreen.requestFullscreen();
+                }
+            } catch (e) {}
+        });
 
         document.addEventListener("fullscreenchange", () => {
             btnFullscreen.textContent = document.fullscreenElement
@@ -935,9 +1000,12 @@
                 : "⛶ Pantalla completa";
         });
 
-        document.addEventListener("click", activarFullscreen, { once: true });
+        if (CONFIG_FULLSCREEN_AUTO) {
+            document.addEventListener("click", activarFullscreen, { once: true });
+        }
 
         function beepSuccess() {
+            if (!CONFIG_SONIDOS_ACTIVOS) return;
             try {
                 const ctx = new (window.AudioContext || window.webkitAudioContext)();
                 const osc = ctx.createOscillator();
@@ -953,6 +1021,7 @@
         }
 
         function beepWarn() {
+            if (!CONFIG_SONIDOS_ACTIVOS) return;
             try {
                 const ctx = new (window.AudioContext || window.webkitAudioContext)();
                 const osc = ctx.createOscillator();
@@ -968,6 +1037,7 @@
         }
 
         function beepError() {
+            if (!CONFIG_SONIDOS_ACTIVOS) return;
             try {
                 const ctx = new (window.AudioContext || window.webkitAudioContext)();
                 const osc = ctx.createOscillator();
@@ -994,9 +1064,9 @@
             statusBadge.textContent = "LISTO PARA ESCANEAR";
             resultIcon.textContent = "👤";
             resultName.textContent = "Esperando rostro...";
-            resultState.textContent = "Sistema en espera silenciosa";
+            resultState.textContent = CONFIG_SONIDOS_ACTIVOS ? "Sistema en espera silenciosa" : "Sistema en espera";
             resultSubtype.textContent = "Acerque el rostro al recuadro para iniciar la validación.";
-            resultDetail.textContent = "La lectura se ejecuta automáticamente cuando el rostro permanece estable frente a cámara por 1 segundo.";
+            resultDetail.textContent = `La lectura se ejecuta automáticamente cuando el rostro permanece estable frente a cámara por ${CONFIG_SEGUNDOS_LECTURA} segundo${CONFIG_SEGUNDOS_LECTURA === 1 ? "" : "s"}.`;
             detailHora.textContent = "—";
             detailTurno.textContent = "—";
             detailAtraso.textContent = "—";

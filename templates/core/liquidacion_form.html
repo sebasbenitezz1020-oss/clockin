@@ -1,0 +1,717 @@
+{% extends "base.html" %}
+{% load number_filters %}
+
+{% block title %}{{ titulo_form }} | ClockIn{% endblock %}
+
+{% block content %}
+<style>
+    .liq-page {
+        padding: 24px 0;
+    }
+
+    .liq-hero {
+        margin-bottom: 20px;
+    }
+
+    .liq-hero h2 {
+        margin: 0;
+        color: #fff;
+        font-size: 34px;
+        font-weight: 800;
+    }
+
+    .liq-hero p {
+        margin: 8px 0 0;
+        color: #94a3b8;
+        font-size: 15px;
+    }
+
+    .liq-help {
+        margin-top: 16px;
+        padding: 16px 18px;
+        border-radius: 18px;
+        background: rgba(255,255,255,.03);
+        border: 1px solid rgba(255,255,255,.05);
+        color: #cbd5e1;
+        font-size: 14px;
+        line-height: 1.55;
+    }
+
+    .liq-grid {
+        display: grid;
+        grid-template-columns: 1.15fr .85fr;
+        gap: 18px;
+    }
+
+    .liq-card {
+        background: linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
+        border: 1px solid rgba(255,255,255,.06);
+        border-radius: 24px;
+        box-shadow: 0 12px 36px rgba(0,0,0,.28);
+        overflow: hidden;
+        position: relative;
+    }
+
+    .liq-card::before {
+        content: "";
+        position: absolute;
+        inset: 0 0 auto 0;
+        height: 3px;
+        background: linear-gradient(90deg, var(--brand-primary), var(--brand-primary-dark));
+        opacity: .95;
+    }
+
+    .liq-card-body {
+        padding: 22px;
+    }
+
+    .liq-form-grid {
+        display: grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap: 16px;
+    }
+
+    .liq-field {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .liq-field.full {
+        grid-column: 1 / -1;
+    }
+
+    .liq-field label {
+        color: #e5e7eb;
+        font-size: 13px;
+        font-weight: 700;
+    }
+
+    .liq-mini-help {
+        color: #94a3b8;
+        font-size: 12px;
+        line-height: 1.45;
+        margin-top: -2px;
+    }
+
+    .liq-field input,
+    .liq-field select,
+    .liq-field textarea {
+        width: 100%;
+        border: 1px solid rgba(255,255,255,.08);
+        background: #0f1722;
+        color: #fff;
+        border-radius: 14px;
+        padding: 13px 14px;
+        font-size: 14px;
+        outline: none;
+    }
+
+    .liq-field input:focus,
+    .liq-field select:focus,
+    .liq-field textarea:focus {
+        border-color: var(--brand-border);
+        box-shadow: 0 0 0 3px var(--brand-soft);
+    }
+
+    .liq-checks {
+        display: flex;
+        gap: 18px;
+        flex-wrap: wrap;
+        margin-top: 16px;
+    }
+
+    .liq-check {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        background: rgba(255,255,255,.03);
+        border: 1px solid rgba(255,255,255,.05);
+        border-radius: 14px;
+        padding: 12px 14px;
+    }
+
+    .liq-check input {
+        width: 18px;
+        height: 18px;
+    }
+
+    .liq-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 12px;
+        margin-top: 20px;
+        flex-wrap: wrap;
+    }
+
+    .liq-btn-soft,
+    .liq-btn-main {
+        padding: 13px 18px;
+        border-radius: 14px;
+        font-size: 14px;
+        font-weight: 800;
+        text-decoration: none;
+        border: none;
+        cursor: pointer;
+    }
+
+    .liq-btn-soft {
+        background: rgba(255,255,255,.05);
+        color: #fff;
+        border: 1px solid rgba(255,255,255,.08);
+    }
+
+    .liq-btn-main {
+        background: linear-gradient(135deg, var(--brand-primary), var(--brand-primary-dark));
+        color: #fff;
+        box-shadow: 0 10px 24px var(--brand-shadow);
+    }
+
+    .liq-summary-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 16px;
+        flex-wrap: wrap;
+    }
+
+    .liq-summary-head h3 {
+        color: #fff;
+        margin: 0;
+        font-size: 22px;
+        font-weight: 800;
+    }
+
+    .liq-badge {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 7px 12px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 800;
+        background: var(--brand-soft);
+        border: 1px solid var(--brand-border);
+        color: var(--brand-text-soft);
+    }
+
+    .liq-badge.warn {
+        background: rgba(245,158,11,.14);
+        border-color: rgba(245,158,11,.22);
+        color: #fcd34d;
+    }
+
+    .liq-empty {
+        color: #94a3b8;
+        font-size: 14px;
+        line-height: 1.55;
+        background: rgba(255,255,255,.02);
+        border: 1px solid rgba(255,255,255,.04);
+        border-radius: 18px;
+        padding: 18px;
+    }
+
+    .liq-block {
+        margin-top: 14px;
+        background: rgba(255,255,255,.025);
+        border: 1px solid rgba(255,255,255,.05);
+        border-radius: 18px;
+        padding: 14px;
+    }
+
+    .liq-block h4 {
+        margin: 0 0 12px;
+        color: #fff;
+        font-size: 15px;
+        font-weight: 800;
+    }
+
+    .liq-line {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 8px 0;
+        border-bottom: 1px solid rgba(255,255,255,.04);
+        font-size: 14px;
+    }
+
+    .liq-line:last-child {
+        border-bottom: none;
+    }
+
+    .liq-line span:first-child {
+        color: #cbd5e1;
+    }
+
+    .liq-line strong {
+        color: #fff;
+        text-align: right;
+    }
+
+    .liq-total {
+        margin-top: 16px;
+        padding: 16px;
+        border-radius: 18px;
+        background: linear-gradient(135deg, var(--brand-soft), rgba(255,255,255,.03));
+        border: 1px solid var(--brand-border);
+    }
+
+    .liq-total-label {
+        color: #cbd5e1;
+        font-size: 13px;
+        margin-bottom: 8px;
+    }
+
+    .liq-total-value {
+        color: #fff;
+        font-size: 34px;
+        font-weight: 900;
+        line-height: 1;
+    }
+
+    .liq-alert {
+        margin-top: 16px;
+        padding: 14px 16px;
+        border-radius: 16px;
+        background: rgba(245,158,11,.12);
+        border: 1px solid rgba(245,158,11,.25);
+        color: #fde68a;
+        font-size: 14px;
+        line-height: 1.45;
+        display: none;
+    }
+
+    .liq-explain {
+        margin-top: 14px;
+        padding: 14px 16px;
+        border-radius: 16px;
+        background: rgba(59,130,246,.10);
+        border: 1px solid rgba(59,130,246,.22);
+        color: #bfdbfe;
+        font-size: 13px;
+        line-height: 1.5;
+    }
+
+    .errorlist {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        color: #fca5a5;
+        font-size: 12px;
+    }
+
+    @media (max-width: 1100px) {
+        .liq-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 720px) {
+        .liq-form-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .liq-actions {
+            flex-direction: column;
+        }
+    }
+</style>
+
+<div class="container-fluid liq-page">
+    <div class="liq-hero">
+        <h2>📑 {{ titulo_form }}</h2>
+        <p>Calcula automáticamente preaviso, haberes, descuentos y total final de liquidación.</p>
+
+        <div class="liq-help">
+            <strong>Cómo llenar esta pantalla:</strong><br>
+            <strong>Días del último salario a pagar:</strong> cuántos días del mes sí trabajó y se le deben pagar.<br>
+            <strong>Vacaciones pendientes no gozadas:</strong> vacaciones ya ganadas anteriormente y todavía no usadas.<br>
+            <strong>Días de preaviso realmente cumplidos:</strong> cuántos días efectivamente se avisó en renuncia o despido.
+        </div>
+    </div>
+
+    <div class="liq-grid">
+        <div class="liq-card">
+            <div class="liq-card-body">
+                <form method="post" id="liquidacionForm">
+                    {% csrf_token %}
+
+                    {% if form.errors %}
+                        <div class="alert-box error-box-strong" style="margin-bottom:16px;">
+                            Revisa los campos marcados. Hay datos pendientes o inválidos.
+                        </div>
+                    {% endif %}
+
+                    <div class="liq-form-grid">
+                        <div class="liq-field">
+                            <label for="{{ form.funcionario.id_for_label }}">Funcionario</label>
+                            {{ form.funcionario }}
+                            {{ form.funcionario.errors }}
+                        </div>
+
+                        <div class="liq-field">
+                            <label for="{{ form.tipo_salida.id_for_label }}">Tipo de salida</label>
+                            {{ form.tipo_salida }}
+                            {{ form.tipo_salida.errors }}
+                        </div>
+
+                        <div class="liq-field">
+                            <label for="{{ form.fecha_salida.id_for_label }}">Fecha de salida</label>
+                            {{ form.fecha_salida }}
+                            {{ form.fecha_salida.errors }}
+                        </div>
+
+                        <div class="liq-field">
+                            <label for="{{ form.fecha_calculo.id_for_label }}">Fecha de cálculo</label>
+                            {{ form.fecha_calculo }}
+                            {{ form.fecha_calculo.errors }}
+                        </div>
+
+                        <div class="liq-field">
+                            <label for="{{ form.dias_trabajados_pendientes.id_for_label }}">Días del último salario a pagar</label>
+                            <div class="liq-mini-help">Normalmente el sistema lo propone solo según la fecha de salida.</div>
+                            {{ form.dias_trabajados_pendientes }}
+                            {{ form.dias_trabajados_pendientes.errors }}
+                        </div>
+
+                        <div class="liq-field">
+                            <label for="{{ form.vacaciones_causadas_pendientes_dias.id_for_label }}">Vacaciones pendientes no gozadas (días)</label>
+                            <div class="liq-mini-help">Solo coloca aquí vacaciones atrasadas o pendientes de períodos anteriores.</div>
+                            {{ form.vacaciones_causadas_pendientes_dias }}
+                            {{ form.vacaciones_causadas_pendientes_dias.errors }}
+                        </div>
+
+                        <div class="liq-field">
+                            <label for="{{ form.preaviso_dias_otorgados.id_for_label }}">Días de preaviso realmente cumplidos</label>
+                            <div class="liq-mini-help">Cuántos días realmente se avisó o se otorgó de preaviso.</div>
+                            {{ form.preaviso_dias_otorgados }}
+                            {{ form.preaviso_dias_otorgados.errors }}
+                        </div>
+
+                        <div class="liq-field">
+                            <label for="{{ form.otros_descuentos.id_for_label }}">Otros descuentos</label>
+                            <div class="liq-mini-help">Campo opcional para ajustes manuales.</div>
+                            {{ form.otros_descuentos }}
+                            {{ form.otros_descuentos.errors }}
+                        </div>
+
+                        <div class="liq-field full">
+                            <label for="{{ form.motivo_observacion.id_for_label }}">Observación / motivo</label>
+                            {{ form.motivo_observacion }}
+                            {{ form.motivo_observacion.errors }}
+                        </div>
+                    </div>
+
+                    <div class="liq-checks">
+                        <label class="liq-check">
+                            {{ form.preaviso_cumplido }}
+                            <span>Preaviso cumplido</span>
+                        </label>
+
+                        <label class="liq-check">
+                            {{ form.descontar_preaviso }}
+                            <span>Descontar preaviso si corresponde</span>
+                        </label>
+                    </div>
+
+                    <div class="liq-actions">
+                        <a href="{% url 'liquidaciones_lista' %}" class="liq-btn-soft">Volver</a>
+                        <button type="submit" class="liq-btn-main">Guardar liquidación</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <div class="liq-card">
+            <div class="liq-card-body">
+                <div class="liq-summary-head">
+                    <h3>Resumen automático</h3>
+                    <span class="liq-badge" id="badgePreview">Esperando datos</span>
+                </div>
+
+                <div class="liq-empty" id="previewEmpty">
+                    Selecciona funcionario, tipo de salida y fecha de salida.  
+                    El sistema calculará automáticamente antigüedad, preaviso, haberes, descuentos y total final.
+                </div>
+
+                <div id="previewContent" style="display:none;">
+                    <div class="liq-block">
+                        <h4>Antigüedad y preaviso</h4>
+                        <div class="liq-line">
+                            <span>Antigüedad</span>
+                            <strong id="pvAntiguedad">—</strong>
+                        </div>
+                        <div class="liq-line">
+                            <span>Días de preaviso según antigüedad</span>
+                            <strong id="pvPreavisoDiasBase">—</strong>
+                        </div>
+                        <div class="liq-line">
+                            <span>Preaviso aplicable en este tipo de salida</span>
+                            <strong id="pvPreavisoDias">—</strong>
+                        </div>
+                        <div class="liq-line">
+                            <span>Días realmente cumplidos / avisados</span>
+                            <strong id="pvPreavisoOtorgados">—</strong>
+                        </div>
+                        <div class="liq-line">
+                            <span>Días faltantes de preaviso</span>
+                            <strong id="pvPreavisoFaltantes">—</strong>
+                        </div>
+                        <div class="liq-line">
+                            <span>Monto de preaviso</span>
+                            <strong id="pvPreavisoMonto">—</strong>
+                        </div>
+                    </div>
+
+                    <div class="liq-explain" id="pvPreavisoExplicacion">
+                        Aquí se explicará automáticamente cómo se aplicó el preaviso en este caso.
+                    </div>
+
+                    <div class="liq-block">
+                        <h4>Haberes</h4>
+                        <div class="liq-line">
+                            <span>Salario pendiente</span>
+                            <strong id="pvSalarioPendiente">—</strong>
+                        </div>
+                        <div class="liq-line">
+                            <span>Vacaciones causadas pendientes</span>
+                            <strong id="pvVacCausadas">—</strong>
+                        </div>
+                        <div class="liq-line">
+                            <span>Vacaciones proporcionales</span>
+                            <strong id="pvVacProp">—</strong>
+                        </div>
+                        <div class="liq-line">
+                            <span>Aguinaldo proporcional</span>
+                            <strong id="pvAguinaldo">—</strong>
+                        </div>
+                        <div class="liq-line">
+                            <span>Indemnización</span>
+                            <strong id="pvIndemnizacion">—</strong>
+                        </div>
+                        <div class="liq-line">
+                            <span>Total haberes</span>
+                            <strong id="pvTotalHaberes">—</strong>
+                        </div>
+                    </div>
+
+                    <div class="liq-block">
+                        <h4>Descuentos</h4>
+                        <div class="liq-line">
+                            <span>IPS</span>
+                            <strong id="pvIps">—</strong>
+                        </div>
+                        <div class="liq-line">
+                            <span>Deudas</span>
+                            <strong id="pvDeudas">—</strong>
+                        </div>
+                        <div class="liq-line">
+                            <span>Otros descuentos</span>
+                            <strong id="pvOtros">—</strong>
+                        </div>
+                        <div class="liq-line">
+                            <span>Total descuentos</span>
+                            <strong id="pvTotalDescuentos">—</strong>
+                        </div>
+                    </div>
+
+                    <div class="liq-total">
+                        <div class="liq-total-label">Total liquidación</div>
+                        <div class="liq-total-value" id="pvTotalLiquidacion">—</div>
+                    </div>
+
+                    <div class="liq-alert" id="pvAlerta"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    const form = document.getElementById("liquidacionForm");
+    if (!form) return;
+
+    const funcionario = document.getElementById("id_funcionario");
+    const tipoSalida = document.getElementById("id_tipo_salida");
+    const fechaSalida = document.getElementById("id_fecha_salida");
+    const diasTrab = document.getElementById("id_dias_trabajados_pendientes");
+    const vacPend = document.getElementById("id_vacaciones_causadas_pendientes_dias");
+    const preavisoDias = document.getElementById("id_preaviso_dias_otorgados");
+    const preavisoCumplido = document.getElementById("id_preaviso_cumplido");
+    const descontarPreaviso = document.getElementById("id_descontar_preaviso");
+    const otrosDescuentos = document.getElementById("id_otros_descuentos");
+
+    const previewEmpty = document.getElementById("previewEmpty");
+    const previewContent = document.getElementById("previewContent");
+    const badgePreview = document.getElementById("badgePreview");
+    const pvAlerta = document.getElementById("pvAlerta");
+    const pvPreavisoExplicacion = document.getElementById("pvPreavisoExplicacion");
+
+    const money = (v) => {
+        const n = Number(v || 0);
+        return "Gs. " + n.toLocaleString("es-PY", { maximumFractionDigits: 0 });
+    };
+
+    const setText = (id, value) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = value;
+    };
+
+    function calcularPreavisoBasePorAntiguedad(anios, mesesTotales) {
+        if (mesesTotales < 12) return 30;
+        if (mesesTotales < 60) return 45;
+        if (mesesTotales < 120) return 60;
+        return 90;
+    }
+
+    function explicarPreaviso(tipo, diasBase, diasAplicables, diasOtorgados, diasFaltantes, preavisoCumplidoFlag, descontarFlag) {
+        if (tipo === "despido_justa_causa") {
+            return `Por la antigüedad, el funcionario tendría una referencia de ${diasBase} día(s), pero en despido por justa causa el sistema no aplica preaviso automático.`;
+        }
+
+        if (tipo === "abandono") {
+            return `Por la antigüedad, la referencia sería de ${diasBase} día(s), pero el caso está cargado como abandono y requiere revisión administrativa/jurídica antes del cierre.`;
+        }
+
+        if (tipo === "renuncia") {
+            if (preavisoCumplidoFlag) {
+                return `En renuncia, por la antigüedad corresponden ${diasAplicables} día(s) de preaviso y aquí figura como cumplido.`;
+            }
+            if (descontarFlag && diasFaltantes > 0) {
+                return `En renuncia, por la antigüedad corresponden ${diasAplicables} día(s). Como solo se cumplieron ${diasOtorgados} día(s), faltan ${diasFaltantes} y el sistema descuenta ese preaviso.`;
+            }
+            return `En renuncia, por la antigüedad corresponden ${diasAplicables} día(s). Aquí el sistema muestra cuántos días realmente se avisó.`;
+        }
+
+        if (tipo === "despido_sin_justa_causa") {
+            if (preavisoCumplidoFlag) {
+                return `En despido sin justa causa, por la antigüedad corresponden ${diasAplicables} día(s) de preaviso y aquí figura como cumplido.`;
+            }
+            return `En despido sin justa causa, por la antigüedad corresponden ${diasAplicables} día(s). Si no se otorgó completo, el sistema suma el preaviso faltante a la liquidación.`;
+        }
+
+        return "El sistema está explicando automáticamente cómo se aplicó el preaviso en este caso.";
+    }
+
+    async function calcularPreview() {
+        if (!funcionario.value || !tipoSalida.value || !fechaSalida.value) {
+            previewEmpty.style.display = "block";
+            previewContent.style.display = "none";
+            badgePreview.textContent = "Esperando datos";
+            badgePreview.classList.remove("warn");
+            pvAlerta.style.display = "none";
+            return;
+        }
+
+        const params = new URLSearchParams({
+            funcionario: funcionario.value,
+            tipo_salida: tipoSalida.value,
+            fecha_salida: fechaSalida.value,
+            dias_trabajados_pendientes: diasTrab.value,
+            vacaciones_causadas_pendientes_dias: vacPend.value,
+            preaviso_dias_otorgados: preavisoDias.value,
+            preaviso_cumplido: preavisoCumplido.checked ? "true" : "false",
+            descontar_preaviso: descontarPreaviso.checked ? "true" : "false",
+            otros_descuentos: otrosDescuentos.value || "0"
+        });
+
+        try {
+            const res = await fetch("{% url 'liquidacion_preview' %}?" + params.toString());
+            const data = await res.json();
+
+            if (!data.ok) {
+                previewEmpty.style.display = "block";
+                previewContent.style.display = "none";
+                badgePreview.textContent = "Error de cálculo";
+                badgePreview.classList.remove("warn");
+                return;
+            }
+
+            previewEmpty.style.display = "none";
+            previewContent.style.display = "block";
+            badgePreview.textContent = "Cálculo automático listo";
+            badgePreview.classList.remove("warn");
+
+            const anios = Number(data.antiguedad.anios || 0);
+            const meses = Number(data.antiguedad.meses || 0);
+            const dias = Number(data.antiguedad.dias || 0);
+            const mesesTotales = anios * 12 + meses;
+            const diasBase = calcularPreavisoBasePorAntiguedad(anios, mesesTotales);
+            const diasAplicables = Number(data.preaviso_dias_corresponde || 0);
+            const diasOtorgados = Number(data.preaviso_dias_otorgados || 0);
+            const diasFaltantes = Math.max(diasAplicables - diasOtorgados, 0);
+
+            setText("pvAntiguedad", `${anios} año(s), ${meses} mes(es), ${dias} día(s)`);
+            setText("pvPreavisoDiasBase", `${diasBase} día(s)`);
+            setText("pvPreavisoDias", `${diasAplicables} día(s)`);
+            setText("pvPreavisoOtorgados", `${diasOtorgados} día(s)`);
+            setText("pvPreavisoFaltantes", `${diasFaltantes} día(s)`);
+            setText("pvPreavisoMonto", money(data.preaviso_monto));
+
+            pvPreavisoExplicacion.textContent = explicarPreaviso(
+                tipoSalida.value,
+                diasBase,
+                diasAplicables,
+                diasOtorgados,
+                diasFaltantes,
+                !!data.preaviso_cumplido,
+                descontarPreaviso.checked
+            );
+
+            setText("pvSalarioPendiente", money(data.salario_pendiente_monto));
+            setText("pvVacCausadas", `${data.vacaciones_causadas_pendientes_dias} día(s) · ${money(data.vacaciones_causadas_monto)}`);
+            setText("pvVacProp", `${data.vacaciones_proporcionales_dias} día(s) · ${money(data.vacaciones_proporcionales_monto)}`);
+            setText("pvAguinaldo", money(data.aguinaldo_proporcional_monto));
+            setText("pvIndemnizacion", `${data.indemnizacion_dias} día(s) · ${money(data.indemnizacion_monto)}`);
+            setText("pvTotalHaberes", money(data.total_haberes));
+
+            setText("pvIps", money(data.ips_monto));
+            setText("pvDeudas", money(data.deudas_monto));
+            setText("pvOtros", money(data.otros_descuentos));
+            setText("pvTotalDescuentos", money(data.total_descuentos));
+            setText("pvTotalLiquidacion", money(data.total_liquidacion));
+
+            if (data.requiere_revision_juridica && data.alerta_revision) {
+                pvAlerta.style.display = "block";
+                pvAlerta.textContent = data.alerta_revision;
+                badgePreview.textContent = "Revisión requerida";
+                badgePreview.classList.add("warn");
+            } else {
+                pvAlerta.style.display = "none";
+                badgePreview.classList.remove("warn");
+            }
+
+            if (!diasTrab.dataset.tocado && (!diasTrab.value || diasTrab.value === "0")) {
+                diasTrab.value = data.dias_trabajados_pendientes;
+            }
+        } catch (error) {
+            previewEmpty.style.display = "block";
+            previewContent.style.display = "none";
+            badgePreview.textContent = "Error de cálculo";
+            badgePreview.classList.remove("warn");
+        }
+    }
+
+    [funcionario, tipoSalida, fechaSalida, diasTrab, vacPend, preavisoDias, otrosDescuentos].forEach(el => {
+        if (!el) return;
+        el.addEventListener("input", calcularPreview);
+        el.addEventListener("change", calcularPreview);
+    });
+
+    [preavisoCumplido, descontarPreaviso].forEach(el => {
+        if (!el) return;
+        el.addEventListener("change", calcularPreview);
+    });
+
+    if (diasTrab) {
+        diasTrab.addEventListener("input", function () {
+            this.dataset.tocado = "1";
+        });
+    }
+
+    calcularPreview();
+})();
+</script>
+{% endblock %}

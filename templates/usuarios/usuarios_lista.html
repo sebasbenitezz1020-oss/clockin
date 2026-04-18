@@ -1,0 +1,187 @@
+{% extends "base.html" %}
+
+{% block title %}Usuarios | ClockIn{% endblock %}
+
+{% block content %}
+<style>
+    .usr-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        gap: 16px;
+        flex-wrap: wrap;
+        margin-bottom: 20px;
+    }
+
+    .usr-head h2 {
+        margin: 0;
+        color: #fff;
+        font-size: 34px;
+        font-weight: 800;
+    }
+
+    .usr-head p {
+        margin: 8px 0 0;
+        color: #94a3b8;
+    }
+
+    .usr-card {
+        background: linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
+        border: 1px solid rgba(255,255,255,.06);
+        border-radius: 24px;
+        padding: 18px;
+        box-shadow: 0 12px 36px rgba(0,0,0,.22);
+    }
+
+    .usr-filter {
+        display: grid;
+        grid-template-columns: 1fr 160px;
+        gap: 12px;
+        margin-bottom: 16px;
+    }
+
+    .usr-filter input {
+        width: 100%;
+        border: 1px solid rgba(255,255,255,.08);
+        background: #0f1722;
+        color: #fff;
+        border-radius: 14px;
+        padding: 13px 14px;
+    }
+
+    .usr-filter button {
+        border: none;
+        border-radius: 14px;
+        background: linear-gradient(135deg, var(--brand-primary), var(--brand-primary-dark));
+        color: #fff;
+        font-weight: 800;
+    }
+
+    .usr-table-wrap {
+        overflow-x: auto;
+    }
+
+    .usr-table {
+        width: 100%;
+        min-width: 760px;
+        border-collapse: separate;
+        border-spacing: 0 8px;
+    }
+
+    .usr-table thead th {
+        color: #dbe6f3;
+        font-size: 11px;
+        font-weight: 800;
+        text-transform: uppercase;
+        padding: 0 10px 4px;
+    }
+
+    .usr-table tbody td {
+        padding: 12px 10px;
+        background: rgba(255,255,255,.02);
+        border-top: 1px solid rgba(255,255,255,.04);
+        border-bottom: 1px solid rgba(255,255,255,.04);
+        color: #fff;
+        font-size: 13px;
+    }
+
+    .usr-table tbody td:first-child {
+        border-left: 1px solid rgba(255,255,255,.04);
+        border-top-left-radius: 16px;
+        border-bottom-left-radius: 16px;
+    }
+
+    .usr-table tbody td:last-child {
+        border-right: 1px solid rgba(255,255,255,.04);
+        border-top-right-radius: 16px;
+        border-bottom-right-radius: 16px;
+    }
+
+    .usr-link {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 8px 12px;
+        border-radius: 10px;
+        font-size: 12px;
+        font-weight: 800;
+        text-decoration: none;
+        background: rgba(59,130,246,.14);
+        color: #bfdbfe;
+        border: 1px solid rgba(59,130,246,.22);
+    }
+
+    .usr-badge {
+        display: inline-flex;
+        padding: 6px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        font-weight: 800;
+    }
+
+    .usr-ok {
+        background: rgba(34,197,94,.14);
+        color: #bbf7d0;
+        border: 1px solid rgba(34,197,94,.22);
+    }
+
+    .usr-off {
+        background: rgba(239,68,68,.14);
+        color: #fecaca;
+        border: 1px solid rgba(239,68,68,.22);
+    }
+</style>
+
+<div class="usr-head">
+    <div>
+        <h2>👤 Usuarios</h2>
+        <p>Administra usuarios y entra a la matriz de permisos de cada uno.</p>
+    </div>
+</div>
+
+<div class="usr-card">
+    <form method="get" class="usr-filter">
+        <input type="text" name="q" value="{{ q }}" placeholder="Buscar por usuario, nombre, apellido o email">
+        <button type="submit">Buscar</button>
+    </form>
+
+    <div class="usr-table-wrap">
+        <table class="usr-table">
+            <thead>
+                <tr>
+                    <th>Usuario</th>
+                    <th>Nombre</th>
+                    <th>Rol base</th>
+                    <th>Estado</th>
+                    <th>Permisos</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for u in usuarios %}
+                <tr>
+                    <td>{{ u.username }}</td>
+                    <td>{{ u.get_full_name|default:"-" }}</td>
+                    <td>{{ u.get_rol_display }}</td>
+                    <td>
+                        {% if u.activo %}
+                            <span class="usr-badge usr-ok">Activo</span>
+                        {% else %}
+                            <span class="usr-badge usr-off">Inactivo</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <a href="{% url 'usuario_permisos' u.id %}" class="usr-link">Configurar permisos</a>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="5" style="text-align:center; color:#94a3b8; padding:22px;">
+                        No hay usuarios.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
