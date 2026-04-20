@@ -3,6 +3,7 @@
 {% block title %}{{ titulo_form }} | ClockIn{% endblock %}
 
 {% block content %}
+
 <div class="page-header">
     <h2>🕓 {{ titulo_form }}</h2>
     <p>Completa la configuración del turno.</p>
@@ -10,6 +11,15 @@
 
 <div class="card form-card">
     <form method="post">
+
+        {% if es_admin_master %}
+        <div class="form-field">
+            <label>Empresa</label>
+            {{ form.empresa }}
+            {{ form.empresa.errors }}
+        </div>
+        {% endif %}
+        
         {% csrf_token %}
 
         {% if form.errors %}

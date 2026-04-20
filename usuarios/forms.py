@@ -2,6 +2,8 @@ from django import forms
 
 from .models import Usuario
 
+from core.models import Empresa
+
 
 class UsuarioForm(forms.ModelForm):
     password1 = forms.CharField(
@@ -24,6 +26,7 @@ class UsuarioForm(forms.ModelForm):
             "email",
             "telefono",
             "rol",
+            "empresa",
             "activo",
         ]
         widgets = {
@@ -33,12 +36,15 @@ class UsuarioForm(forms.ModelForm):
             "email": forms.EmailInput(attrs={"class": "form-control"}),
             "telefono": forms.TextInput(attrs={"class": "form-control"}),
             "rol": forms.Select(attrs={"class": "form-control"}),
+            "empresa": forms.Select(attrs={"class": "form-control"}),
             "activo": forms.CheckboxInput(attrs={"class": "form-check-input"}),
         }
 
     def __init__(self, *args, **kwargs):
         self.es_edicion = kwargs.pop("es_edicion", False)
         super().__init__(*args, **kwargs)
+
+        self.fields["empresa"].queryset = Empresa.objects.filter(activo=True).order_by("nombre")
 
         if not self.es_edicion:
             self.fields["password1"].required = True

@@ -17,6 +17,13 @@ class Usuario(AbstractUser):
     )
     telefono = models.CharField(max_length=30, blank=True, null=True)
     activo = models.BooleanField(default=True)
+    empresa = models.ForeignKey(
+        "core.Empresa",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="usuarios"
+    )
 
     def save(self, *args, **kwargs):
         self.is_active = self.activo

@@ -348,6 +348,16 @@
         </div>
     </div>
 
+    {% if es_admin_master %}
+        <div class="alert-box warning-box mb-20">
+            Vista global del ICL.
+        </div>
+    {% elif empresa_usuario %}
+        <div class="alert-box success-box mb-20">
+            ICL actual de: <strong>{{ empresa_usuario.nombre }}</strong>
+        </div>
+    {% endif %}
+
     <div class="icl-stats">
         <div class="icl-stat-card">
             <div class="icl-stat-top">

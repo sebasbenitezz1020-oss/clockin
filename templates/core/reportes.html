@@ -8,6 +8,16 @@
     <p>Consulta reportes diarios y mensuales del sistema.</p>
 </div>
 
+{% if es_admin_master %}
+    <div class="alert-box warning-box mb-20">
+        Vista global de reportes de todas las empresas.
+    </div>
+{% elif empresa_usuario %}
+    <div class="alert-box success-box mb-20">
+        Reportes de: <strong>{{ empresa_usuario.nombre }}</strong>
+    </div>
+{% endif %}
+
 <div class="dashboard-grid-2 mb-20">
     <div class="card">
         <div class="section-head">

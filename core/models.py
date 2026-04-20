@@ -246,6 +246,13 @@ class ConfiguracionGeneral(models.Model):
 
 
 class Turno(models.Model):
+    empresa = models.ForeignKey(
+    "Empresa",
+    on_delete=models.CASCADE,
+    related_name="turnos",
+    null=True,
+    blank=True
+)
     nombre = models.CharField(max_length=100, unique=True)
 
     hora_entrada = models.TimeField()

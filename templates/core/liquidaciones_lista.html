@@ -192,6 +192,16 @@
     <a href="{% url 'liquidacion_nueva' %}" class="liqlist-btn">➕ Nueva liquidación</a>
 </div>
 
+{% if es_admin_master %}
+    <div class="alert-box warning-box mb-20">
+        Vista global de liquidaciones.
+    </div>
+{% elif empresa_usuario %}
+    <div class="alert-box success-box mb-20">
+        Liquidaciones de: <strong>{{ empresa_usuario.nombre }}</strong>
+    </div>
+{% endif %}
+
 <div class="liqlist-card">
     <form method="get" class="liqlist-filter">
         <input type="text" name="q" value="{{ q }}" placeholder="Buscar por funcionario, cédula, tipo de salida o estado">

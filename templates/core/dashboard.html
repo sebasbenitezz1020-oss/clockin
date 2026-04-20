@@ -25,6 +25,23 @@
         color: #94a3b8;
     }
 
+    .dash-company-note {
+        margin-top: 10px;
+        font-weight: 700;
+    }
+
+    .dash-company-note.global {
+        color: #fcd34d;
+    }
+
+    .dash-company-note.empresa {
+        color: #93c5fd;
+    }
+
+    .dash-company-note.error {
+        color: #fca5a5;
+    }
+
     .dash-stats {
         display: grid;
         grid-template-columns: repeat(5, 1fr);
@@ -394,6 +411,14 @@
     <div class="dash-hero">
         <h2>📊 Dashboard General</h2>
         <p>Resumen en tiempo real de ClockIn para el día {{ hoy|date:"d/m/Y" }}.</p>
+
+        {% if es_admin_master %}
+            <p class="dash-company-note global">🌐 Vista global de todas las empresas.</p>
+        {% elif empresa_usuario %}
+            <p class="dash-company-note empresa">🏢 Empresa actual: {{ empresa_usuario.nombre }}</p>
+        {% else %}
+            <p class="dash-company-note error">⚠ Tu usuario aún no tiene empresa asignada.</p>
+        {% endif %}
     </div>
 
     {% if perm_funcionarios or perm_asistencia or perm_nomina or perm_deudas %}

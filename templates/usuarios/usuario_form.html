@@ -171,6 +171,12 @@
             </div>
 
             <div class="uform-field">
+                <label>Empresa</label>
+                {{ form.empresa }}
+                {{ form.empresa.errors }}
+            </div>
+
+            <div class="uform-field">
                 <label>Contraseña</label>
                 {% if modo_edicion %}
                     <div class="uform-help">Déjala en blanco si no quieres cambiarla.</div>

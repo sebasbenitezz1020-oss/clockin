@@ -47,6 +47,7 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 'core.context_processors.config_general',
                 'usuarios.context_processors.permisos_menu',
+                'usuarios.context_processors.multiempresa_context',
             ],
         },
     },

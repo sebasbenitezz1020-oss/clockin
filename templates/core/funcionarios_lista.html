@@ -441,6 +441,16 @@
         </a>
     </div>
 
+    {% if es_admin_master %}
+        <div class="alert-box warning-box mb-20">
+            Vista global de funcionarios de todas las empresas.
+        </div>
+    {% elif empresa_usuario %}
+        <div class="alert-box success-box mb-20">
+            Funcionarios de: <strong>{{ empresa_usuario.nombre }}</strong>
+        </div>
+    {% endif %}
+
     <div class="func-stats">
         <div class="func-stat-card">
             <div class="func-stat-top">
@@ -488,6 +498,7 @@
                     >
                 </div>
 
+                {% if es_admin_master %}
                 <div class="input-shell">
                     <select name="empresa" id="filtro_empresa">
                         <option value="">Todas las empresas</option>
@@ -498,6 +509,7 @@
                         {% endfor %}
                     </select>
                 </div>
+                {% endif %}
 
                 <div class="input-shell">
                     <select name="sucursal" id="filtro_sucursal">
@@ -647,7 +659,8 @@
 document.addEventListener("DOMContentLoaded", function () {
     const empresaSelect = document.getElementById("filtro_empresa");
     const sucursalSelect = document.getElementById("filtro_sucursal");
-    if (!empresaSelect || !sucursalSelect) return;
+    if (!sucursalSelect) return;
+    if (!empresaSelect) return;
 
     const opciones = Array.from(sucursalSelect.querySelectorAll("option")).map(opt => ({
         value: opt.value,

@@ -193,6 +193,16 @@
     <a href="{% url 'dia_libre_nuevo' %}" class="dl-btn">➕ Nuevo día libre</a>
 </div>
 
+{% if es_admin_master %}
+    <div class="alert-box warning-box mb-20">
+        Vista global de días libres de todas las empresas.
+    </div>
+{% elif empresa_usuario %}
+    <div class="alert-box success-box mb-20">
+        Planilla actual de empresa: <strong>{{ empresa_usuario.nombre }}</strong>
+    </div>
+{% endif %}
+
 <div class="dl-stats">
     <div class="dl-stat">
         <div class="lab">Funcionarios activos</div>
@@ -210,6 +220,7 @@
 
 <div class="dl-card">
     <form method="get" class="dl-filter">
+        {% if es_admin_master %}
         <select name="empresa">
             <option value="">Todas las empresas</option>
             {% for empresa in empresas %}
@@ -218,6 +229,7 @@
                 </option>
             {% endfor %}
         </select>
+        {% endif %}
 
         <select name="sucursal">
             <option value="">Todas las sucursales</option>

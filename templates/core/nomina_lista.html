@@ -143,6 +143,16 @@
         </div>
     </div>
 
+    {% if es_admin_master %}
+        <div class="alert-box warning-box mb-20">
+            Vista global de nómina de todas las empresas.
+        </div>
+    {% elif empresa_usuario %}
+        <div class="alert-box success-box mb-20">
+            Nómina actual de: <strong>{{ empresa_usuario.nombre }}</strong>
+        </div>
+    {% endif %}
+
     <div class="nom-stats">
         <div class="nom-stat">
             <div class="lab">Total bruto</div>

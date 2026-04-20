@@ -11,6 +11,16 @@
     <a href="{% url 'vacacion_nueva' %}" class="btn-primary btn-link">+ Nueva vacación</a>
 </div>
 
+{% if es_admin_master %}
+    <div class="alert-box warning-box" style="margin-bottom: 14px;">
+        Vista global de vacaciones de todas las empresas.
+    </div>
+{% elif empresa_usuario %}
+    <div class="alert-box success-box" style="margin-bottom: 14px;">
+        Vacaciones de: <strong>{{ empresa_usuario.nombre }}</strong>
+    </div>
+{% endif %}
+
 {% if messages %}
     {% for message in messages %}
         <div class="alert-box success-box">{{ message }}</div>

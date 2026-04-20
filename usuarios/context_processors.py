@@ -1,4 +1,18 @@
 from .utils import tiene_permiso, es_admin_total
+from usuarios.multiempresa import es_admin_master, obtener_empresa_usuario
+
+
+def multiempresa_context(request):
+    if not request.user.is_authenticated:
+        return {
+            "empresa_usuario": None,
+            "es_admin_master": False,
+        }
+
+    return {
+        "empresa_usuario": obtener_empresa_usuario(request.user),
+        "es_admin_master": es_admin_master(request.user),
+    }
 
 
 def permisos_menu(request):

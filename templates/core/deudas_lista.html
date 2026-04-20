@@ -311,6 +311,16 @@
         <p>Gestiona vale compras, préstamos, adelantos y otras deudas de funcionarios.</p>
     </div>
 
+    {% if es_admin_master %}
+        <div class="alert-box warning-box mb-20">
+            Vista global de deudas de todas las empresas.
+        </div>
+    {% elif empresa_usuario %}
+        <div class="alert-box success-box mb-20">
+            Viendo deudas de: <strong>{{ empresa_usuario.nombre }}</strong>
+        </div>
+    {% endif %}
+
     <div class="deudas-card">
         <div class="deudas-card-body">
             <form method="get" class="deudas-toolbar">
@@ -391,16 +401,14 @@
                                         {% endif %}
 
                                         <div class="progress-wrap">
-                                             <div
-                                                    class="progress-bar
-                                                        {% if porcentaje_uso|add:'0' >= 100 %}progress-danger
-                                                        {% elif porcentaje_uso|add:'0' >= 80 %}progress-warn
-                                                        {% else %}progress-ok{% endif %}"
-                                                    style="width: {{ porcentaje_uso }}%;">
-                                                </div>
+                                            <div
+                                                class="progress-bar
+                                                    {% if porcentaje_uso|add:'0' >= 100 %}progress-danger
+                                                    {% elif porcentaje_uso|add:'0' >= 80 %}progress-warn
+                                                    {% else %}progress-ok{% endif %}"
+                                                style="width: {{ porcentaje_uso }}%;">
                                             </div>
-            
-                                        
+                                        </div>
 
                                         <div class="alerta-limite
                                             {% if porcentaje_uso|add:'0' >= 100 %}alerta-danger
