@@ -898,3 +898,65 @@ a {
         grid-template-columns: 1fr;
     }
 }
+.chips-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.chip {
+    background: rgba(59,130,246,.15);
+    border: 1px solid rgba(59,130,246,.3);
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 13px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.chip button {
+    background: none;
+    border: none;
+    color: #f87171;
+    font-weight: bold;
+    cursor: pointer;
+}
+/* ===== FIX ROSTRO + ESTADO (PRO) ===== */
+
+.func-table td:nth-child(8),
+.func-table td:nth-child(9) {
+    white-space: normal !important;
+}
+
+/* Contenedor visual más cómodo */
+.func-table td:nth-child(8),
+.func-table td:nth-child(9) {
+    display: flex;
+    align-items: center;
+}
+
+/* Mejora visual de badges */
+.badge-soft {
+    max-width: 100%;
+    text-align: center;
+    justify-content: center;
+    padding: 6px 12px;
+    font-size: 11px;
+}
+
+/* Evita que se monten visualmente */
+.func-table td:nth-child(8) .badge-soft,
+.func-table td:nth-child(9) .badge-soft {
+    margin: 2px 0;
+}
+
+/* Ajuste fino de columnas */
+.func-table th:nth-child(8), .func-table td:nth-child(8) {
+    width: 14%;
+}
+
+.func-table th:nth-child(9), .func-table td:nth-child(9) {
+    width: 10%;
+}

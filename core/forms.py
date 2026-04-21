@@ -320,7 +320,6 @@ class FuncionarioForm(forms.ModelForm):
 
         self.fields["cargo"].choices = [("", "Seleccionar cargo")] + config.cargos_choices
         self.fields["sector"].choices = [("", "Seleccionar sector")] + config.sectores_choices
-        self.fields["banco"].choices = [("", "Seleccionar banco")] + config.bancos_choices
 
         empresa_id = None
 

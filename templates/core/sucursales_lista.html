@@ -1,70 +1,381 @@
 {% extends "base.html" %}
-
-{% block title %}Sucursales{% endblock %}
+{% load static %}
 
 {% block content %}
-<div class="page-header">
-    <h2>🏬 Sucursales</h2>
-    <p>Administra las sucursales por empresa.</p>
-</div>
+<style>
+.page-wrap {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 6px 0 24px;
+}
 
-<div class="card form-card">
-    <div class="form-actions" style="margin-bottom: 16px;">
-        <form method="get" style="display:grid; grid-template-columns: 1fr 1fr auto auto; gap:10px; width:100%;">
-            <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Buscar sucursal o empresa">
+.pro-card {
+    background: linear-gradient(145deg, #0e1624, #0b111a);
+    border: 1px solid rgba(255,255,255,.06);
+    border-radius: 24px;
+    box-shadow: 0 18px 40px rgba(0,0,0,.35);
+    padding: 26px;
+}
 
-            <select name="empresa" class="form-control">
-                <option value="">Todas las empresas</option>
-                {% for empresa in empresas %}
-                    <option value="{{ empresa.id }}" {% if empresa_id == empresa.id|stringformat:"s" %}selected{% endif %}>
-                        {{ empresa.nombre }}
-                    </option>
-                {% endfor %}
-            </select>
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 22px;
+    flex-wrap: wrap;
+}
 
-            <button type="submit" class="btn-primary btn-link">Filtrar</button>
-            <a href="{% url 'sucursal_nueva' %}" class="btn-secondary">+ Nueva sucursal</a>
+.page-title-box h1 {
+    margin: 0;
+    font-size: 42px;
+    font-weight: 900;
+    color: #fff;
+    line-height: 1.05;
+    letter-spacing: -.5px;
+}
+
+.page-title-box p {
+    margin: 10px 0 0;
+    font-size: 20px;
+    color: #b8c4d9;
+}
+
+.page-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    background: rgba(59,130,246,.12);
+    color: #bfdbfe;
+    font-size: 13px;
+    font-weight: 700;
+    border: 1px solid rgba(59,130,246,.2);
+}
+
+.filters-grid {
+    display: grid;
+    grid-template-columns: 1.3fr .9fr auto auto;
+    gap: 14px;
+    margin-bottom: 22px;
+}
+
+.field-pro input,
+.field-pro select {
+    width: 100%;
+    background: #0d1522;
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 16px;
+    padding: 16px 18px;
+    color: #fff;
+    font-size: 15px;
+    outline: none;
+}
+
+.field-pro input:focus,
+.field-pro select:focus {
+    border-color: rgba(59,130,246,.55);
+    box-shadow: 0 0 0 3px rgba(59,130,246,.12);
+}
+
+.field-pro select option {
+    background: #0d1522;
+    color: #fff;
+}
+
+.btn-pro,
+.btn-pro-secondary {
+    border: none;
+    border-radius: 16px;
+    padding: 14px 18px;
+    font-weight: 800;
+    font-size: 15px;
+    cursor: pointer;
+    transition: .18s ease;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+}
+
+.btn-pro {
+    color: #fff;
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    box-shadow: 0 10px 25px rgba(37,99,235,.28);
+}
+
+.btn-pro:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.04);
+}
+
+.btn-pro-secondary {
+    color: #fff;
+    background: linear-gradient(135deg, #1e293b, #334155);
+    border: 1px solid rgba(255,255,255,.08);
+}
+
+.table-shell {
+    overflow-x: auto;
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,.06);
+    background: rgba(255,255,255,.02);
+}
+
+.pro-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    min-width: 1120px;
+}
+
+.pro-table thead th {
+    text-align: left;
+    padding: 18px;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: #93a4bf;
+    background: rgba(255,255,255,.03);
+    border-bottom: 1px solid rgba(255,255,255,.06);
+}
+
+.pro-table tbody td {
+    padding: 18px;
+    border-bottom: 1px solid rgba(255,255,255,.05);
+    color: #f8fafc;
+    vertical-align: middle;
+}
+
+.pro-table tbody tr:hover {
+    background: rgba(59,130,246,.04);
+}
+
+.pro-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.branch-name {
+    font-size: 18px;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 4px;
+}
+
+.branch-sub {
+    font-size: 13px;
+    color: #94a3b8;
+}
+
+.company-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 12px;
+    border-radius: 12px;
+    background: rgba(255,255,255,.04);
+    border: 1px solid rgba(255,255,255,.06);
+    color: #e2e8f0;
+    font-weight: 700;
+}
+
+.address-text {
+    color: #e5edf8;
+    line-height: 1.5;
+}
+
+.status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 13px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.status-pill.active {
+    background: rgba(34,197,94,.12);
+    color: #86efac;
+    border: 1px solid rgba(34,197,94,.22);
+}
+
+.status-pill.inactive {
+    background: rgba(239,68,68,.12);
+    color: #fca5a5;
+    border: 1px solid rgba(239,68,68,.22);
+}
+
+.actions-wrap {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.btn-mini {
+    padding: 10px 14px;
+    border-radius: 12px;
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 800;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-edit {
+    background: rgba(59,130,246,.14);
+    color: #bfdbfe;
+    border: 1px solid rgba(59,130,246,.18);
+}
+
+.btn-toggle-active {
+    background: rgba(239,68,68,.14);
+    color: #fecaca;
+    border: 1px solid rgba(239,68,68,.18);
+}
+
+.btn-toggle-inactive {
+    background: rgba(34,197,94,.14);
+    color: #bbf7d0;
+    border: 1px solid rgba(34,197,94,.18);
+}
+
+.empty-box {
+    padding: 36px 20px;
+    text-align: center;
+    color: #94a3b8;
+}
+
+@media (max-width: 980px) {
+    .page-title-box h1 {
+        font-size: 34px;
+    }
+
+    .page-title-box p {
+        font-size: 17px;
+    }
+
+    .filters-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .btn-pro,
+    .btn-pro-secondary {
+        width: 100%;
+    }
+
+    .pro-card {
+        padding: 18px;
+        border-radius: 20px;
+    }
+}
+</style>
+
+<div class="page-wrap">
+    <div class="pro-card">
+        <div class="page-header">
+            <div class="page-title-box">
+                <div class="page-badge">🏬 Multiempresa</div>
+                <h1>Sucursales</h1>
+                <p>Administra las sucursales por empresa con una vista más limpia y mejor distribuida.</p>
+            </div>
+        </div>
+
+        <form method="get" class="filters-grid">
+            <div class="field-pro">
+                <input
+                    type="text"
+                    name="q"
+                    value="{{ q|default:'' }}"
+                    placeholder="Buscar por sucursal o empresa"
+                >
+            </div>
+
+            <div class="field-pro">
+                <select name="empresa">
+                    <option value="">Todas las empresas</option>
+                    {% for empresa in empresas %}
+                        <option value="{{ empresa.id }}" {% if empresa_id|stringformat:"s" == empresa.id|stringformat:"s" %}selected{% endif %}>
+                            {{ empresa.nombre }}
+                        </option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <button type="submit" class="btn-pro-secondary">
+                Filtrar
+            </button>
+
+            <a href="{% url 'sucursal_nueva' %}" class="btn-pro">
+                + Nueva sucursal
+            </a>
         </form>
-    </div>
 
-    <div class="table-wrap">
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>Empresa</th>
-                    <th>Sucursal</th>
-                    <th>Dirección</th>
-                    <th>Estado</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for sucursal in sucursales %}
-                <tr>
-                    <td>{{ sucursal.empresa.nombre }}</td>
-                    <td>{{ sucursal.nombre }}</td>
-                    <td>{{ sucursal.direccion|default:"-" }}</td>
-                    <td>
-                        {% if sucursal.activo %}
-                            Activa
-                        {% else %}
-                            Inactiva
-                        {% endif %}
-                    </td>
-                    <td>
-                        <a href="{% url 'sucursal_editar' sucursal.id %}" class="btn-secondary">Editar</a>
-                        <a href="{% url 'sucursal_toggle_activo' sucursal.id %}" class="btn-secondary">
-                            {% if sucursal.activo %}Inactivar{% else %}Activar{% endif %}
-                        </a>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="5">No hay sucursales registradas.</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <div class="table-shell">
+            <table class="pro-table">
+                <thead>
+                    <tr>
+                        <th style="width: 24%;">Empresa</th>
+                        <th style="width: 20%;">Sucursal</th>
+                        <th style="width: 30%;">Dirección</th>
+                        <th style="width: 12%;">Estado</th>
+                        <th style="width: 14%;">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for sucursal in sucursales %}
+                    <tr>
+                        <td>
+                            <span class="company-badge">{{ sucursal.empresa.nombre }}</span>
+                        </td>
+                        <td>
+                            <div class="branch-name">{{ sucursal.nombre }}</div>
+                            <div class="branch-sub">Sucursal registrada</div>
+                        </td>
+                        <td>
+                            <div class="address-text">
+                                {{ sucursal.direccion|default:"Sin dirección cargada" }}
+                            </div>
+                        </td>
+                        <td>
+                            {% if sucursal.activo %}
+                                <span class="status-pill active">● Activa</span>
+                            {% else %}
+                                <span class="status-pill inactive">● Inactiva</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="actions-wrap">
+                                <a href="{% url 'sucursal_editar' sucursal.id %}" class="btn-mini btn-edit">
+                                    Editar
+                                </a>
+
+                                {% if sucursal.activo %}
+                                    <a href="{% url 'sucursal_toggle_activo' sucursal.id %}" class="btn-mini btn-toggle-active">
+                                        Inactivar
+                                    </a>
+                                {% else %}
+                                    <a href="{% url 'sucursal_toggle_activo' sucursal.id %}" class="btn-mini btn-toggle-inactive">
+                                        Activar
+                                    </a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5">
+                            <div class="empty-box">
+                                No se encontraron sucursales registradas.
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 {% endblock %}

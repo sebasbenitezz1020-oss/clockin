@@ -1,58 +1,358 @@
 {% extends "base.html" %}
-
-{% block title %}Empresas{% endblock %}
+{% load static %}
 
 {% block content %}
-<div class="page-header">
-    <h2>🏢 Empresas</h2>
-    <p>Administra las empresas del sistema.</p>
-</div>
+<style>
+.page-wrap {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 6px 0 24px;
+}
 
-<div class="card form-card">
-    <div class="form-actions" style="margin-bottom: 16px;">
-        <form method="get" style="display:flex; gap:10px; width:100%;">
-            <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Buscar empresa o RUC">
-            <button type="submit" class="btn-primary btn-link">Buscar</button>
-            <a href="{% url 'empresa_nueva' %}" class="btn-secondary">+ Nueva empresa</a>
+.pro-card {
+    background: linear-gradient(145deg, #0e1624, #0b111a);
+    border: 1px solid rgba(255,255,255,.06);
+    border-radius: 24px;
+    box-shadow: 0 18px 40px rgba(0,0,0,.35);
+    padding: 26px;
+}
+
+.page-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 16px;
+    margin-bottom: 22px;
+    flex-wrap: wrap;
+}
+
+.page-title-box h1 {
+    margin: 0;
+    font-size: 42px;
+    font-weight: 900;
+    color: #fff;
+    line-height: 1.05;
+    letter-spacing: -.5px;
+}
+
+.page-title-box p {
+    margin: 10px 0 0;
+    font-size: 20px;
+    color: #b8c4d9;
+}
+
+.page-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    background: rgba(59,130,246,.12);
+    color: #bfdbfe;
+    font-size: 13px;
+    font-weight: 700;
+    border: 1px solid rgba(59,130,246,.2);
+}
+
+.tools-bar {
+    display: grid;
+    grid-template-columns: 1fr auto auto;
+    gap: 14px;
+    margin-bottom: 22px;
+}
+
+.search-box input {
+    width: 100%;
+    background: #0d1522;
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 16px;
+    padding: 16px 18px;
+    color: #fff;
+    font-size: 15px;
+    outline: none;
+}
+
+.search-box input:focus {
+    border-color: rgba(59,130,246,.55);
+    box-shadow: 0 0 0 3px rgba(59,130,246,.12);
+}
+
+.btn-pro,
+.btn-pro-secondary {
+    border: none;
+    border-radius: 16px;
+    padding: 14px 18px;
+    font-weight: 800;
+    font-size: 15px;
+    cursor: pointer;
+    transition: .18s ease;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    white-space: nowrap;
+}
+
+.btn-pro {
+    color: #fff;
+    background: linear-gradient(135deg, #2563eb, #1d4ed8);
+    box-shadow: 0 10px 25px rgba(37,99,235,.28);
+}
+
+.btn-pro:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.04);
+}
+
+.btn-pro-secondary {
+    color: #fff;
+    background: linear-gradient(135deg, #1e293b, #334155);
+    border: 1px solid rgba(255,255,255,.08);
+}
+
+.btn-pro-secondary:hover {
+    filter: brightness(1.06);
+}
+
+.table-shell {
+    overflow-x: auto;
+    border-radius: 20px;
+    border: 1px solid rgba(255,255,255,.06);
+    background: rgba(255,255,255,.02);
+}
+
+.pro-table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    min-width: 900px;
+}
+
+.pro-table thead th {
+    text-align: left;
+    padding: 18px 18px;
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: .08em;
+    color: #93a4bf;
+    background: rgba(255,255,255,.03);
+    border-bottom: 1px solid rgba(255,255,255,.06);
+}
+
+.pro-table tbody td {
+    padding: 18px;
+    border-bottom: 1px solid rgba(255,255,255,.05);
+    color: #f8fafc;
+    vertical-align: middle;
+}
+
+.pro-table tbody tr:hover {
+    background: rgba(59,130,246,.04);
+}
+
+.pro-table tbody tr:last-child td {
+    border-bottom: none;
+}
+
+.company-name {
+    font-size: 18px;
+    font-weight: 800;
+    color: #fff;
+    margin-bottom: 4px;
+}
+
+.company-sub {
+    font-size: 13px;
+    color: #94a3b8;
+}
+
+.ruc-badge {
+    display: inline-flex;
+    align-items: center;
+    padding: 8px 12px;
+    border-radius: 12px;
+    background: rgba(255,255,255,.04);
+    border: 1px solid rgba(255,255,255,.06);
+    color: #e2e8f0;
+    font-weight: 700;
+}
+
+.status-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 13px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.status-pill.active {
+    background: rgba(34,197,94,.12);
+    color: #86efac;
+    border: 1px solid rgba(34,197,94,.22);
+}
+
+.status-pill.inactive {
+    background: rgba(239,68,68,.12);
+    color: #fca5a5;
+    border: 1px solid rgba(239,68,68,.22);
+}
+
+.actions-wrap {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.btn-mini {
+    padding: 10px 14px;
+    border-radius: 12px;
+    text-decoration: none;
+    font-size: 13px;
+    font-weight: 800;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border: none;
+    cursor: pointer;
+}
+
+.btn-edit {
+    background: rgba(59,130,246,.14);
+    color: #bfdbfe;
+    border: 1px solid rgba(59,130,246,.18);
+}
+
+.btn-toggle-active {
+    background: rgba(239,68,68,.14);
+    color: #fecaca;
+    border: 1px solid rgba(239,68,68,.18);
+}
+
+.btn-toggle-inactive {
+    background: rgba(34,197,94,.14);
+    color: #bbf7d0;
+    border: 1px solid rgba(34,197,94,.18);
+}
+
+.empty-box {
+    padding: 36px 20px;
+    text-align: center;
+    color: #94a3b8;
+}
+
+@media (max-width: 900px) {
+    .page-title-box h1 {
+        font-size: 34px;
+    }
+
+    .page-title-box p {
+        font-size: 17px;
+    }
+
+    .tools-bar {
+        grid-template-columns: 1fr;
+    }
+
+    .btn-pro,
+    .btn-pro-secondary {
+        width: 100%;
+    }
+
+    .pro-card {
+        padding: 18px;
+        border-radius: 20px;
+    }
+}
+</style>
+
+<div class="page-wrap">
+    <div class="pro-card">
+        <div class="page-header">
+            <div class="page-title-box">
+                <div class="page-badge">🏢 Administración global</div>
+                <h1>Empresas</h1>
+                <p>Administra las empresas registradas en el sistema con una vista más clara y profesional.</p>
+            </div>
+        </div>
+
+        <form method="get" class="tools-bar">
+            <div class="search-box">
+                <input
+                    type="text"
+                    name="q"
+                    value="{{ q|default:'' }}"
+                    placeholder="Buscar empresa por nombre o RUC"
+                >
+            </div>
+
+            <button type="submit" class="btn-pro-secondary">
+                Buscar
+            </button>
+
+            <a href="{% url 'empresa_nueva' %}" class="btn-pro">
+                + Nueva empresa
+            </a>
         </form>
-    </div>
 
-    <div class="table-wrap">
-        <table class="table">
-            <thead>
-                <tr>
-                    <th>Empresa</th>
-                    <th>RUC</th>
-                    <th>Estado</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for empresa in empresas %}
-                <tr>
-                    <td>{{ empresa.nombre }}</td>
-                    <td>{{ empresa.ruc|default:"-" }}</td>
-                    <td>
-                        {% if empresa.activo %}
-                            Activa
-                        {% else %}
-                            Inactiva
-                        {% endif %}
-                    </td>
-                    <td>
-                        <a href="{% url 'empresa_editar' empresa.id %}" class="btn-secondary">Editar</a>
-                        <a href="{% url 'empresa_toggle_activo' empresa.id %}" class="btn-secondary">
-                            {% if empresa.activo %}Inactivar{% else %}Activar{% endif %}
-                        </a>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="4">No hay empresas registradas.</td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+        <div class="table-shell">
+            <table class="pro-table">
+                <thead>
+                    <tr>
+                        <th style="width: 42%;">Empresa</th>
+                        <th style="width: 20%;">RUC</th>
+                        <th style="width: 16%;">Estado</th>
+                        <th style="width: 22%;">Acciones</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for empresa in empresas %}
+                    <tr>
+                        <td>
+                            <div class="company-name">{{ empresa.nombre }}</div>
+                            <div class="company-sub">Registro principal del sistema</div>
+                        </td>
+                        <td>
+                            <span class="ruc-badge">{{ empresa.ruc }}</span>
+                        </td>
+                        <td>
+                            {% if empresa.activo %}
+                                <span class="status-pill active">● Activa</span>
+                            {% else %}
+                                <span class="status-pill inactive">● Inactiva</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="actions-wrap">
+                                <a href="{% url 'empresa_editar' empresa.id %}" class="btn-mini btn-edit">
+                                    Editar
+                                </a>
+
+                                {% if empresa.activo %}
+                                    <a href="{% url 'empresa_toggle_activo' empresa.id %}" class="btn-mini btn-toggle-active">
+                                        Inactivar
+                                    </a>
+                                {% else %}
+                                    <a href="{% url 'empresa_toggle_activo' empresa.id %}" class="btn-mini btn-toggle-inactive">
+                                        Activar
+                                    </a>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4">
+                            <div class="empty-box">
+                                No se encontraron empresas registradas.
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
 </div>
 {% endblock %}
