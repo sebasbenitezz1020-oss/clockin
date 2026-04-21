@@ -4,6 +4,72 @@
 
 {% block content %}
 
+<style>
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+}
+
+.form-field {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-field label {
+    margin-bottom: 8px;
+    font-weight: 700;
+    color: #f8fafc;
+}
+
+.form-field input,
+.form-field select {
+    background: #0f1722;
+    border: 1px solid rgba(255,255,255,.10);
+    border-radius: 14px;
+    padding: 14px 16px;
+    color: #fff;
+    outline: none;
+    transition: .18s ease;
+}
+
+.form-field input:focus,
+.form-field select:focus {
+    border-color: rgba(59,130,246,.55);
+    box-shadow: 0 0 0 3px rgba(59,130,246,.12);
+}
+
+.checks-row {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-top: 18px;
+}
+
+.check-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(255,255,255,.03);
+    border: 1px solid rgba(255,255,255,.06);
+    border-radius: 12px;
+    padding: 12px 14px;
+    color: #fff;
+}
+
+.check-item input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: #3b82f6;
+}
+
+@media (max-width: 900px) {
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
 <div class="page-header">
     <h2>🕓 {{ titulo_form }}</h2>
     <p>Completa la configuración del turno.</p>
@@ -11,16 +77,15 @@
 
 <div class="card form-card">
     <form method="post">
+        {% csrf_token %}
 
         {% if es_admin_master %}
-        <div class="form-field">
+        <div class="form-field" style="margin-bottom: 18px;">
             <label>Empresa</label>
             {{ form.empresa }}
             {{ form.empresa.errors }}
         </div>
         {% endif %}
-        
-        {% csrf_token %}
 
         {% if form.errors %}
             <div class="alert-box error-box-strong">
@@ -53,13 +118,13 @@
                 {{ form.tolerancia_minutos.errors }}
             </div>
 
-            <div class="form-field">
+            <div class="form-field" id="wrap_inicio_almuerzo">
                 <label for="{{ form.hora_inicio_almuerzo.id_for_label }}">Inicio almuerzo</label>
                 {{ form.hora_inicio_almuerzo }}
                 {{ form.hora_inicio_almuerzo.errors }}
             </div>
 
-            <div class="form-field">
+            <div class="form-field" id="wrap_fin_almuerzo">
                 <label for="{{ form.hora_fin_almuerzo.id_for_label }}">Fin almuerzo</label>
                 {{ form.hora_fin_almuerzo }}
                 {{ form.hora_fin_almuerzo.errors }}
@@ -68,11 +133,13 @@
 
         <div class="checks-row">
             <label class="check-item">
-                {{ form.usa_almuerzo }} <span>Usa almuerzo</span>
+                {{ form.usa_almuerzo }}
+                <span>Usa almuerzo</span>
             </label>
 
             <label class="check-item">
-                {{ form.activo }} <span>Turno activo</span>
+                {{ form.activo }}
+                <span>Turno activo</span>
             </label>
         </div>
 
@@ -82,4 +149,24 @@
         </div>
     </form>
 </div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const usaAlmuerzo = document.getElementById("id_usa_almuerzo");
+    const inicioWrap = document.getElementById("wrap_inicio_almuerzo");
+    const finWrap = document.getElementById("wrap_fin_almuerzo");
+
+    function toggleAlmuerzo() {
+        const visible = usaAlmuerzo && usaAlmuerzo.checked;
+        if (inicioWrap) inicioWrap.style.display = visible ? "flex" : "none";
+        if (finWrap) finWrap.style.display = visible ? "flex" : "none";
+    }
+
+    if (usaAlmuerzo) {
+        usaAlmuerzo.addEventListener("change", toggleAlmuerzo);
+        toggleAlmuerzo();
+    }
+});
+</script>
+
 {% endblock %}

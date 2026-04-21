@@ -960,3 +960,66 @@ a {
 .func-table th:nth-child(9), .func-table td:nth-child(9) {
     width: 10%;
 }
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 18px;
+}
+
+.form-field {
+    display: flex;
+    flex-direction: column;
+}
+
+.form-field label {
+    margin-bottom: 8px;
+    font-weight: 700;
+    color: #f8fafc;
+}
+
+.form-field input,
+.form-field select {
+    background: #0f1722;
+    border: 1px solid rgba(255,255,255,.10);
+    border-radius: 14px;
+    padding: 14px 16px;
+    color: #fff;
+    outline: none;
+    transition: .18s ease;
+}
+
+.form-field input:focus,
+.form-field select:focus {
+    border-color: rgba(59,130,246,.55);
+    box-shadow: 0 0 0 3px rgba(59,130,246,.12);
+}
+
+.checks-row {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-top: 18px;
+}
+
+.check-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(255,255,255,.03);
+    border: 1px solid rgba(255,255,255,.06);
+    border-radius: 12px;
+    padding: 12px 14px;
+    color: #fff;
+}
+
+.check-item input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: #3b82f6;
+}
+
+@media (max-width: 900px) {
+    .form-grid {
+        grid-template-columns: 1fr;
+    }
+}

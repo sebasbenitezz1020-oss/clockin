@@ -45,37 +45,120 @@ class TurnoForm(forms.ModelForm):
 
     class Meta:
         model = Turno
-        fields = "__all__"  # usamos todos los campos del modelo
+        fields = "__all__"
 
         widgets = {
             "empresa": forms.Select(attrs={"class": "form-control"}),
-            "nombre": forms.TextInput(attrs={"class": "form-control"}),
-            "hora_inicio": forms.TimeInput(attrs={"type": "time", "class": "form-control"}),
-            "hora_fin": forms.TimeInput(attrs={"type": "time", "class": "form-control"}),
+            "nombre": forms.TextInput(attrs={
+                "class": "form-control",
+                "placeholder": "Ej: 1er. Turno"
+            }),
+            "hora_entrada": forms.TimeInput(attrs={
+                "type": "time",
+                "step": "300",
+                "class": "form-control"
+            }, format="%H:%M"),
+            "hora_salida": forms.TimeInput(attrs={
+                "type": "time",
+                "step": "300",
+                "class": "form-control"
+            }, format="%H:%M"),
+            "hora_inicio_almuerzo": forms.TimeInput(attrs={
+                "type": "time",
+                "step": "300",
+                "class": "form-control"
+            }, format="%H:%M"),
+            "hora_fin_almuerzo": forms.TimeInput(attrs={
+                "type": "time",
+                "step": "300",
+                "class": "form-control"
+            }, format="%H:%M"),
+            "tolerancia_minutos": forms.NumberInput(attrs={
+                "class": "form-control",
+                "min": "0",
+                "max": "120",
+                "placeholder": "Ej: 1"
+            }),
+            "usa_almuerzo": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "activo": forms.CheckboxInput(attrs={"class": "form-check-input"}),
         }
 
         labels = {
             "empresa": "Empresa",
             "nombre": "Nombre del Turno",
-            "hora_inicio": "Hora de Inicio",
-            "hora_fin": "Hora de Fin",
+            "hora_entrada": "Hora de entrada",
+            "hora_salida": "Hora de salida",
+            "hora_inicio_almuerzo": "Inicio almuerzo",
+            "hora_fin_almuerzo": "Fin almuerzo",
+            "tolerancia_minutos": "Tolerancia en minutos",
+            "usa_almuerzo": "Usa almuerzo",
+            "activo": "Turno activo",
         }
 
     def __init__(self, *args, **kwargs):
         user = kwargs.pop("user", None)
         super().__init__(*args, **kwargs)
 
+        for campo in [
+            "hora_entrada",
+            "hora_salida",
+            "hora_inicio_almuerzo",
+            "hora_fin_almuerzo",
+        ]:
+            if campo in self.fields:
+                self.fields[campo].input_formats = ["%H:%M"]
+                self.fields[campo].required = False
+
+        if "tolerancia_minutos" in self.fields:
+            self.fields["tolerancia_minutos"].required = False
+
         # 🔒 MULTIEMPRESA (BLINDAJE)
         if user:
             if hasattr(user, "empresa") and not user.is_superuser:
-                # Usuario normal → empresa fija
                 self.fields["empresa"].queryset = self.fields["empresa"].queryset.filter(id=user.empresa.id)
                 self.fields["empresa"].initial = user.empresa
-                self.fields["empresa"].disabled = True  # no puede cambiar
-
+                self.fields["empresa"].disabled = True
             else:
-                # Admin master → puede elegir empresa
                 self.fields["empresa"].required = True
+
+    def clean(self):
+        cleaned_data = super().clean()
+
+        hora_entrada = cleaned_data.get("hora_entrada")
+        hora_salida = cleaned_data.get("hora_salida")
+        usa_almuerzo = cleaned_data.get("usa_almuerzo")
+        hora_inicio_almuerzo = cleaned_data.get("hora_inicio_almuerzo")
+        hora_fin_almuerzo = cleaned_data.get("hora_fin_almuerzo")
+
+        if not hora_entrada:
+            self.add_error("hora_entrada", "Debes seleccionar la hora de entrada.")
+
+        if not hora_salida:
+            self.add_error("hora_salida", "Debes seleccionar la hora de salida.")
+
+        if hora_entrada and hora_salida and hora_salida <= hora_entrada:
+            self.add_error("hora_salida", "La hora de salida debe ser mayor que la hora de entrada.")
+
+        if usa_almuerzo:
+            if not hora_inicio_almuerzo:
+                self.add_error("hora_inicio_almuerzo", "Debes seleccionar el inicio del almuerzo.")
+
+            if not hora_fin_almuerzo:
+                self.add_error("hora_fin_almuerzo", "Debes seleccionar el fin del almuerzo.")
+
+            if hora_entrada and hora_inicio_almuerzo and hora_inicio_almuerzo <= hora_entrada:
+                self.add_error("hora_inicio_almuerzo", "El inicio de almuerzo debe ser posterior a la entrada.")
+
+            if hora_inicio_almuerzo and hora_fin_almuerzo and hora_fin_almuerzo <= hora_inicio_almuerzo:
+                self.add_error("hora_fin_almuerzo", "El fin de almuerzo debe ser mayor que el inicio de almuerzo.")
+
+            if hora_salida and hora_fin_almuerzo and hora_fin_almuerzo >= hora_salida:
+                self.add_error("hora_fin_almuerzo", "El fin de almuerzo debe ser anterior a la salida.")
+        else:
+            cleaned_data["hora_inicio_almuerzo"] = None
+            cleaned_data["hora_fin_almuerzo"] = None
+
+        return cleaned_data
 
 
 class ConfiguracionGeneralForm(forms.ModelForm):
