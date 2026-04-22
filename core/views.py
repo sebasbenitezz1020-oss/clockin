@@ -1808,11 +1808,13 @@ def reportes(request):
         else:
             funcionarios = funcionarios.none()
 
-    funcionarios = funcionarios.order_by("apellido", "nombre")
+    funcionarios = funcionarios.select_related("turno", "sucursal_rel").order_by("apellido", "nombre")
 
-    asistencias_dia = Asistencia.objects.select_related("funcionario", "funcionario__turno").filter(
-        fecha=fecha_reporte
-    )
+    asistencias_dia = Asistencia.objects.select_related(
+        "funcionario",
+        "funcionario__turno",
+        "funcionario__sucursal_rel",
+    ).filter(fecha=fecha_reporte)
 
     if not admin_master:
         if empresa_usuario:
@@ -1821,17 +1823,101 @@ def reportes(request):
             asistencias_dia = asistencias_dia.none()
 
     if funcionario_id:
+        funcionarios = funcionarios.filter(id=funcionario_id)
         asistencias_dia = asistencias_dia.filter(funcionario_id=funcionario_id)
 
+    asistencias_dia = asistencias_dia.order_by("funcionario__apellido", "funcionario__nombre")
+
+    funcionarios_con_turno = funcionarios.filter(turno__isnull=False)
+
+    ids_con_asistencia = list(
+        asistencias_dia.values_list("funcionario_id", flat=True).distinct()
+    )
+
+    permisos_dia = PermisoLicencia.objects.select_related(
+        "funcionario",
+        "funcionario__turno",
+        "funcionario__sucursal_rel",
+    ).filter(
+        funcionario__in=funcionarios,
+        estado=PermisoLicencia.Estados.APROBADO,
+        fecha_desde=fecha_reporte,
+    )
+
+    vacaciones_dia = Vacacion.objects.select_related(
+        "funcionario",
+        "funcionario__turno",
+        "funcionario__sucursal_rel",
+    ).filter(
+        funcionario__in=funcionarios,
+        estado=Vacacion.Estados.APROBADO,
+        fecha_desde=fecha_reporte,
+    )
+
+    ids_justificados = set(permisos_dia.values_list("funcionario_id", flat=True))
+    ids_justificados.update(vacaciones_dia.values_list("funcionario_id", flat=True))
+
+    ausentes_dia = funcionarios_con_turno.exclude(id__in=ids_con_asistencia).exclude(id__in=ids_justificados)
+
+    llegadas_tarde = asistencias_dia.filter(
+        hora_entrada__isnull=False,
+        llego_tarde=True
+    )
+
+    presentes_en_horario = asistencias_dia.filter(
+        hora_entrada__isnull=False,
+        llego_tarde=False
+    )
+
+    sin_salida = asistencias_dia.filter(
+        hora_entrada__isnull=False,
+        hora_salida__isnull=True
+    )
+
+    permisos_licencias_dia = []
+    for item in permisos_dia:
+        permisos_licencias_dia.append({
+            "tipo": "Permiso / Licencia",
+            "funcionario": item.funcionario,
+            "obj": item,
+        })
+
+    for item in vacaciones_dia:
+        permisos_licencias_dia.append({
+            "tipo": "Vacación",
+            "funcionario": item.funcionario,
+            "obj": item,
+        })
+
     presentes_dia = asistencias_dia.filter(hora_entrada__isnull=False).count()
-    tardanzas_dia = asistencias_dia.filter(llego_tarde=True).count()
+    tardanzas_dia = llegadas_tarde.count()
     salidas_dia = asistencias_dia.filter(hora_salida__isnull=False).count()
+    ausencias_dia = ausentes_dia.count()
+    justificados_dia = len({item["funcionario"].id for item in permisos_licencias_dia})
+    sin_salida_dia = sin_salida.count()
+    programados_dia = funcionarios_con_turno.count()
+    en_horario_dia = presentes_en_horario.count()
+
+    requieren_atencion_hoy = tardanzas_dia + ausencias_dia + sin_salida_dia
+
+    porcentaje_asistencia = 0
+    if programados_dia > 0:
+        porcentaje_asistencia = round((presentes_dia / programados_dia) * 100, 1)
+
+    porcentaje_cumplimiento = 0
+    if programados_dia > 0:
+        porcentaje_cumplimiento = round((en_horario_dia / programados_dia) * 100, 1)
+
+    resumen_semaforo = {
+        "verde": en_horario_dia,
+        "amarillo": tardanzas_dia,
+        "rojo": ausencias_dia,
+        "naranja": sin_salida_dia,
+        "azul": justificados_dia,
+    }
 
     resultados_mensuales = []
     funcionarios_para_mes = funcionarios
-
-    if funcionario_id:
-        funcionarios_para_mes = funcionarios_para_mes.filter(id=funcionario_id)
 
     dias_mes = monthrange(anio, mes)[1]
     total_dias_laborales_estimados = sum(
@@ -1901,10 +1987,24 @@ def reportes(request):
         "fecha_reporte": fecha_reporte,
         "funcionarios": funcionarios,
         "funcionario_id": funcionario_id,
-        "asistencias_dia": asistencias_dia.order_by("funcionario__apellido", "funcionario__nombre"),
+        "asistencias_dia": asistencias_dia,
         "presentes_dia": presentes_dia,
         "tardanzas_dia": tardanzas_dia,
         "salidas_dia": salidas_dia,
+        "ausencias_dia": ausencias_dia,
+        "justificados_dia": justificados_dia,
+        "sin_salida_dia": sin_salida_dia,
+        "programados_dia": programados_dia,
+        "en_horario_dia": en_horario_dia,
+        "porcentaje_asistencia": porcentaje_asistencia,
+        "porcentaje_cumplimiento": porcentaje_cumplimiento,
+        "requieren_atencion_hoy": requieren_atencion_hoy,
+        "resumen_semaforo": resumen_semaforo,
+        "llegadas_tarde": llegadas_tarde,
+        "ausentes_dia": ausentes_dia,
+        "permisos_licencias_dia": permisos_licencias_dia,
+        "sin_salida": sin_salida,
+        "presentes_en_horario": presentes_en_horario,
         "mes": mes,
         "anio": anio,
         "meses": meses,

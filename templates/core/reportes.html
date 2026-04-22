@@ -3,6 +3,420 @@
 {% block title %}Reportes | ClockIn{% endblock %}
 
 {% block content %}
+<style>
+.reportes-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.section-card-pro {
+    background: linear-gradient(145deg, #0f1722, #0b111a);
+    border: 1px solid rgba(255,255,255,.06);
+    border-radius: 22px;
+    padding: 20px;
+    box-shadow: 0 12px 28px rgba(0,0,0,.22);
+}
+
+.kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.kpi-card {
+    background: linear-gradient(145deg, #111a28, #0b111a);
+    border: 1px solid rgba(255,255,255,.06);
+    border-radius: 18px;
+    padding: 18px;
+    box-shadow: 0 12px 28px rgba(0,0,0,.18);
+}
+
+.kpi-label {
+    display: block;
+    font-size: 13px;
+    color: #94a3b8;
+    margin-bottom: 8px;
+}
+
+.kpi-value {
+    font-size: 30px;
+    font-weight: 900;
+    color: #fff;
+    line-height: 1;
+}
+
+.kpi-card.success { border-color: rgba(34,197,94,.18); }
+.kpi-card.warning { border-color: rgba(245,158,11,.18); }
+.kpi-card.danger { border-color: rgba(239,68,68,.18); }
+.kpi-card.info { border-color: rgba(59,130,246,.18); }
+
+.attention-strip {
+    display: grid;
+    grid-template-columns: 1.4fr 1fr;
+    gap: 18px;
+}
+
+.attention-box {
+    border-radius: 20px;
+    padding: 18px;
+    background: linear-gradient(145deg, rgba(239,68,68,.12), rgba(127,29,29,.08));
+    border: 1px solid rgba(239,68,68,.18);
+}
+
+.attention-box h3 {
+    margin: 0 0 8px;
+    color: #fff;
+    font-size: 20px;
+}
+
+.attention-big {
+    font-size: 44px;
+    font-weight: 900;
+    color: #fecaca;
+    line-height: 1;
+    margin-bottom: 8px;
+}
+
+.attention-sub {
+    color: #fca5a5;
+    font-size: 13px;
+}
+
+.semaforo-box {
+    border-radius: 20px;
+    padding: 18px;
+    background: linear-gradient(145deg, rgba(59,130,246,.08), rgba(15,23,34,.2));
+    border: 1px solid rgba(255,255,255,.06);
+}
+
+.semaforo-box h3 {
+    margin: 0 0 14px;
+    color: #fff;
+    font-size: 18px;
+}
+
+.semaforo-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.semaforo-pill {
+    border-radius: 16px;
+    padding: 12px;
+    text-align: center;
+    border: 1px solid transparent;
+}
+
+.semaforo-pill strong {
+    display: block;
+    font-size: 22px;
+    line-height: 1;
+    margin-bottom: 6px;
+    color: #fff;
+}
+
+.semaforo-pill span {
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.semaforo-verde {
+    background: rgba(34,197,94,.14);
+    border-color: rgba(34,197,94,.2);
+    color: #bbf7d0;
+}
+
+.semaforo-amarillo {
+    background: rgba(245,158,11,.14);
+    border-color: rgba(245,158,11,.2);
+    color: #fde68a;
+}
+
+.semaforo-rojo {
+    background: rgba(239,68,68,.14);
+    border-color: rgba(239,68,68,.2);
+    color: #fecaca;
+}
+
+.semaforo-naranja {
+    background: rgba(249,115,22,.14);
+    border-color: rgba(249,115,22,.2);
+    color: #fdba74;
+}
+
+.semaforo-azul {
+    background: rgba(59,130,246,.14);
+    border-color: rgba(59,130,246,.2);
+    color: #bfdbfe;
+}
+
+.alert-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+}
+
+.alert-card-pro {
+    background: linear-gradient(145deg, #0f1722, #0b111a);
+    border: 1px solid rgba(255,255,255,.06);
+    border-radius: 20px;
+    padding: 18px;
+    box-shadow: 0 12px 28px rgba(0,0,0,.22);
+}
+
+.alert-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 14px;
+}
+
+.alert-card-head h4 {
+    margin: 0;
+    font-size: 18px;
+    color: #fff;
+}
+
+.alert-counter {
+    min-width: 34px;
+    height: 34px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+    font-size: 13px;
+}
+
+.alert-counter.red {
+    background: rgba(239,68,68,.16);
+    color: #fecaca;
+    border: 1px solid rgba(239,68,68,.24);
+}
+
+.alert-counter.yellow {
+    background: rgba(245,158,11,.16);
+    color: #fde68a;
+    border: 1px solid rgba(245,158,11,.24);
+}
+
+.alert-counter.green {
+    background: rgba(34,197,94,.16);
+    color: #bbf7d0;
+    border: 1px solid rgba(34,197,94,.24);
+}
+
+.alert-counter.blue {
+    background: rgba(59,130,246,.16);
+    color: #bfdbfe;
+    border: 1px solid rgba(59,130,246,.24);
+}
+
+.mini-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.mini-item {
+    padding: 12px 14px;
+    border-radius: 14px;
+    background: rgba(255,255,255,.03);
+    border: 1px solid rgba(255,255,255,.05);
+}
+
+.mini-item strong {
+    display: block;
+    color: #fff;
+    font-size: 14px;
+    margin-bottom: 4px;
+}
+
+.mini-item span {
+    display: block;
+    color: #94a3b8;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.quick-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 12px;
+}
+
+.quick-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 7px 11px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 800;
+    text-decoration: none;
+    transition: .18s ease;
+    border: 1px solid transparent;
+    white-space: nowrap;
+}
+
+.quick-btn:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.05);
+}
+
+.quick-btn.gray {
+    background: rgba(255,255,255,.06);
+    color: #e2e8f0;
+    border-color: rgba(255,255,255,.08);
+}
+
+.quick-btn.blue {
+    background: rgba(59,130,246,.14);
+    color: #bfdbfe;
+    border-color: rgba(59,130,246,.22);
+}
+
+.quick-btn.green {
+    background: rgba(34,197,94,.14);
+    color: #bbf7d0;
+    border-color: rgba(34,197,94,.22);
+}
+
+.quick-btn.orange {
+    background: rgba(249,115,22,.14);
+    color: #fdba74;
+    border-color: rgba(249,115,22,.22);
+}
+
+.quick-btn.red {
+    background: rgba(239,68,68,.14);
+    color: #fecaca;
+    border-color: rgba(239,68,68,.22);
+}
+
+.empty-mini {
+    padding: 14px;
+    border-radius: 14px;
+    background: rgba(255,255,255,.02);
+    color: #94a3b8;
+    font-size: 13px;
+    border: 1px dashed rgba(255,255,255,.08);
+}
+
+.report-filter-form .form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.top-metrics-inline {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+    margin-top: 14px;
+}
+
+.metric-inline-card {
+    background: rgba(255,255,255,.03);
+    border: 1px solid rgba(255,255,255,.05);
+    border-radius: 16px;
+    padding: 14px;
+}
+
+.metric-inline-card span {
+    display: block;
+    color: #94a3b8;
+    font-size: 12px;
+    margin-bottom: 6px;
+}
+
+.metric-inline-card strong {
+    display: block;
+    color: #fff;
+    font-size: 26px;
+    line-height: 1;
+}
+
+.badge-soft-success,
+.badge-soft-warning,
+.badge-soft-danger,
+.badge-soft-info,
+.badge-soft-orange {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 7px 12px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.badge-soft-success {
+    background: rgba(34,197,94,.14);
+    color: #bbf7d0;
+    border: 1px solid rgba(34,197,94,.22);
+}
+
+.badge-soft-warning {
+    background: rgba(245,158,11,.14);
+    color: #fde68a;
+    border: 1px solid rgba(245,158,11,.22);
+}
+
+.badge-soft-danger {
+    background: rgba(239,68,68,.14);
+    color: #fecaca;
+    border: 1px solid rgba(239,68,68,.22);
+}
+
+.badge-soft-info {
+    background: rgba(59,130,246,.14);
+    color: #bfdbfe;
+    border: 1px solid rgba(59,130,246,.22);
+}
+
+.badge-soft-orange {
+    background: rgba(249,115,22,.14);
+    color: #fdba74;
+    border: 1px solid rgba(249,115,22,.22);
+}
+
+.table-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+@media (max-width: 1200px) {
+    .kpi-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+
+    .attention-strip {
+        grid-template-columns: 1fr;
+    }
+
+    .semaforo-grid {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 900px) {
+    .alert-cards-grid,
+    .report-filter-form .form-grid,
+    .kpi-grid,
+    .top-metrics-inline,
+    .semaforo-grid {
+        grid-template-columns: 1fr;
+    }
+}
+</style>
+
 <div class="page-header">
     <h2>📑 Reportes</h2>
     <p>Consulta reportes diarios y mensuales del sistema.</p>
@@ -18,11 +432,12 @@
     </div>
 {% endif %}
 
-<div class="dashboard-grid-2 mb-20">
-    <div class="card">
+<div class="reportes-layout">
+
+    <div class="section-card-pro">
         <div class="section-head">
             <h3>📅 Reporte diario</h3>
-            <span class="section-subtitle">Asistencias por fecha</span>
+            <span class="section-subtitle">Panel operativo para control diario</span>
         </div>
 
         <form method="get" class="report-filter-form">
@@ -45,24 +460,226 @@
                 </div>
             </div>
 
+            <input type="hidden" name="mes" value="{{ mes }}">
+            <input type="hidden" name="anio" value="{{ anio }}">
+
             <div class="form-actions">
                 <button type="submit" class="btn-primary btn-link">Filtrar diario</button>
             </div>
         </form>
 
-        <div class="cards-grid dashboard-cards-3 mt-20">
-            <div class="card stat-card">
-                <span class="stat-label">Presentes</span>
-                <strong class="stat-number-small">{{ presentes_dia }}</strong>
+        <div class="top-metrics-inline">
+            <div class="metric-inline-card">
+                <span>% Asistencia del día</span>
+                <strong>{{ porcentaje_asistencia }}%</strong>
             </div>
-            <div class="card stat-card">
-                <span class="stat-label">Tardanzas</span>
-                <strong class="stat-number-small">{{ tardanzas_dia }}</strong>
+            <div class="metric-inline-card">
+                <span>% Cumplimiento en horario</span>
+                <strong>{{ porcentaje_cumplimiento }}%</strong>
             </div>
-            <div class="card stat-card">
-                <span class="stat-label">Salidas</span>
-                <strong class="stat-number-small">{{ salidas_dia }}</strong>
+        </div>
+    </div>
+
+    <div class="attention-strip">
+        <div class="attention-box">
+            <h3>🚨 Requieren atención hoy</h3>
+            <div class="attention-big">{{ requieren_atencion_hoy }}</div>
+            <div class="attention-sub">
+                Se suman tardanzas, ausencias y funcionarios con entrada registrada pero sin salida.
             </div>
+        </div>
+
+        <div class="semaforo-box">
+            <h3>🎯 Semáforo operativo</h3>
+            <div class="semaforo-grid">
+                <div class="semaforo-pill semaforo-verde">
+                    <strong>{{ resumen_semaforo.verde }}</strong>
+                    <span>En horario</span>
+                </div>
+                <div class="semaforo-pill semaforo-amarillo">
+                    <strong>{{ resumen_semaforo.amarillo }}</strong>
+                    <span>Tarde</span>
+                </div>
+                <div class="semaforo-pill semaforo-rojo">
+                    <strong>{{ resumen_semaforo.rojo }}</strong>
+                    <span>Ausente</span>
+                </div>
+                <div class="semaforo-pill semaforo-naranja">
+                    <strong>{{ resumen_semaforo.naranja }}</strong>
+                    <span>Sin salida</span>
+                </div>
+                <div class="semaforo-pill semaforo-azul">
+                    <strong>{{ resumen_semaforo.azul }}</strong>
+                    <span>Justificados</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="kpi-grid">
+        <div class="kpi-card info">
+            <span class="kpi-label">Programados</span>
+            <div class="kpi-value">{{ programados_dia }}</div>
+        </div>
+        <div class="kpi-card success">
+            <span class="kpi-label">Presentes</span>
+            <div class="kpi-value">{{ presentes_dia }}</div>
+        </div>
+        <div class="kpi-card success">
+            <span class="kpi-label">En horario</span>
+            <div class="kpi-value">{{ en_horario_dia }}</div>
+        </div>
+        <div class="kpi-card warning">
+            <span class="kpi-label">Tardanzas</span>
+            <div class="kpi-value">{{ tardanzas_dia }}</div>
+        </div>
+        <div class="kpi-card danger">
+            <span class="kpi-label">Ausencias</span>
+            <div class="kpi-value">{{ ausencias_dia }}</div>
+        </div>
+        <div class="kpi-card info">
+            <span class="kpi-label">Permisos / licencias</span>
+            <div class="kpi-value">{{ justificados_dia }}</div>
+        </div>
+    </div>
+
+    <div class="alert-cards-grid">
+        <div class="alert-card-pro">
+            <div class="alert-card-head">
+                <h4>⏰ Llegadas tarde</h4>
+                <span class="alert-counter yellow">{{ llegadas_tarde|length }}</span>
+            </div>
+
+            <div class="mini-list">
+                {% for a in llegadas_tarde %}
+                    <div class="mini-item">
+                        <strong>{{ a.funcionario.nombre_completo }}</strong>
+                        <span>Turno: {{ a.funcionario.turno.nombre|default:"-" }}</span>
+                        <span>Entrada: {{ a.hora_entrada|date:"H:i:s" }} · Atraso: {{ a.minutos_atraso }} min</span>
+                        <span>Sucursal: {{ a.funcionario.sucursal_mostrar }}</span>
+
+                        <div class="quick-actions">
+                            <a href="{% url 'funcionarios_lista' %}?q={{ a.funcionario.cedula }}" class="quick-btn gray">👤 Ver funcionario</a>
+                            <a href="{% url 'asistencia_marcar' %}?funcionario={{ a.funcionario.id }}" class="quick-btn orange">⏱ Revisar asistencia</a>
+                            <a href="{% url 'permisos_lista' %}?funcionario={{ a.funcionario.id }}" class="quick-btn blue">📄 Permisos</a>
+                            <a href="{% url 'historial_lista' %}?q={{ a.funcionario.cedula }}" class="quick-btn green">🕘 Historial</a>
+                        </div>
+                    </div>
+                {% empty %}
+                    <div class="empty-mini">No hubo llegadas tarde en la fecha seleccionada.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="alert-card-pro">
+            <div class="alert-card-head">
+                <h4>🚫 Ausentes</h4>
+                <span class="alert-counter red">{{ ausentes_dia|length }}</span>
+            </div>
+
+            <div class="mini-list">
+                {% for f in ausentes_dia %}
+                    <div class="mini-item">
+                        <strong>{{ f.nombre_completo }}</strong>
+                        <span>CI: {{ f.cedula }}</span>
+                        <span>Turno: {{ f.turno.nombre|default:"-" }}</span>
+                        <span>Sucursal: {{ f.sucursal_mostrar }}</span>
+
+                        <div class="quick-actions">
+                            <a href="{% url 'funcionarios_lista' %}?q={{ f.cedula }}" class="quick-btn gray">👤 Ver funcionario</a>
+                            <a href="{% url 'permisos_lista' %}?funcionario={{ f.id }}" class="quick-btn blue">📄 Justificar / permiso</a>
+                            <a href="{% url 'vacaciones_lista' %}?funcionario={{ f.id }}" class="quick-btn orange">🏖 Vacaciones</a>
+                            <a href="{% url 'historial_lista' %}?q={{ f.cedula }}" class="quick-btn green">🕘 Historial</a>
+                        </div>
+                    </div>
+                {% empty %}
+                    <div class="empty-mini">No hay ausencias detectadas para la fecha seleccionada.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="alert-card-pro">
+            <div class="alert-card-head">
+                <h4>📄 Permisos / licencias</h4>
+                <span class="alert-counter blue">{{ permisos_licencias_dia|length }}</span>
+            </div>
+
+            <div class="mini-list">
+                {% for item in permisos_licencias_dia %}
+                    <div class="mini-item">
+                        <strong>{{ item.funcionario.nombre_completo }}</strong>
+                        <span>Tipo: {{ item.tipo }}</span>
+                        <span>Turno: {{ item.funcionario.turno.nombre|default:"-" }}</span>
+                        <span>Sucursal: {{ item.funcionario.sucursal_mostrar }}</span>
+
+                        <div class="quick-actions">
+                            <a href="{% url 'funcionarios_lista' %}?q={{ item.funcionario.cedula }}" class="quick-btn gray">👤 Ver funcionario</a>
+                            <a href="{% url 'permisos_lista' %}?funcionario={{ item.funcionario.id }}" class="quick-btn blue">📄 Ver permisos</a>
+                            <a href="{% url 'historial_lista' %}?q={{ item.funcionario.cedula }}" class="quick-btn green">🕘 Historial</a>
+                        </div>
+                    </div>
+                {% empty %}
+                    <div class="empty-mini">No hay permisos, licencias o vacaciones cargadas para este día.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="alert-card-pro">
+            <div class="alert-card-head">
+                <h4>🕘 Sin salida registrada</h4>
+                <span class="alert-counter red">{{ sin_salida|length }}</span>
+            </div>
+
+            <div class="mini-list">
+                {% for a in sin_salida %}
+                    <div class="mini-item">
+                        <strong>{{ a.funcionario.nombre_completo }}</strong>
+                        <span>Turno: {{ a.funcionario.turno.nombre|default:"-" }}</span>
+                        <span>Entrada registrada: {{ a.hora_entrada|date:"H:i:s" }}</span>
+                        <span>Sucursal: {{ a.funcionario.sucursal_mostrar }}</span>
+
+                        <div class="quick-actions">
+                            <a href="{% url 'funcionarios_lista' %}?q={{ a.funcionario.cedula }}" class="quick-btn gray">👤 Ver funcionario</a>
+                            <a href="{% url 'asistencia_marcar' %}?funcionario={{ a.funcionario.id }}" class="quick-btn orange">⏱ Revisar asistencia</a>
+                            <a href="{% url 'historial_lista' %}?q={{ a.funcionario.cedula }}" class="quick-btn green">🕘 Historial</a>
+                        </div>
+                    </div>
+                {% empty %}
+                    <div class="empty-mini">No hay funcionarios pendientes de marcar salida.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="alert-card-pro" style="grid-column: 1 / -1;">
+            <div class="alert-card-head">
+                <h4>✅ Presentes en horario</h4>
+                <span class="alert-counter green">{{ presentes_en_horario|length }}</span>
+            </div>
+
+            <div class="mini-list">
+                {% for a in presentes_en_horario %}
+                    <div class="mini-item">
+                        <strong>{{ a.funcionario.nombre_completo }}</strong>
+                        <span>Turno: {{ a.funcionario.turno.nombre|default:"-" }}</span>
+                        <span>Entrada: {{ a.hora_entrada|date:"H:i:s" }}</span>
+                        <span>Sucursal: {{ a.funcionario.sucursal_mostrar }}</span>
+
+                        <div class="quick-actions">
+                            <a href="{% url 'funcionarios_lista' %}?q={{ a.funcionario.cedula }}" class="quick-btn gray">👤 Ver funcionario</a>
+                            <a href="{% url 'historial_lista' %}?q={{ a.funcionario.cedula }}" class="quick-btn green">🕘 Historial</a>
+                        </div>
+                    </div>
+                {% empty %}
+                    <div class="empty-mini">No hay registros de presentes en horario para mostrar.</div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <div class="section-card-pro">
+        <div class="section-head">
+            <h3>📋 Tabla general del día</h3>
+            <span class="section-subtitle">Vista completa de asistencias registradas con semáforo de estado</span>
         </div>
 
         <div class="table-wrap mt-20">
@@ -75,6 +692,7 @@
                         <th>Salida</th>
                         <th>Atraso</th>
                         <th>Estado</th>
+                        <th>Acciones rápidas</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -86,16 +704,30 @@
                             <td>{% if a.hora_salida %}{{ a.hora_salida|date:"H:i:s" }}{% else %}-{% endif %}</td>
                             <td>{{ a.minutos_atraso }} min</td>
                             <td>
-                                {% if a.llego_tarde %}
-                                    <span class="badge-danger">Tarde</span>
+                                {% if a.hora_entrada and a.hora_salida %}
+                                    {% if a.llego_tarde %}
+                                        <span class="badge-soft-warning">🟡 Tarde</span>
+                                    {% else %}
+                                        <span class="badge-soft-success">🟢 En horario</span>
+                                    {% endif %}
+                                {% elif a.hora_entrada and not a.hora_salida %}
+                                    <span class="badge-soft-orange">🟠 Sin salida</span>
                                 {% else %}
-                                    <span class="badge-success">En horario</span>
+                                    <span class="badge-soft-info">🔵 Pendiente</span>
                                 {% endif %}
+                            </td>
+                            <td>
+                                <div class="table-actions">
+                                    <a href="{% url 'funcionarios_lista' %}?q={{ a.funcionario.cedula }}" class="quick-btn gray">Funcionario</a>
+                                    <a href="{% url 'asistencia_marcar' %}?funcionario={{ a.funcionario.id }}" class="quick-btn orange">Asistencia</a>
+                                    <a href="{% url 'permisos_lista' %}?funcionario={{ a.funcionario.id }}" class="quick-btn blue">Permisos</a>
+                                    <a href="{% url 'historial_lista' %}?q={{ a.funcionario.cedula }}" class="quick-btn green">Historial</a>
+                                </div>
                             </td>
                         </tr>
                     {% empty %}
                         <tr>
-                            <td colspan="6" class="empty-row">No hay asistencias para la fecha seleccionada.</td>
+                            <td colspan="7" class="empty-row">No hay asistencias para la fecha seleccionada.</td>
                         </tr>
                     {% endfor %}
                 </tbody>
@@ -103,7 +735,7 @@
         </div>
     </div>
 
-    <div class="card">
+    <div class="section-card-pro">
         <div class="section-head">
             <h3>📆 Reporte mensual</h3>
             <span class="section-subtitle">Resumen por funcionario</span>
@@ -162,11 +794,11 @@
                             <td>{{ item.vacaciones_aprobadas }}</td>
                             <td>
                                 {% if item.icl >= 80 %}
-                                    <span class="badge-success">{{ item.icl }}%</span>
+                                    <span class="badge-soft-success">{{ item.icl }}%</span>
                                 {% elif item.icl >= 50 %}
-                                    <span class="badge-warning">{{ item.icl }}%</span>
+                                    <span class="badge-soft-warning">{{ item.icl }}%</span>
                                 {% else %}
-                                    <span class="badge-danger">{{ item.icl }}%</span>
+                                    <span class="badge-soft-danger">{{ item.icl }}%</span>
                                 {% endif %}
                             </td>
                         </tr>
@@ -179,5 +811,6 @@
             </table>
         </div>
     </div>
+
 </div>
 {% endblock %}
