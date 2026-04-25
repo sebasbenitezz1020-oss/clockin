@@ -576,6 +576,135 @@
             100% { transform: scale(1); opacity: 1; }
         }
 
+        /* ====== MEJORAS VISUALES PRO ====== */
+
+        .video-wrap.validating .scan-frame::after {
+            content: "";
+            position: absolute;
+            width: 42%;
+            height: 4px;
+            border-radius: 999px;
+            background: linear-gradient(90deg, transparent, var(--brand-primary), transparent);
+            box-shadow: 0 0 24px var(--brand-shadow);
+            animation: scanMove 1s ease-in-out infinite;
+        }
+
+        @keyframes scanMove {
+            0% {
+                transform: translateY(-150px);
+                opacity: .15;
+            }
+            50% {
+                opacity: 1;
+            }
+            100% {
+                transform: translateY(150px);
+                opacity: .15;
+            }
+        }
+
+        .connection-pill {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            height: 42px;
+            padding: 0 14px;
+            border-radius: 999px;
+            background: rgba(34,197,94,.12);
+            border: 1px solid rgba(34,197,94,.22);
+            color: #bbf7d0;
+            font-size: 13px;
+            font-weight: 800;
+            white-space: nowrap;
+        }
+
+        .connection-pill.offline {
+            background: rgba(239,68,68,.14);
+            border-color: rgba(239,68,68,.24);
+            color: #fecaca;
+        }
+
+        .video-wrap.has-face {
+            border-color: var(--brand-primary);
+            box-shadow: 0 0 0 1px var(--brand-soft), 0 0 34px var(--brand-shadow);
+        }
+
+        .video-wrap.validating {
+            border-color: var(--brand-primary);
+            box-shadow: 0 0 0 2px var(--brand-soft), 0 0 42px var(--brand-shadow);
+        }
+
+        .ok-theme .result-box {
+            background:
+                radial-gradient(circle at top right, rgba(34,197,94,.14), transparent 30%),
+                var(--panel-soft);
+        }
+
+        .warn-theme .result-box {
+            background:
+                radial-gradient(circle at top right, rgba(245,158,11,.14), transparent 30%),
+                var(--panel-soft);
+        }
+
+        .error-theme .result-box {
+            background:
+                radial-gradient(circle at top right, rgba(239,68,68,.16), transparent 30%),
+                var(--panel-soft);
+        }
+
+     /* ====== ESTADOS VISUALES DEL RECUADRO BIOMÉTRICO ====== */
+
+        .video-wrap.scan-ok {
+            border-color: rgba(34,197,94,.95);
+            box-shadow:
+                0 0 0 2px rgba(34,197,94,.18),
+                0 0 46px rgba(34,197,94,.45);
+        }
+
+        .video-wrap.scan-ok .scan-frame::before {
+            border-color: #22c55e;
+            box-shadow:
+                0 0 0 9999px rgba(34,197,94,0.08) inset,
+                0 0 32px rgba(34,197,94,.75);
+        }
+
+        .video-wrap.scan-error {
+            border-color: rgba(239,68,68,.95);
+            box-shadow:
+                0 0 0 2px rgba(239,68,68,.18),
+                0 0 46px rgba(239,68,68,.45);
+            animation: shakeError .35s ease;
+        }
+
+        .video-wrap.scan-error .scan-frame::before {
+            border-color: #ef4444;
+            box-shadow:
+                0 0 0 9999px rgba(239,68,68,0.08) inset,
+                0 0 32px rgba(239,68,68,.75);
+        }
+
+        .video-wrap.scan-warn {
+            border-color: rgba(245,158,11,.95);
+            box-shadow:
+                0 0 0 2px rgba(245,158,11,.18),
+                0 0 46px rgba(245,158,11,.42);
+        }
+
+        .video-wrap.scan-warn .scan-frame::before {
+            border-color: #f59e0b;
+            box-shadow:
+                0 0 0 9999px rgba(245,158,11,0.08) inset,
+                0 0 32px rgba(245,158,11,.70);
+        }
+
+        @keyframes shakeError {
+            0% { transform: translateX(0); }
+            25% { transform: translateX(-4px); }
+            50% { transform: translateX(4px); }
+            75% { transform: translateX(-3px); }
+            100% { transform: translateX(0); }
+        }   
+
         canvas {
             display: none;
         }
@@ -605,7 +734,8 @@
             }
 
             .mini-chip,
-            .fullscreen-btn {
+            .fullscreen-btn,
+            .connection-pill {
                 height: 38px;
                 padding: 0 12px;
                 font-size: 12px;
@@ -761,6 +891,10 @@
                 width: 54%;
                 height: 54%;
             }
+
+            .video-wrap.validating .scan-frame::after {
+                width: 54%;
+            }
         }
     </style>
 </head>
@@ -781,6 +915,7 @@
             </div>
 
             <div class="topbar-right">
+                <div class="connection-pill" id="connectionStatus">🟢 Servidor conectado</div>
                 <div class="mini-chip accent" id="chipTiempo">Lectura en 1 segundo</div>
                 <button type="button" class="fullscreen-btn" id="btnFullscreen">⛶ Pantalla completa</button>
             </div>
@@ -872,504 +1007,594 @@
     </div>
 
     <script>
-        const video = document.getElementById("video");
-        const canvas = document.getElementById("canvas");
+    const video = document.getElementById("video");
+    const canvas = document.getElementById("canvas");
 
-        const appScreen = document.getElementById("appScreen");
-        const btnFullscreen = document.getElementById("btnFullscreen");
-        const chipTiempo = document.getElementById("chipTiempo");
+    const appScreen = document.getElementById("appScreen");
+    const btnFullscreen = document.getElementById("btnFullscreen");
+    const chipTiempo = document.getElementById("chipTiempo");
 
-        const clock = document.getElementById("clock");
-        const dateText = document.getElementById("dateText");
+    const clock = document.getElementById("clock");
+    const dateText = document.getElementById("dateText");
 
-        const statusCard = document.getElementById("statusCard");
-        const resultBox = document.getElementById("resultBox");
-        const systemStatusText = document.getElementById("systemStatusText");
-        const statusBadge = document.getElementById("statusBadge");
+    const statusCard = document.getElementById("statusCard");
+    const resultBox = document.getElementById("resultBox");
+    const systemStatusText = document.getElementById("systemStatusText");
+    const statusBadge = document.getElementById("statusBadge");
 
-        const resultIcon = document.getElementById("resultIcon");
-        const resultName = document.getElementById("resultName");
-        const resultState = document.getElementById("resultState");
-        const resultSubtype = document.getElementById("resultSubtype");
-        const resultDetail = document.getElementById("resultDetail");
+    const resultIcon = document.getElementById("resultIcon");
+    const resultName = document.getElementById("resultName");
+    const resultState = document.getElementById("resultState");
+    const resultSubtype = document.getElementById("resultSubtype");
+    const resultDetail = document.getElementById("resultDetail");
 
-        const detailHora = document.getElementById("detailHora");
-        const detailTurno = document.getElementById("detailTurno");
-        const detailAtraso = document.getElementById("detailAtraso");
+    const detailHora = document.getElementById("detailHora");
+    const detailTurno = document.getElementById("detailTurno");
+    const detailAtraso = document.getElementById("detailAtraso");
 
-        const btnEntrada = document.getElementById("btnEntrada");
-        const btnSalida = document.getElementById("btnSalida");
-        const cameraHint = document.getElementById("cameraHint");
-        const cameraTopHint = document.getElementById("cameraTopHint");
-        const footerModo = document.getElementById("footerModo");
-        const footerLectura = document.getElementById("footerLectura");
-        const videoWrap = document.getElementById("videoWrap");
-        const pillRostro = document.getElementById("pillRostro");
-        const pillCuenta = document.getElementById("pillCuenta");
+    const btnEntrada = document.getElementById("btnEntrada");
+    const btnSalida = document.getElementById("btnSalida");
+    const cameraHint = document.getElementById("cameraHint");
+    const cameraTopHint = document.getElementById("cameraTopHint");
+    const footerModo = document.getElementById("footerModo");
+    const footerLectura = document.getElementById("footerLectura");
+    const videoWrap = document.getElementById("videoWrap");
+    const pillRostro = document.getElementById("pillRostro");
+    const pillCuenta = document.getElementById("pillCuenta");
+    const connectionStatus = document.getElementById("connectionStatus");
 
-        const CONFIG_SEGUNDOS_LECTURA = Number("{{ config_general.biometrico_segundos_lectura|default:1 }}");
-        const CONFIG_PAUSA_EXITO_MS = Number("{{ config_general.biometrico_pausa_exito_ms|default:4000 }}");
-        const CONFIG_PAUSA_AVISO_MS = Number("{{ config_general.biometrico_pausa_aviso_ms|default:3000 }}");
-        const CONFIG_PAUSA_ERROR_MS = Number("{{ config_general.biometrico_pausa_error_ms|default:2200 }}");
-        const CONFIG_SONIDOS_ACTIVOS = "{% if config_general and config_general.biometrico_sonidos_activos %}true{% else %}false{% endif %}" === "true";
-        const CONFIG_FULLSCREEN_AUTO = "{% if config_general and config_general.biometrico_fullscreen_auto %}true{% else %}false{% endif %}" === "true";
+    const CONFIG_SEGUNDOS_LECTURA = 1;
+    const CONFIG_PAUSA_AVISO_MS = Number("{{ config_general.biometrico_pausa_aviso_ms|default:1800 }}");
+    const CONFIG_PAUSA_ERROR_MS = Number("{{ config_general.biometrico_pausa_error_ms|default:1500 }}");
+    const CONFIG_SONIDOS_ACTIVOS = "{% if config_general and config_general.biometrico_sonidos_activos %}true{% else %}false{% endif %}" === "true";
+    const CONFIG_FULLSCREEN_AUTO = "{% if config_general and config_general.biometrico_fullscreen_auto %}true{% else %}false{% endif %}" === "true";
 
-        const DETECCION_INTERVALO = 350;
-        const ESTABILIDAD_MS = CONFIG_SEGUNDOS_LECTURA * 1000;
-        const PAUSA_EXITO_MS = CONFIG_PAUSA_EXITO_MS;
-        const PAUSA_AVISO_MS = CONFIG_PAUSA_AVISO_MS;
-        const PAUSA_ERROR_MS = CONFIG_PAUSA_ERROR_MS;
+    const DETECCION_INTERVALO = 650;
+    const ESTABILIDAD_MS = 1000;
+    const PAUSA_EXITO_MS = 1000;
+    const PAUSA_AVISO_MS = CONFIG_PAUSA_AVISO_MS;
+    const PAUSA_ERROR_MS = CONFIG_PAUSA_ERROR_MS;
+    const BLOQUEO_MISMO_FUNCIONARIO_MS = 5000;
 
-        let resetTimer = null;
-        let pausaHasta = 0;
-        let modoSeleccionado = "entrada";
-        let enviando = false;
-        let rostroPresente = false;
-        let rostroDetectadoDesde = null;
-        let ultimaDeteccion = 0;
-        let streamReady = false;
+    let resetTimer = null;
+    let pausaHasta = 0;
+    let modoSeleccionado = "entrada";
+    let enviando = false;
+    let detectando = false;
+    let rostroPresente = false;
+    let rostroDetectadoDesde = null;
+    let ultimaDeteccion = 0;
+    let streamReady = false;
 
-        chipTiempo.textContent = `Lectura en ${CONFIG_SEGUNDOS_LECTURA} segundo${CONFIG_SEGUNDOS_LECTURA === 1 ? "" : "s"}`;
-        footerLectura.textContent = CONFIG_SONIDOS_ACTIVOS ? "Solo con rostro" : "Solo con rostro / sin sonido";
+    let ultimoFuncionarioOk = null;
+    let ultimoFuncionarioTiempo = 0;
 
-        function actualizarReloj() {
-            const ahora = new Date();
+    chipTiempo.textContent = "Lectura en 1 segundo";
+    footerLectura.textContent = CONFIG_SONIDOS_ACTIVOS ? "Solo con rostro" : "Solo con rostro / sin sonido";
 
-            clock.textContent = ahora.toLocaleTimeString("es-PY", {
-                hour: "2-digit",
-                minute: "2-digit",
-                second: "2-digit",
+    function actualizarConexion(ok) {
+        if (!connectionStatus) return;
+
+        if (ok) {
+            connectionStatus.classList.remove("offline");
+            connectionStatus.textContent = "🟢 Servidor conectado";
+        } else {
+            connectionStatus.classList.add("offline");
+            connectionStatus.textContent = "🔴 Sin conexión";
+        }
+    }
+
+    function actualizarReloj() {
+        const ahora = new Date();
+
+        clock.textContent = ahora.toLocaleTimeString("es-PY", {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit",
+        });
+
+        dateText.textContent = ahora.toLocaleDateString("es-PY", {
+            weekday: "long",
+            year: "numeric",
+            month: "long",
+            day: "numeric",
+        });
+    }
+
+    setInterval(actualizarReloj, 1000);
+    actualizarReloj();
+
+    function actualizarModoUI() {
+        btnEntrada.classList.toggle("active", modoSeleccionado === "entrada");
+        btnSalida.classList.toggle("active", modoSeleccionado === "salida");
+
+        if (modoSeleccionado === "entrada") {
+            cameraHint.textContent = "Modo actual: ENTRADA. Sirve para entrada del día y regreso de almuerzo.";
+            footerModo.textContent = "Entrada";
+        } else {
+            cameraHint.textContent = "Modo actual: SALIDA. Sirve para salida a almuerzo y salida final.";
+            footerModo.textContent = "Salida";
+        }
+    }
+
+    btnEntrada.addEventListener("click", () => {
+        modoSeleccionado = "entrada";
+        actualizarModoUI();
+        limpiarEstado();
+    });
+
+    btnSalida.addEventListener("click", () => {
+        modoSeleccionado = "salida";
+        actualizarModoUI();
+        limpiarEstado();
+    });
+
+    async function activarFullscreen() {
+        if (!CONFIG_FULLSCREEN_AUTO) return;
+        try {
+            if (!document.fullscreenElement && appScreen.requestFullscreen) {
+                await appScreen.requestFullscreen();
+            }
+        } catch (e) {}
+    }
+
+    btnFullscreen.addEventListener("click", async () => {
+        try {
+            if (!document.fullscreenElement && appScreen.requestFullscreen) {
+                await appScreen.requestFullscreen();
+            }
+        } catch (e) {}
+    });
+
+    document.addEventListener("fullscreenchange", () => {
+        btnFullscreen.textContent = document.fullscreenElement
+            ? "✅ Full screen activo"
+            : "⛶ Pantalla completa";
+    });
+
+    if (CONFIG_FULLSCREEN_AUTO) {
+        document.addEventListener("click", activarFullscreen, { once: true });
+    }
+
+    function beepSuccess() {
+        if (!CONFIG_SONIDOS_ACTIVOS) return;
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = "sine";
+            osc.frequency.setValueAtTime(880, ctx.currentTime);
+            gain.gain.setValueAtTime(0.08, ctx.currentTime);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.12);
+        } catch (e) {}
+    }
+
+    function beepWarn() {
+        if (!CONFIG_SONIDOS_ACTIVOS) return;
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = "triangle";
+            osc.frequency.setValueAtTime(520, ctx.currentTime);
+            gain.gain.setValueAtTime(0.07, ctx.currentTime);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.14);
+        } catch (e) {}
+    }
+
+    function beepError() {
+        if (!CONFIG_SONIDOS_ACTIVOS) return;
+        try {
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = "square";
+            osc.frequency.setValueAtTime(220, ctx.currentTime);
+            gain.gain.setValueAtTime(0.07, ctx.currentTime);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.16);
+        } catch (e) {}
+    }
+
+    function aplicarPulse() {
+        resultBox.classList.remove("pulse-success");
+        void resultBox.offsetWidth;
+        resultBox.classList.add("pulse-success");
+    }
+
+    function limpiarEstado() {
+        videoWrap.classList.remove("scan-ok", "scan-error", "scan-warn");
+
+        statusCard.className = "status-card idle-theme";
+        systemStatusText.textContent = "En espera";
+        statusBadge.textContent = "LISTO PARA ESCANEAR";
+        resultIcon.textContent = "👤";
+        resultName.textContent = "Esperando rostro...";
+        resultState.textContent = CONFIG_SONIDOS_ACTIVOS ? "Sistema en espera silenciosa" : "Sistema en espera";
+        resultSubtype.textContent = "Acerque el rostro al recuadro para iniciar la validación.";
+        resultDetail.textContent = "La lectura se ejecuta automáticamente cuando el rostro permanece estable frente a cámara por 1 segundo.";
+        detailHora.textContent = "—";
+        detailTurno.textContent = "—";
+        detailAtraso.textContent = "—";
+    }
+
+    function programarReinicio(ms = 1600) {
+        if (resetTimer) clearTimeout(resetTimer);
+        resetTimer = setTimeout(() => limpiarEstado(), ms);
+    }
+
+    function activarPausa(ms) {
+        pausaHasta = Date.now() + ms;
+        rostroPresente = false;
+        rostroDetectadoDesde = null;
+        actualizarIndicadoresRostro(false);
+    }
+
+    function traducirTipo(tipo) {
+        if (tipo === "entrada") return "Entrada confirmada";
+        if (tipo === "salida_almuerzo") return "Salida a almuerzo confirmada";
+        if (tipo === "regreso_almuerzo") return "Regreso de almuerzo confirmado";
+        if (tipo === "salida") return "Salida final confirmada";
+        return "Marcación confirmada";
+    }
+
+    function iconoTipo(tipo) {
+        if (tipo === "entrada") return "🟢";
+        if (tipo === "salida_almuerzo") return "🍽️";
+        if (tipo === "regreso_almuerzo") return "🔙";
+        if (tipo === "salida") return "🏁";
+        return "✅";
+    }
+
+    function actualizarIndicadoresRostro(hayRostro, restanteMs = null, validando = false) {
+        if (validando) {
+            videoWrap.classList.add("validating");
+            videoWrap.classList.remove("has-face");
+            pillRostro.className = "face-pill ready";
+            pillRostro.textContent = "Validando identidad…";
+            pillCuenta.className = "face-pill ready";
+            pillCuenta.textContent = "Procesando";
+            cameraTopHint.textContent = "Validando identidad";
+            return;
+        }
+
+        videoWrap.classList.remove("validating");
+
+        if (!hayRostro) {
+            videoWrap.classList.remove("has-face");
+            pillRostro.className = "face-pill waiting";
+            pillRostro.textContent = "Sin rostro detectado";
+            pillCuenta.className = "face-pill";
+            pillCuenta.textContent = "Esperando...";
+            cameraTopHint.textContent = "Esperando detección de rostro";
+            return;
+        }
+
+        videoWrap.classList.add("has-face");
+        pillRostro.className = "face-pill detected";
+        pillRostro.textContent = "Rostro detectado";
+
+        if (restanteMs !== null && restanteMs > 0) {
+            const segundos = (restanteMs / 1000).toFixed(1);
+            pillCuenta.className = "face-pill detected";
+            pillCuenta.textContent = `Captura en ${segundos}s`;
+            cameraTopHint.textContent = "Mantenga el rostro dentro del recuadro";
+        } else {
+            pillCuenta.className = "face-pill ready";
+            pillCuenta.textContent = "Listo para validar";
+            cameraTopHint.textContent = "Rostro listo para lectura";
+        }
+    }
+
+    function mostrarEsperaConRostro(restanteMs) {
+        statusCard.className = "status-card idle-theme";
+        systemStatusText.textContent = "Rostro detectado";
+        statusBadge.textContent = "PREPARANDO LECTURA";
+        resultIcon.textContent = "🧠";
+        resultName.textContent = "Rostro detectado";
+        resultState.textContent = "Preparando validación";
+        resultSubtype.textContent = `Mantenga el rostro estable ${Math.max(1, Math.ceil(restanteMs / 1000))} segundo(s)`;
+        resultDetail.textContent = "La identidad se validará automáticamente en cuanto el rostro permanezca estable dentro del recuadro.";
+
+        detailHora.textContent = "—";
+        detailTurno.textContent = "—";
+        detailAtraso.textContent = "—";
+    }
+
+    function mostrarExito(data) {
+        videoWrap.classList.remove("scan-error", "scan-warn");
+        videoWrap.classList.add("scan-ok");
+        actualizarConexion(true);
+
+        statusCard.className = "status-card ok-theme";
+        systemStatusText.textContent = "Lectura exitosa";
+        statusBadge.textContent = "ASISTENCIA REGISTRADA";
+        resultIcon.textContent = iconoTipo(data.tipo);
+        resultName.textContent = data.funcionario || "Funcionario reconocido";
+        resultState.textContent = traducirTipo(data.tipo);
+        resultSubtype.textContent = data.subtipo || data.mensaje || "Marcación confirmada correctamente";
+        resultDetail.textContent = data.mensaje || "La operación fue procesada exitosamente.";
+
+        detailHora.textContent = data.hora || "—";
+        detailTurno.textContent = data.turno || "—";
+        detailAtraso.textContent = data.llego_tarde ? ((data.minutos_atraso || 0) + " min") : "0 min";
+
+        if (data.funcionario_id) {
+            ultimoFuncionarioOk = String(data.funcionario_id);
+            ultimoFuncionarioTiempo = Date.now();
+        }
+
+        aplicarPulse();
+        beepSuccess();
+        activarPausa(PAUSA_EXITO_MS);
+        programarReinicio(1400);
+    }
+
+    function mostrarAviso(data, conSonido = true, pausaMs = PAUSA_AVISO_MS) {
+        videoWrap.classList.remove("scan-ok", "scan-error");
+        videoWrap.classList.add("scan-warn");
+        statusCard.className = "status-card warn-theme";
+        systemStatusText.textContent = "Atención";
+        statusBadge.textContent = "REVISE LA MARCACIÓN";
+        resultIcon.textContent = "⚠️";
+        resultName.textContent = data.funcionario || "Marcación no disponible";
+        resultState.textContent = "Secuencia de marcación no válida";
+        resultSubtype.textContent = data.mensaje || "La siguiente acción esperada no corresponde a este modo.";
+        resultDetail.textContent = "Cambie el modo o espere la siguiente marcación correspondiente.";
+
+        detailHora.textContent = "—";
+        detailTurno.textContent = data.turno || "—";
+        detailAtraso.textContent = "—";
+
+        if (conSonido) beepWarn();
+        activarPausa(pausaMs);
+        programarReinicio(1600);
+    }
+
+    function mostrarError(errorText, conSonido = true) {
+        videoWrap.classList.remove("scan-ok", "scan-warn");
+        videoWrap.classList.add("scan-error");
+        statusCard.className = "status-card error-theme";
+        systemStatusText.textContent = "No validado";
+        statusBadge.textContent = "ROSTRO NO RECONOCIDO";
+        resultIcon.textContent = "❌";
+        resultName.textContent = "Validación no completada";
+        resultState.textContent = "No pudimos confirmar la identidad";
+        resultSubtype.textContent = "Intente nuevamente frente a la cámara";
+        resultDetail.textContent = errorText || "Ajuste el rostro dentro del recuadro y vuelva a intentar.";
+
+        detailHora.textContent = "—";
+        detailTurno.textContent = "—";
+        detailAtraso.textContent = "—";
+
+        if (conSonido) beepError();
+        activarPausa(PAUSA_ERROR_MS);
+        programarReinicio(1600);
+    }
+
+    function capturarFrame(calidad = 0.76, anchoObjetivo = 720) {
+        const ctx = canvas.getContext("2d", { willReadFrequently: true });
+        const vw = video.videoWidth;
+        const vh = video.videoHeight;
+
+        if (!vw || !vh) return null;
+
+        let width = vw;
+        let height = vh;
+
+        if (anchoObjetivo && vw > anchoObjetivo) {
+            const ratio = vh / vw;
+            width = anchoObjetivo;
+            height = Math.round(anchoObjetivo * ratio);
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        ctx.drawImage(video, 0, 0, width, height);
+
+        return canvas.toDataURL("image/jpeg", calidad);
+    }
+
+    function bloquearPorCliente(funcionarioId) {
+        if (!funcionarioId) return false;
+
+        const ahora = Date.now();
+        const id = String(funcionarioId);
+
+        if (ultimoFuncionarioOk === id && (ahora - ultimoFuncionarioTiempo) < BLOQUEO_MISMO_FUNCIONARIO_MS) {
+            return true;
+        }
+
+        return false;
+    }
+
+    async function detectarRostro() {
+        if (!streamReady || !video.videoWidth || !video.videoHeight) return;
+
+        const ahora = Date.now();
+
+        if (enviando || detectando || ahora < pausaHasta) return;
+        if (ahora - ultimaDeteccion < DETECCION_INTERVALO) return;
+
+        detectando = true;
+        ultimaDeteccion = ahora;
+
+        const data = capturarFrame(0.58, 480);
+        if (!data) {
+            detectando = false;
+            return;
+        }
+
+        try {
+            const res = await fetch("/biometrico/reconocer/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                },
+                body: new URLSearchParams({
+                    imagen: data,
+                    modo: modoSeleccionado,
+                    solo_deteccion: "1"
+                })
             });
 
-            dateText.textContent = ahora.toLocaleDateString("es-PY", {
-                weekday: "long",
-                year: "numeric",
-                month: "long",
-                day: "numeric",
-            });
-        }
+            const json = await res.json();
+            actualizarConexion(true);
 
-        setInterval(actualizarReloj, 1000);
-        actualizarReloj();
-
-        function actualizarModoUI() {
-            btnEntrada.classList.toggle("active", modoSeleccionado === "entrada");
-            btnSalida.classList.toggle("active", modoSeleccionado === "salida");
-
-            if (modoSeleccionado === "entrada") {
-                cameraHint.textContent = "Modo actual: ENTRADA. Sirve para entrada del día y regreso de almuerzo.";
-                footerModo.textContent = "Entrada";
-            } else {
-                cameraHint.textContent = "Modo actual: SALIDA. Sirve para salida a almuerzo y salida final.";
-                footerModo.textContent = "Salida";
-            }
-        }
-
-        btnEntrada.addEventListener("click", () => {
-            modoSeleccionado = "entrada";
-            actualizarModoUI();
-            limpiarEstado();
-        });
-
-        btnSalida.addEventListener("click", () => {
-            modoSeleccionado = "salida";
-            actualizarModoUI();
-            limpiarEstado();
-        });
-
-        async function activarFullscreen() {
-            if (!CONFIG_FULLSCREEN_AUTO) return;
-            try {
-                if (!document.fullscreenElement && appScreen.requestFullscreen) {
-                    await appScreen.requestFullscreen();
-                }
-            } catch (e) {}
-        }
-
-        btnFullscreen.addEventListener("click", async () => {
-            try {
-                if (!document.fullscreenElement && appScreen.requestFullscreen) {
-                    await appScreen.requestFullscreen();
-                }
-            } catch (e) {}
-        });
-
-        document.addEventListener("fullscreenchange", () => {
-            btnFullscreen.textContent = document.fullscreenElement
-                ? "✅ Full screen activo"
-                : "⛶ Pantalla completa";
-        });
-
-        if (CONFIG_FULLSCREEN_AUTO) {
-            document.addEventListener("click", activarFullscreen, { once: true });
-        }
-
-        function beepSuccess() {
-            if (!CONFIG_SONIDOS_ACTIVOS) return;
-            try {
-                const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                const osc = ctx.createOscillator();
-                const gain = ctx.createGain();
-                osc.type = "sine";
-                osc.frequency.setValueAtTime(880, ctx.currentTime);
-                gain.gain.setValueAtTime(0.08, ctx.currentTime);
-                osc.connect(gain);
-                gain.connect(ctx.destination);
-                osc.start();
-                osc.stop(ctx.currentTime + 0.12);
-            } catch (e) {}
-        }
-
-        function beepWarn() {
-            if (!CONFIG_SONIDOS_ACTIVOS) return;
-            try {
-                const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                const osc = ctx.createOscillator();
-                const gain = ctx.createGain();
-                osc.type = "triangle";
-                osc.frequency.setValueAtTime(520, ctx.currentTime);
-                gain.gain.setValueAtTime(0.07, ctx.currentTime);
-                osc.connect(gain);
-                gain.connect(ctx.destination);
-                osc.start();
-                osc.stop(ctx.currentTime + 0.14);
-            } catch (e) {}
-        }
-
-        function beepError() {
-            if (!CONFIG_SONIDOS_ACTIVOS) return;
-            try {
-                const ctx = new (window.AudioContext || window.webkitAudioContext)();
-                const osc = ctx.createOscillator();
-                const gain = ctx.createGain();
-                osc.type = "square";
-                osc.frequency.setValueAtTime(220, ctx.currentTime);
-                gain.gain.setValueAtTime(0.07, ctx.currentTime);
-                osc.connect(gain);
-                gain.connect(ctx.destination);
-                osc.start();
-                osc.stop(ctx.currentTime + 0.16);
-            } catch (e) {}
-        }
-
-        function aplicarPulse() {
-            resultBox.classList.remove("pulse-success");
-            void resultBox.offsetWidth;
-            resultBox.classList.add("pulse-success");
-        }
-
-        function limpiarEstado() {
-            statusCard.className = "status-card idle-theme";
-            systemStatusText.textContent = "En espera";
-            statusBadge.textContent = "LISTO PARA ESCANEAR";
-            resultIcon.textContent = "👤";
-            resultName.textContent = "Esperando rostro...";
-            resultState.textContent = CONFIG_SONIDOS_ACTIVOS ? "Sistema en espera silenciosa" : "Sistema en espera";
-            resultSubtype.textContent = "Acerque el rostro al recuadro para iniciar la validación.";
-            resultDetail.textContent = `La lectura se ejecuta automáticamente cuando el rostro permanece estable frente a cámara por ${CONFIG_SEGUNDOS_LECTURA} segundo${CONFIG_SEGUNDOS_LECTURA === 1 ? "" : "s"}.`;
-            detailHora.textContent = "—";
-            detailTurno.textContent = "—";
-            detailAtraso.textContent = "—";
-        }
-
-        function programarReinicio() {
-            if (resetTimer) clearTimeout(resetTimer);
-            resetTimer = setTimeout(() => limpiarEstado(), 3000);
-        }
-
-        function activarPausa(ms) {
-            pausaHasta = Date.now() + ms;
-            rostroPresente = false;
-            rostroDetectadoDesde = null;
-            actualizarIndicadoresRostro(false);
-        }
-
-        function traducirTipo(tipo) {
-            if (tipo === "entrada") return "Entrada confirmada";
-            if (tipo === "salida_almuerzo") return "Salida a almuerzo confirmada";
-            if (tipo === "regreso_almuerzo") return "Regreso de almuerzo confirmado";
-            if (tipo === "salida") return "Salida final confirmada";
-            return "Marcación confirmada";
-        }
-
-        function iconoTipo(tipo) {
-            if (tipo === "entrada") return "🟢";
-            if (tipo === "salida_almuerzo") return "🍽️";
-            if (tipo === "regreso_almuerzo") return "🔙";
-            if (tipo === "salida") return "🏁";
-            return "✅";
-        }
-
-        function actualizarIndicadoresRostro(hayRostro, restanteMs = null, validando = false) {
-            if (validando) {
-                videoWrap.classList.add("validating");
-                videoWrap.classList.remove("has-face");
-                pillRostro.className = "face-pill ready";
-                pillRostro.textContent = "Validando identidad…";
-                pillCuenta.className = "face-pill ready";
-                pillCuenta.textContent = "Procesando";
-                cameraTopHint.textContent = "Validando identidad";
-                return;
-            }
-
-            videoWrap.classList.remove("validating");
+            const hayRostro = !!json.hay_rostro;
 
             if (!hayRostro) {
-                videoWrap.classList.remove("has-face");
-                pillRostro.className = "face-pill waiting";
-                pillRostro.textContent = "Sin rostro detectado";
-                pillCuenta.className = "face-pill";
-                pillCuenta.textContent = "Esperando...";
-                cameraTopHint.textContent = "Esperando detección de rostro";
+                rostroPresente = false;
+                rostroDetectadoDesde = null;
+                actualizarIndicadoresRostro(false);
                 return;
             }
 
-            videoWrap.classList.add("has-face");
-            pillRostro.className = "face-pill detected";
-            pillRostro.textContent = "Rostro detectado";
-
-            if (restanteMs !== null && restanteMs > 0) {
-                const segundos = (restanteMs / 1000).toFixed(1);
-                pillCuenta.className = "face-pill detected";
-                pillCuenta.textContent = `Captura en ${segundos}s`;
-                cameraTopHint.textContent = "Mantenga el rostro dentro del recuadro";
-            } else {
-                pillCuenta.className = "face-pill ready";
-                pillCuenta.textContent = "Listo para validar";
-                cameraTopHint.textContent = "Rostro listo para lectura";
-            }
-        }
-
-        function mostrarEsperaConRostro(restanteMs) {
-            statusCard.className = "status-card idle-theme";
-            systemStatusText.textContent = "Rostro detectado";
-            statusBadge.textContent = "PREPARANDO LECTURA";
-            resultIcon.textContent = "🧠";
-            resultName.textContent = "Rostro detectado";
-            resultState.textContent = "Preparando validación";
-            resultSubtype.textContent = `Mantenga el rostro estable ${Math.max(1, Math.ceil(restanteMs / 1000))} segundo(s)`;
-            resultDetail.textContent = "La identidad se validará automáticamente en cuanto el rostro permanezca estable dentro del recuadro.";
-
-            detailHora.textContent = "—";
-            detailTurno.textContent = "—";
-            detailAtraso.textContent = "—";
-        }
-
-        function mostrarExito(data) {
-            statusCard.className = "status-card ok-theme";
-            systemStatusText.textContent = "Lectura exitosa";
-            statusBadge.textContent = "ASISTENCIA REGISTRADA";
-            resultIcon.textContent = iconoTipo(data.tipo);
-            resultName.textContent = data.funcionario || "Funcionario reconocido";
-            resultState.textContent = traducirTipo(data.tipo);
-            resultSubtype.textContent = data.subtipo || data.mensaje || "Marcación confirmada correctamente";
-            resultDetail.textContent = data.mensaje || "La operación fue procesada exitosamente.";
-
-            detailHora.textContent = data.hora || "—";
-            detailTurno.textContent = data.turno || "—";
-            detailAtraso.textContent = data.llego_tarde ? ((data.minutos_atraso || 0) + " min") : "0 min";
-
-            aplicarPulse();
-            beepSuccess();
-            activarPausa(PAUSA_EXITO_MS);
-            programarReinicio();
-        }
-
-        function mostrarAviso(data, conSonido = true) {
-            statusCard.className = "status-card warn-theme";
-            systemStatusText.textContent = "Atención";
-            statusBadge.textContent = "REVISE LA MARCACIÓN";
-            resultIcon.textContent = "⚠️";
-            resultName.textContent = data.funcionario || "Marcación no disponible";
-            resultState.textContent = "Secuencia de marcación no válida";
-            resultSubtype.textContent = data.mensaje || "La siguiente acción esperada no corresponde a este modo.";
-            resultDetail.textContent = "Cambie el modo o espere la siguiente marcación correspondiente.";
-
-            detailHora.textContent = "—";
-            detailTurno.textContent = data.turno || "—";
-            detailAtraso.textContent = "—";
-
-            if (conSonido) beepWarn();
-            activarPausa(PAUSA_AVISO_MS);
-            programarReinicio();
-        }
-
-        function mostrarError(errorText, conSonido = true) {
-            statusCard.className = "status-card error-theme";
-            systemStatusText.textContent = "No validado";
-            statusBadge.textContent = "ROSTRO NO RECONOCIDO";
-            resultIcon.textContent = "❌";
-            resultName.textContent = "Validación no completada";
-            resultState.textContent = "No pudimos confirmar la identidad";
-            resultSubtype.textContent = "Intente nuevamente frente a la cámara";
-            resultDetail.textContent = errorText || "Ajuste el rostro dentro del recuadro y vuelva a intentar.";
-
-            detailHora.textContent = "—";
-            detailTurno.textContent = "—";
-            detailAtraso.textContent = "—";
-
-            if (conSonido) beepError();
-            activarPausa(PAUSA_ERROR_MS);
-            programarReinicio();
-        }
-
-        function capturarFrame(calidad = 0.85, anchoObjetivo = null) {
-            const ctx = canvas.getContext("2d");
-            const vw = video.videoWidth;
-            const vh = video.videoHeight;
-
-            if (!vw || !vh) return null;
-
-            let width = vw;
-            let height = vh;
-
-            if (anchoObjetivo && vw > anchoObjetivo) {
-                const ratio = vh / vw;
-                width = anchoObjetivo;
-                height = Math.round(anchoObjetivo * ratio);
+            if (json.cantidad_rostros && Number(json.cantidad_rostros) > 1) {
+                rostroPresente = false;
+                rostroDetectadoDesde = null;
+                actualizarIndicadoresRostro(false);
+                cameraTopHint.textContent = "Debe acercarse una sola persona";
+                return;
             }
 
-            canvas.width = width;
-            canvas.height = height;
-            ctx.save();
-            ctx.scale(-1, 1);
-            ctx.drawImage(video, -width, 0, width, height);
-            ctx.restore();
+            if (!rostroPresente) {
+                rostroPresente = true;
+                rostroDetectadoDesde = Date.now();
+            }
 
-            return canvas.toDataURL("image/jpeg", calidad);
+            const transcurrido = Date.now() - rostroDetectadoDesde;
+            const restante = Math.max(ESTABILIDAD_MS - transcurrido, 0);
+
+            actualizarIndicadoresRostro(true, restante);
+            mostrarEsperaConRostro(restante);
+
+            if (transcurrido >= ESTABILIDAD_MS) {
+                await reconocerRostro();
+            }
+        } catch (error) {
+            actualizarConexion(false);
+        } finally {
+            detectando = false;
         }
+    }
 
-        async function detectarRostro() {
-            if (!streamReady || !video.videoWidth || !video.videoHeight) return;
+    async function reconocerRostro() {
+        if (enviando) return;
+        if (Date.now() < pausaHasta) return;
 
-            const ahora = Date.now();
-            if (enviando || ahora < pausaHasta) return;
-            if (ahora - ultimaDeteccion < DETECCION_INTERVALO) return;
+        const data = capturarFrame(0.72, 720);
+        if (!data) return;
 
-            ultimaDeteccion = ahora;
+        enviando = true;
+        actualizarIndicadoresRostro(true, 0, true);
 
-            const data = capturarFrame(0.65, 640);
-            if (!data) return;
+        try {
+            const res = await fetch("/biometrico/reconocer/", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/x-www-form-urlencoded",
+                },
+                body: new URLSearchParams({
+                    imagen: data,
+                    modo: modoSeleccionado
+                })
+            });
 
-            try {
-                const res = await fetch("/biometrico/reconocer/", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/x-www-form-urlencoded",
-                    },
-                    body: new URLSearchParams({
-                        imagen: data,
-                        modo: modoSeleccionado,
-                        solo_deteccion: "1"
-                    })
-                });
+            const dataJson = await res.json();
+            actualizarConexion(true);
 
-                const json = await res.json();
-                const hayRostro = !!json.hay_rostro;
-
-                if (!hayRostro) {
-                    rostroPresente = false;
-                    rostroDetectadoDesde = null;
-                    actualizarIndicadoresRostro(false);
+            if (dataJson.tipo === "duplicado") {
+                if (bloquearPorCliente(dataJson.funcionario_id)) {
+                    activarPausa(1000);
                     return;
                 }
 
-                if (!rostroPresente) {
-                    rostroPresente = true;
-                    rostroDetectadoDesde = Date.now();
-                }
-
-                const transcurrido = Date.now() - rostroDetectadoDesde;
-                const restante = Math.max(ESTABILIDAD_MS - transcurrido, 0);
-
-                actualizarIndicadoresRostro(true, restante);
-                mostrarEsperaConRostro(restante);
-
-                if (transcurrido >= ESTABILIDAD_MS) {
-                    await reconocerRostro();
-                }
-            } catch (error) {
-                // silencio en espera
+                mostrarAviso({
+                    funcionario: dataJson.funcionario,
+                    mensaje: dataJson.mensaje || "Lectura reciente detectada. Espere unos segundos.",
+                    turno: dataJson.turno || "—"
+                }, false, 1000);
+                return;
             }
-        }
 
-        async function reconocerRostro() {
-            if (enviando) return;
-            if (Date.now() < pausaHasta) return;
-
-            const data = capturarFrame(0.90);
-            if (!data) return;
-
-            enviando = true;
-            actualizarIndicadoresRostro(true, 0, true);
-
-            try {
-                const res = await fetch("/biometrico/reconocer/", {
-                    method: "POST",
-                    headers: {
-                        "Content-Type": "application/x-www-form-urlencoded",
-                    },
-                    body: new URLSearchParams({
-                        imagen: data,
-                        modo: modoSeleccionado
-                    })
-                });
-
-                const dataJson = await res.json();
-
-                if (dataJson.ok) {
-                    mostrarExito(dataJson);
-                } else if (
-                    dataJson.tipo === "ya_entrada" ||
-                    dataJson.tipo === "ya_salida" ||
-                    dataJson.tipo === "ya_completo" ||
-                    dataJson.tipo === "sin_entrada" ||
-                    dataJson.tipo === "espera_salida_almuerzo" ||
-                    dataJson.tipo === "espera_regreso_almuerzo" ||
-                    dataJson.tipo === "espera_salida_final"
-                ) {
-                    mostrarAviso(dataJson, true);
-                } else if (dataJson.tipo === "sin_rostro") {
-                    rostroPresente = false;
-                    rostroDetectadoDesde = null;
-                    limpiarEstado();
-                    actualizarIndicadoresRostro(false);
-                } else if (dataJson.tipo === "anti_fraude" || dataJson.tipo === "rostro_estatico") {
-                    mostrarAviso({
-                        mensaje: dataJson.mensaje || "Mueva ligeramente el rostro e intente nuevamente.",
-                        turno: dataJson.turno || "—"
-                    }, false);
-                } else {
-                    mostrarError(dataJson.mensaje || dataJson.error || "No reconocido", true);
-                }
-            } catch (error) {
-                mostrarError("No fue posible completar la validación. Intente nuevamente.", false);
-            } finally {
-                enviando = false;
+            if (dataJson.ok) {
+                mostrarExito(dataJson);
+            } else if (
+                dataJson.tipo === "ya_entrada" ||
+                dataJson.tipo === "ya_salida" ||
+                dataJson.tipo === "ya_completo" ||
+                dataJson.tipo === "sin_entrada" ||
+                dataJson.tipo === "espera_salida_almuerzo" ||
+                dataJson.tipo === "espera_regreso_almuerzo" ||
+                dataJson.tipo === "espera_salida_final"
+            ) {
+                mostrarAviso(dataJson, true, 1400);
+            } else if (dataJson.tipo === "sin_rostro" || dataJson.tipo === "procesando") {
+                rostroPresente = false;
+                rostroDetectadoDesde = null;
+                limpiarEstado();
+                actualizarIndicadoresRostro(false);
+            } else if (dataJson.tipo === "multiples_rostros") {
+                mostrarAviso({
+                    mensaje: dataJson.mensaje || "Debe acercarse una sola persona a la cámara.",
+                    turno: dataJson.turno || "—"
+                }, false, 1200);
+            } else if (dataJson.tipo === "anti_fraude" || dataJson.tipo === "rostro_estatico") {
+                mostrarAviso({
+                    mensaje: dataJson.mensaje || "Mueva ligeramente el rostro e intente nuevamente.",
+                    turno: dataJson.turno || "—"
+                }, false, 1200);
+            } else {
+                mostrarError(dataJson.mensaje || dataJson.error || "No reconocido", true);
             }
+        } catch (error) {
+            actualizarConexion(false);
+            mostrarError("No fue posible completar la validación. Intente nuevamente.", false);
+        } finally {
+            enviando = false;
+            rostroPresente = false;
+            rostroDetectadoDesde = null;
         }
+    }
 
-        navigator.mediaDevices.getUserMedia({
-            video: {
-                facingMode: "user",
-                width: { ideal: 1280 },
-                height: { ideal: 720 }
-            },
-            audio: false
-        })
-        .then(stream => {
-            video.srcObject = stream;
+    navigator.mediaDevices.getUserMedia({
+        video: {
+            facingMode: "user",
+            width: { ideal: 960 },
+            height: { ideal: 540 },
+            frameRate: { ideal: 24, max: 30 }
+        },
+        audio: false
+    })
+    .then(stream => {
+        video.srcObject = stream;
+
+        video.onloadedmetadata = () => {
             streamReady = true;
-        })
-        .catch(() => {
-            mostrarError("No se pudo abrir la cámara del dispositivo.", false);
-        });
+            actualizarConexion(true);
+            video.play().catch(() => {});
+        };
+    })
+    .catch(() => {
+        actualizarConexion(false);
+        mostrarError("No se pudo abrir la cámara del dispositivo.", false);
+    });
 
-        actualizarModoUI();
-        limpiarEstado();
-        actualizarIndicadoresRostro(false);
+    actualizarModoUI();
+    limpiarEstado();
+    actualizarIndicadoresRostro(false);
 
-        setInterval(detectarRostro, DETECCION_INTERVALO);
+    setInterval(detectarRostro, DETECCION_INTERVALO);
     </script>
 </body>
 </html>
