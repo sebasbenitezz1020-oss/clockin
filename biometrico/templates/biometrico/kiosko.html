@@ -355,13 +355,29 @@
         .scan-frame::before {
             content: "";
             width: 42%;
-            height: 56%;
+            height: 60%;
             border: 3px solid var(--brand-primary);
             border-radius: 30px;
             box-shadow:
                 0 0 0 9999px rgba(0,0,0,0.14) inset,
                 0 0 24px var(--brand-shadow);
             transition: all .18s ease;
+        }
+
+        .zona-lectura-label {
+            position: absolute;
+            left: 50%;
+            bottom: 18px;
+            transform: translateX(-50%);
+            padding: 9px 14px;
+            border-radius: 999px;
+            background: rgba(0,0,0,.55);
+            border: 1px solid rgba(255,255,255,.12);
+            color: #dbeafe;
+            font-size: 13px;
+            font-weight: 800;
+            pointer-events: none;
+            white-space: nowrap;
         }
 
         .video-wrap.has-face .scan-frame::before {
@@ -942,6 +958,7 @@
                     <div class="video-wrap" id="videoWrap">
                         <video id="video" autoplay playsinline muted></video>
                         <div class="scan-frame"></div>
+                        <div class="zona-lectura-label">Ubique el rostro dentro del cuadro</div>
                     </div>
 
                     <div class="face-pill-row">
@@ -1050,7 +1067,14 @@
     const CONFIG_FULLSCREEN_AUTO = "{% if config_general and config_general.biometrico_fullscreen_auto %}true{% else %}false{% endif %}" === "true";
 
     const DETECCION_INTERVALO = 650;
-    const ESTABILIDAD_MS = 1000;
+    const ESTABILIDAD_MS = 600;
+
+    const ZONA_LECTURA_CONFIG = {
+        x: 0.22,
+        y: 0.12,
+        width: 0.56,
+        height: 0.72
+    };
     const PAUSA_EXITO_MS = 1000;
     const PAUSA_AVISO_MS = CONFIG_PAUSA_AVISO_MS;
     const PAUSA_ERROR_MS = CONFIG_PAUSA_ERROR_MS;
@@ -1380,7 +1404,7 @@
         programarReinicio(1600);
     }
 
-    function capturarFrame(calidad = 0.76, anchoObjetivo = 720) {
+    function capturarFrameZonaLectura(calidad = 0.76, anchoObjetivo = 720) {
         const ctx = canvas.getContext("2d", { willReadFrequently: true });
         const vw = video.videoWidth;
         const vh = video.videoHeight;
@@ -1400,6 +1424,25 @@
         canvas.height = height;
 
         ctx.drawImage(video, 0, 0, width, height);
+
+        const zx = Math.round(width * 0.15);
+        const zy = Math.round(height * 0.05);
+        const zw = Math.round(width * 0.70);
+        const zh = Math.round(height * 0.88);
+
+        ctx.fillStyle = "rgba(0, 0, 0, 1)";
+
+        // arriba
+        ctx.fillRect(0, 0, width, zy);
+
+        // abajo
+        ctx.fillRect(0, zy + zh, width, height - (zy + zh));
+
+        // izquierda
+        ctx.fillRect(0, zy, zx, zh);
+
+        // derecha
+        ctx.fillRect(zx + zw, zy, width - (zx + zw), zh);
 
         return canvas.toDataURL("image/jpeg", calidad);
     }
@@ -1428,7 +1471,7 @@
         detectando = true;
         ultimaDeteccion = ahora;
 
-        const data = capturarFrame(0.58, 480);
+        const data = capturarFrameZonaLectura(0.78, 900);
         if (!data) {
             detectando = false;
             return;
@@ -1492,7 +1535,7 @@
         if (enviando) return;
         if (Date.now() < pausaHasta) return;
 
-        const data = capturarFrame(0.72, 720);
+        const data = capturarFrameZonaLectura(0.90, 1100);
         if (!data) return;
 
         enviando = true;
