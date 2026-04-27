@@ -73,7 +73,7 @@ def _bloquear_si_no_admin_master(request):
 
 @login_required
 def marcacion_manual(request):
-    permiso = validar_permiso_o_redirigir(request, "asistencia", "puede_crear")
+    permiso = validar_permiso_o_redirigir(request, "asistencia", "puede_ver")
     if permiso:
         return permiso
 

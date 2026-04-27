@@ -318,13 +318,12 @@
             <p>Registro manual de marcaciones y seguimiento detallado de la jornada.</p>
         </div>
 
-        {% if perms.app.add_asistencia or request.user.is_superuser %}
+        
         <div>
             <a href="{% url 'marcacion_manual' %}" class="asis-btn" style="text-decoration:none; background:linear-gradient(135deg,#f59e0b,#f97316);">
                 📝 Marcación manual autorizada
             </a>
         </div>
-        {% endif %}
 </div>
 
     {% if messages %}
