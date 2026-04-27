@@ -528,6 +528,11 @@ class Funcionario(models.Model):
 
 
 class Asistencia(models.Model):
+    ORIGEN_MARCACION_CHOICES = [
+        ("lector", "Lector facial"),
+        ("manual", "Manual"),
+    ]
+
     funcionario = models.ForeignKey(
         Funcionario,
         on_delete=models.CASCADE,
@@ -542,6 +547,23 @@ class Asistencia(models.Model):
 
     minutos_atraso = models.PositiveIntegerField(default=0)
     llego_tarde = models.BooleanField(default=False)
+
+    origen_marcacion = models.CharField(
+        max_length=20,
+        choices=ORIGEN_MARCACION_CHOICES,
+        default="lector"
+    )
+
+    marcado_manual_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="marcaciones_manuales"
+    )
+
+    motivo_marcacion_manual = models.TextField(blank=True, null=True)
+    fecha_hora_real_sistema = models.DateTimeField(blank=True, null=True)
 
     observacion = models.CharField(max_length=255, blank=True, default="")
     creado_en = models.DateTimeField(auto_now_add=True)
@@ -573,6 +595,37 @@ class Asistencia(models.Model):
         else:
             self.minutos_atraso = 0
             self.llego_tarde = False
+
+    @property
+    def es_manual(self):
+        return self.origen_marcacion == "manual"
+
+    @property
+    def operador_manual_nombre(self):
+        if not self.marcado_manual_por:
+            return "-"
+        nombre = self.marcado_manual_por.get_full_name()
+        return nombre or self.marcado_manual_por.username
+
+    @property
+    def auditoria_manual_texto(self):
+        if not self.es_manual:
+            return ""
+
+        partes = []
+
+        if self.operador_manual_nombre:
+            partes.append(f"Operador: {self.operador_manual_nombre}")
+
+        if self.fecha_hora_real_sistema:
+            partes.append(
+                f"Sistema: {timezone.localtime(self.fecha_hora_real_sistema).strftime('%d/%m/%Y %H:%M:%S')}"
+            )
+
+        if self.motivo_marcacion_manual:
+            partes.append(f"Motivo: {self.motivo_marcacion_manual}")
+
+        return " | ".join(partes)
 
     @property
     def siguiente_marcacion(self):
@@ -638,6 +691,7 @@ class Asistencia(models.Model):
             return "Trabajando"
 
         return "Finalizado"
+    
 
 
 class Deuda(models.Model):
@@ -746,6 +800,28 @@ class NominaMensual(models.Model):
 
     def __str__(self):
         return f"{self.funcionario.nombre_completo} - Nómina {self.mes:02d}/{self.anio}"
+    
+class CierreNomina(models.Model):
+    mes = models.PositiveSmallIntegerField()
+    anio = models.PositiveIntegerField()
+    empresa = models.ForeignKey(Empresa, on_delete=models.CASCADE, null=True, blank=True)
+    cerrado = models.BooleanField(default=True)
+    cerrado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True
+    )
+    cerrado_en = models.DateTimeField(default=timezone.now)
+    observacion = models.TextField(blank=True, default="")
+
+    class Meta:
+        unique_together = ("mes", "anio", "empresa")
+        ordering = ["-anio", "-mes"]
+
+    def __str__(self):
+        empresa = self.empresa.nombre if self.empresa else "Global"
+        return f"Nómina {self.mes:02d}/{self.anio} - {empresa}"    
 
 
 class PermisoLicencia(models.Model):

@@ -12,6 +12,52 @@ from .models import (
     DiaLibre,
 )
 
+from django import forms
+from django.utils import timezone
+from .models import Asistencia
+
+
+class MarcacionManualForm(forms.Form):
+    funcionario = forms.ModelChoiceField(
+        queryset=Funcionario.objects.filter(activo=True),
+        label="Funcionario",
+        widget=forms.Select(attrs={"class": "form-control"})
+    )
+
+    tipo = forms.ChoiceField(
+        choices=[
+            ("entrada", "Entrada"),
+            ("salida", "Salida"),
+        ],
+        label="Tipo de marcación",
+        widget=forms.Select(attrs={"class": "form-control"})
+    )
+
+    fecha = forms.DateField(
+        label="Fecha",
+        initial=timezone.localdate,
+        widget=forms.DateInput(attrs={
+            "type": "date",
+            "class": "form-control"
+        })
+    )
+
+    hora = forms.TimeField(
+        label="Hora real de llegada/salida",
+        widget=forms.TimeInput(attrs={
+            "type": "time",
+            "class": "form-control"
+        })
+    )
+
+    motivo = forms.CharField(
+        label="Motivo",
+        widget=forms.Textarea(attrs={
+            "class": "form-control",
+            "rows": 3,
+            "placeholder": "Ej: Problema con lector facial, cámara falló, tablet trabada..."
+        })
+    )
 
 class EmpresaForm(forms.ModelForm):
     class Meta:
@@ -645,9 +691,29 @@ class VacacionForm(forms.ModelForm):
         fecha_hasta = cleaned_data.get("fecha_hasta")
         dias_solicitados = cleaned_data.get("dias_solicitados")
         estado = cleaned_data.get("estado")
+        hoy = timezone.localdate()
 
         if fecha_desde and fecha_hasta and fecha_hasta < fecha_desde:
             raise forms.ValidationError("La fecha hasta no puede ser menor que la fecha desde.")
+
+        if fecha_desde:
+            if fecha_desde.weekday() != 0:
+                raise forms.ValidationError(
+                    "Según la normativa laboral, las vacaciones deben iniciar un día lunes o el siguiente día hábil si el lunes fuera feriado."
+                )
+
+            diferencia = (fecha_desde - hoy).days
+            if diferencia < 15:
+                raise forms.ValidationError(
+                    "La notificación de vacaciones debe realizarse con al menos 15 días de anticipación."
+                )
+
+        if fecha_desde and fecha_hasta and dias_solicitados:
+            dias_reales = (fecha_hasta - fecha_desde).days + 1
+            if dias_solicitados != dias_reales:
+                raise forms.ValidationError(
+                    f"Los días solicitados no coinciden con el rango seleccionado. Deben ser {dias_reales} día(s)."
+                )
 
         if funcionario and dias_solicitados and estado == Vacacion.Estados.APROBADO:
             saldo = funcionario.saldo_vacaciones

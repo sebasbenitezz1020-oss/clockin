@@ -21,6 +21,15 @@ from usuarios.utils import validar_permiso_o_redirigir, tiene_permiso
 from usuarios.multiempresa import es_admin_master, obtener_empresa_usuario, filtrar_por_empresa_relacion
 from usuarios.multiempresa import es_admin_master, obtener_empresa_usuario
 
+from datetime import datetime
+from django.contrib import messages
+from django.contrib.auth.decorators import login_required, permission_required
+from django.shortcuts import render, redirect
+from django.utils import timezone
+
+from .forms import MarcacionManualForm
+from .models import Asistencia
+
 from .forms import (
     ConfiguracionGeneralForm,
     DeudaForm,
@@ -45,6 +54,7 @@ from .models import (
     HistorialAccion,
     Liquidacion,
     NominaMensual,
+    CierreNomina,
     PermisoLicencia,
     Sucursal,
     Turno,
@@ -60,6 +70,93 @@ def _bloquear_si_no_admin_master(request):
         return redirect("dashboard")
 
     return None
+
+@login_required
+def marcacion_manual(request):
+    permiso = validar_permiso_o_redirigir(request, "asistencia", "puede_crear")
+    if permiso:
+        return permiso
+
+    empresa_usuario = obtener_empresa_usuario(request.user)
+    admin_master = es_admin_master(request.user)
+
+    if request.method == "POST":
+        form = MarcacionManualForm(request.POST)
+
+        if not admin_master and empresa_usuario:
+            form.fields["funcionario"].queryset = Funcionario.objects.filter(
+                activo=True,
+                sucursal_rel__empresa=empresa_usuario
+            ).order_by("apellido", "nombre")
+
+        if form.is_valid():
+            funcionario = form.cleaned_data["funcionario"]
+            tipo = form.cleaned_data["tipo"]
+            fecha = form.cleaned_data["fecha"]
+            hora = form.cleaned_data["hora"]
+            motivo = form.cleaned_data["motivo"]
+
+            if not admin_master:
+                if not funcionario.sucursal_rel or funcionario.sucursal_rel.empresa != empresa_usuario:
+                    messages.error(request, "No puedes registrar asistencia manual para otra empresa.")
+                    return redirect("asistencia_marcar")
+
+            fecha_hora_manual = timezone.make_aware(
+                datetime.combine(fecha, hora)
+            )
+
+            asistencia, creada = Asistencia.objects.get_or_create(
+                funcionario=funcionario,
+                fecha=fecha,
+            )
+
+            if tipo == "entrada":
+                asistencia.hora_entrada = fecha_hora_manual
+                asistencia.calcular_atraso()
+            elif tipo == "salida":
+                asistencia.hora_salida = fecha_hora_manual
+
+            asistencia.origen_marcacion = "manual"
+            asistencia.marcado_manual_por = request.user
+            asistencia.motivo_marcacion_manual = motivo
+            asistencia.fecha_hora_real_sistema = timezone.now()
+
+            if tipo == "entrada":
+                if asistencia.llego_tarde:
+                    asistencia.observacion = f"📝 Entrada manual. Llegó con {asistencia.minutos_atraso} minuto(s) de atraso."
+                else:
+                    asistencia.observacion = "📝 Entrada manual registrada en horario."
+            else:
+                asistencia.observacion = "📝 Salida manual registrada."
+
+            asistencia.save()
+
+            registrar_historial(
+                request,
+                "Asistencia",
+                "Marcación manual",
+                f"Marcación manual de {tipo} para {funcionario.nombre_completo}. "
+                f"Hora registrada: {fecha_hora_manual.strftime('%d/%m/%Y %H:%M:%S')}. "
+                f"Operador: {request.user}. Motivo: {motivo}"
+            )
+
+            messages.success(
+                request,
+                f"Marcación manual registrada correctamente para {funcionario.nombre_completo}."
+            )
+            return redirect("asistencia_marcar")
+    else:
+        form = MarcacionManualForm()
+
+        if not admin_master and empresa_usuario:
+            form.fields["funcionario"].queryset = Funcionario.objects.filter(
+                activo=True,
+                sucursal_rel__empresa=empresa_usuario
+            ).order_by("apellido", "nombre")
+
+    return render(request, "asistencias/marcacion_manual.html", {
+        "form": form
+    })
 
 
 def registrar_historial(request, modulo, accion, descripcion):
@@ -1495,6 +1592,8 @@ def vacaciones_lista(request):
     permiso = validar_permiso_o_redirigir(request, "vacaciones", "puede_ver")
     if permiso:
         return permiso
+    
+    alertas_vacaciones = []
 
     q = request.GET.get("q", "").strip()
 
@@ -1529,8 +1628,19 @@ def vacaciones_lista(request):
             sucursal_rel__empresa=empresa_usuario
         ).order_by("apellido", "nombre") if empresa_usuario else Funcionario.objects.none()
 
+        alertas_vacaciones = []
+
+        for funcionario in funcionarios_resumen:
+            alerta = calcular_alertas_vacaciones(funcionario)
+            if alerta:
+                alertas_vacaciones.append({
+                    "funcionario": funcionario,
+                    "alerta": alerta,
+                })
+
     return render(request, "core/vacaciones_lista.html", {
         "vacaciones": vacaciones,
+        "alertas_vacaciones": alertas_vacaciones,
         "funcionarios_resumen": funcionarios_resumen,
         "q": q,
         "empresa_usuario": empresa_usuario,
@@ -1588,6 +1698,14 @@ def vacacion_nueva(request):
         "form": form,
         "titulo_form": "Nueva vacación",
         "boton_texto": "Guardar vacación",
+        "funcionarios_json": [
+    {
+        "id": f.id,
+        "nombre": f.nombre_completo,
+        "dias": f.saldo_vacaciones,
+    }
+    for f in form.fields["funcionario"].queryset
+],
     })
 
 @login_required
@@ -1651,8 +1769,195 @@ def vacacion_editar(request, pk):
         "titulo_form": "Editar vacación",
         "boton_texto": "Guardar cambios",
         "vacacion": vacacion,
+        "funcionarios_json": [
+    {
+        "id": f.id,
+        "nombre": f.nombre_completo,
+        "dias": f.saldo_vacaciones,
+    }
+    for f in form.fields["funcionario"].queryset
+],
     })
 
+@login_required
+def vacacion_notificacion_pdf(request, pk):
+    permiso = validar_permiso_o_redirigir(request, "vacaciones", "puede_ver")
+    if permiso:
+        return permiso
+
+    empresa_usuario = obtener_empresa_usuario(request.user)
+    admin_master = es_admin_master(request.user)
+
+    vacacion = get_object_or_404(
+        Vacacion.objects.select_related(
+            "funcionario",
+            "funcionario__sucursal_rel",
+            "funcionario__sucursal_rel__empresa"
+        ),
+        pk=pk
+    )
+
+    if not admin_master:
+        if not vacacion.funcionario.sucursal_rel or vacacion.funcionario.sucursal_rel.empresa != empresa_usuario:
+            messages.error(request, "No puedes generar notificación de otra empresa.")
+            return redirect("vacaciones_lista")
+
+    funcionario = vacacion.funcionario
+    config = ConfiguracionGeneral.obtener()
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        leftMargin=20 * mm,
+        rightMargin=20 * mm,
+        topMargin=20 * mm,
+        bottomMargin=20 * mm,
+    )
+
+    styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle(
+        name="TituloVacaciones",
+        parent=styles["Heading1"],
+        fontName="Helvetica-Bold",
+        fontSize=16,
+        leading=20,
+        alignment=TA_CENTER,
+        textColor=colors.HexColor("#111827"),
+        spaceAfter=12,
+    ))
+
+    styles.add(ParagraphStyle(
+        name="TextoVacaciones",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=10,
+        leading=16,
+        alignment=TA_LEFT,
+        textColor=colors.HexColor("#111827"),
+    ))
+
+    elementos = []
+
+    empresa_nombre = funcionario.empresa_mostrar
+    sucursal_nombre = funcionario.sucursal_mostrar
+    fecha_emision = timezone.localdate()
+
+    elementos.append(Paragraph(config.nombre_sistema or "ClockIn", styles["TituloVacaciones"]))
+    elementos.append(Paragraph("NOTIFICACIÓN DE VACACIONES ANUALES REMUNERADAS", styles["TituloVacaciones"]))
+    elementos.append(Spacer(1, 10))
+
+    datos = [
+        ["Empresa", empresa_nombre],
+        ["Sucursal", sucursal_nombre],
+        ["Fecha de emisión", fecha_emision.strftime("%d/%m/%Y")],
+        ["Funcionario", funcionario.nombre_completo],
+        ["Cédula", funcionario.cedula],
+        ["Cargo", funcionario.cargo or "-"],
+        ["Fecha desde", vacacion.fecha_desde.strftime("%d/%m/%Y")],
+        ["Fecha hasta", vacacion.fecha_hasta.strftime("%d/%m/%Y")],
+        ["Días otorgados", str(vacacion.dias_solicitados)],
+    ]
+
+    tabla = Table(datos, colWidths=[55 * mm, 105 * mm])
+    tabla.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#eff6ff")),
+        ("TEXTCOLOR", (0, 0), (0, -1), colors.HexColor("#1d4ed8")),
+        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+        ("FONTNAME", (1, 0), (1, -1), "Helvetica"),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#cbd5e1")),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+    ]))
+    elementos.append(tabla)
+    elementos.append(Spacer(1, 16))
+
+    texto = f"""
+    Por medio de la presente, se comunica formalmente al trabajador <b>{funcionario.nombre_completo}</b>,
+    con C.I. N° <b>{funcionario.cedula}</b>, que hará uso de sus vacaciones anuales remuneradas
+    desde el día <b>{vacacion.fecha_desde.strftime("%d/%m/%Y")}</b> hasta el día
+    <b>{vacacion.fecha_hasta.strftime("%d/%m/%Y")}</b>, por un total de
+    <b>{vacacion.dias_solicitados}</b> día(s).
+    <br/><br/>
+    Esta comunicación se realiza por escrito con la anticipación correspondiente, conforme a la normativa laboral vigente.
+    Las vacaciones deberán iniciar en día lunes o en el siguiente día hábil si aquel fuese feriado.
+    """
+
+    elementos.append(Paragraph(texto, styles["TextoVacaciones"]))
+    elementos.append(Spacer(1, 34))
+
+    firmas = Table([
+        ["_______________________________", "_______________________________"],
+        ["Firma del empleador / RRHH", "Firma del funcionario"],
+        ["", ""],
+        ["Fecha de recepción: ____/____/______", "Aclaración: ____________________"],
+    ], colWidths=[80 * mm, 80 * mm])
+
+    firmas.setStyle(TableStyle([
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("TOPPADDING", (0, 0), (-1, -1), 7),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
+    ]))
+    elementos.append(firmas)
+
+    doc.build(elementos)
+
+    pdf = buffer.getvalue()
+    buffer.close()
+
+    registrar_historial(
+        request,
+        "Vacaciones",
+        "Notificación PDF",
+        f"Se generó notificación de vacaciones para {funcionario.nombre_completo} del {vacacion.fecha_desde} al {vacacion.fecha_hasta}."
+    )
+
+    response = HttpResponse(content_type="application/pdf")
+    response["Content-Disposition"] = f'inline; filename="notificacion_vacaciones_{funcionario.cedula}_{vacacion.id}.pdf"'
+    response.write(pdf)
+    return response
+
+def sumar_meses(fecha, meses):
+    mes = fecha.month - 1 + meses
+    anio = fecha.year + mes // 12
+    mes = mes % 12 + 1
+    dia = min(fecha.day, monthrange(anio, mes)[1])
+    return date(anio, mes, dia)
+
+
+def calcular_alertas_vacaciones(funcionario):
+    if not funcionario.fecha_ingreso:
+        return None
+
+    hoy = timezone.localdate()
+    ultimo_aniversario = date(hoy.year, funcionario.fecha_ingreso.month, funcionario.fecha_ingreso.day)
+
+    if ultimo_aniversario > hoy:
+        ultimo_aniversario = date(hoy.year - 1, funcionario.fecha_ingreso.month, funcionario.fecha_ingreso.day)
+
+    vencimiento = sumar_meses(ultimo_aniversario, 6)
+    dias_para_vencer = (vencimiento - hoy).days
+
+    if funcionario.saldo_vacaciones <= 0:
+        return None
+
+    if dias_para_vencer < 0:
+        return {
+            "tipo": "vencida",
+            "texto": f"Vacaciones vencidas desde {vencimiento.strftime('%d/%m/%Y')}",
+            "vencimiento": vencimiento,
+        }
+
+    if dias_para_vencer <= 45:
+        return {
+            "tipo": "proxima",
+            "texto": f"Vacaciones próximas a vencer en {dias_para_vencer} día(s)",
+            "vencimiento": vencimiento,
+        }
+
+    return None
 
 @login_required
 def icl_lista(request):
@@ -2057,6 +2362,15 @@ def nomina_lista(request):
     empresa_usuario = obtener_empresa_usuario(request.user)
     admin_master = es_admin_master(request.user)
 
+    empresa_cierre = None if admin_master else empresa_usuario
+
+    cierre_nomina = CierreNomina.objects.filter(
+        mes=mes,
+        anio=anio,
+        empresa=empresa_cierre,
+        cerrado=True
+    ).first()
+
     if request.method == "POST":
         permiso_post = validar_permiso_o_redirigir(request, "nomina", "puede_crear")
         if permiso_post:
@@ -2069,6 +2383,10 @@ def nomina_lista(request):
                 funcionarios = funcionarios.filter(sucursal_rel__empresa=empresa_usuario)
             else:
                 funcionarios = funcionarios.none()
+
+        if cierre_nomina:
+            messages.error(request, "Esta nómina ya está cerrada. Debes reabrirla antes de recalcular.")
+            return redirect(f"/nomina/?mes={mes}&anio={anio}")        
 
         funcionarios = funcionarios.order_by("apellido", "nombre")
 
@@ -2146,6 +2464,14 @@ def nomina_lista(request):
     ]
     anios = list(range(hoy.year - 2, hoy.year + 2))
 
+    if admin_master:
+        sucursales = Sucursal.objects.filter(activo=True).order_by("empresa__nombre", "nombre")
+    else:
+        sucursales = Sucursal.objects.filter(
+            activo=True,
+            empresa=empresa_usuario
+        ).order_by("nombre") if empresa_usuario else Sucursal.objects.none()
+
     return render(request, "core/nomina_lista.html", {
         "nominas": nominas,
         "mes": mes,
@@ -2153,6 +2479,8 @@ def nomina_lista(request):
         "estado": estado,
         "meses": meses,
         "anios": anios,
+        "sucursales": sucursales,
+        "cierre_nomina": cierre_nomina,
         "total_bruto": total_bruto,
         "total_deudas": total_deudas,
         "total_neto": total_neto,
@@ -2202,6 +2530,358 @@ def nomina_toggle_pagado(request, pk):
     )
     messages.success(request, "Estado de nómina actualizado correctamente.")
     return redirect(f"/nomina/?mes={nomina.mes}&anio={nomina.anio}")
+
+def _gs(valor):
+    return f"Gs. {Decimal(valor or 0):,.0f}".replace(",", ".")
+
+@login_required
+def nomina_cerrar_periodo(request):
+    permiso = validar_permiso_o_redirigir(request, "nomina", "puede_pagar")
+    if permiso:
+        return permiso
+
+    hoy = timezone.localdate()
+    mes = int(request.GET.get("mes", hoy.month))
+    anio = int(request.GET.get("anio", hoy.year))
+
+    empresa_usuario = obtener_empresa_usuario(request.user)
+    admin_master = es_admin_master(request.user)
+
+    empresa_cierre = None if admin_master else empresa_usuario
+
+    cierre, creado = CierreNomina.objects.get_or_create(
+        mes=mes,
+        anio=anio,
+        empresa=empresa_cierre,
+        defaults={
+            "cerrado": True,
+            "cerrado_por": request.user,
+            "cerrado_en": timezone.now(),
+            "observacion": "Cierre manual de nómina.",
+        }
+    )
+
+    if not creado:
+        cierre.cerrado = True
+        cierre.cerrado_por = request.user
+        cierre.cerrado_en = timezone.now()
+        cierre.save()
+
+    registrar_historial(
+        request,
+        "Nómina",
+        "Cerrar período",
+        f"Se cerró la nómina del período {mes:02d}/{anio}."
+    )
+
+    messages.success(request, f"Nómina {mes:02d}/{anio} cerrada correctamente.")
+    return redirect(f"/nomina/?mes={mes}&anio={anio}")
+
+
+@login_required
+def nomina_reabrir_periodo(request):
+    permiso = validar_permiso_o_redirigir(request, "nomina", "puede_pagar")
+    if permiso:
+        return permiso
+
+    hoy = timezone.localdate()
+    mes = int(request.GET.get("mes", hoy.month))
+    anio = int(request.GET.get("anio", hoy.year))
+
+    empresa_usuario = obtener_empresa_usuario(request.user)
+    admin_master = es_admin_master(request.user)
+
+    empresa_cierre = None if admin_master else empresa_usuario
+
+    cierre = CierreNomina.objects.filter(
+        mes=mes,
+        anio=anio,
+        empresa=empresa_cierre,
+        cerrado=True
+    ).first()
+
+    if cierre:
+        cierre.cerrado = False
+        cierre.save()
+
+        registrar_historial(
+            request,
+            "Nómina",
+            "Reabrir período",
+            f"Se reabrió la nómina del período {mes:02d}/{anio}."
+        )
+
+        messages.success(request, f"Nómina {mes:02d}/{anio} reabierta correctamente.")
+    else:
+        messages.warning(request, "No existe un cierre activo para este período.")
+
+    return redirect(f"/nomina/?mes={mes}&anio={anio}")
+
+def _nomina_permitida(request, nomina):
+    empresa_usuario = obtener_empresa_usuario(request.user)
+    admin_master = es_admin_master(request.user)
+
+    if admin_master:
+        return True
+
+    return (
+        empresa_usuario
+        and nomina.funcionario.sucursal_rel
+        and nomina.funcionario.sucursal_rel.empresa == empresa_usuario
+    )
+
+
+@login_required
+def nomina_extracto_pdf(request, pk):
+    permiso = validar_permiso_o_redirigir(request, "nomina", "puede_ver")
+    if permiso:
+        return permiso
+
+    nomina = get_object_or_404(
+        NominaMensual.objects.select_related(
+            "funcionario",
+            "funcionario__sucursal_rel",
+            "funcionario__sucursal_rel__empresa"
+        ),
+        pk=pk
+    )
+
+    if not _nomina_permitida(request, nomina):
+        messages.error(request, "No puedes exportar nóminas de otra empresa.")
+        return redirect("nomina_lista")
+
+    funcionario = nomina.funcionario
+    config = ConfiguracionGeneral.obtener()
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        leftMargin=18 * mm,
+        rightMargin=18 * mm,
+        topMargin=18 * mm,
+        bottomMargin=18 * mm,
+    )
+
+    styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle(
+        name="TituloNomina",
+        parent=styles["Heading1"],
+        fontName="Helvetica-Bold",
+        fontSize=18,
+        leading=22,
+        alignment=TA_CENTER,
+        textColor=colors.HexColor("#111827"),
+        spaceAfter=8,
+    ))
+
+    elementos = []
+
+    elementos.append(Paragraph(config.nombre_sistema or "ClockIn", styles["TituloNomina"]))
+    elementos.append(Paragraph("EXTRACTO DE NÓMINA INDIVIDUAL", styles["TituloNomina"]))
+    elementos.append(Spacer(1, 8))
+
+    datos = [
+        ["Funcionario", funcionario.nombre_completo],
+        ["Cédula", funcionario.cedula],
+        ["Empresa", funcionario.empresa_mostrar],
+        ["Sucursal", funcionario.sucursal_mostrar],
+        ["Cargo", funcionario.cargo or "-"],
+        ["Período", f"{nomina.mes:02d}/{nomina.anio}"],
+        ["Estado", nomina.get_estado_pago_display()],
+        ["Fecha de pago", nomina.fecha_pago.strftime("%d/%m/%Y") if nomina.fecha_pago else "-"],
+        ["Modalidad de cobro", nomina.modalidad_cobro or "-"],
+        ["Banco", nomina.banco or "-"],
+        ["Cuenta", f"{nomina.tipo_cuenta or '-'} / {nomina.numero_cuenta or '-'}"],
+    ]
+
+    tabla_datos = Table(datos, colWidths=[55 * mm, 105 * mm])
+    tabla_datos.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#eff6ff")),
+        ("TEXTCOLOR", (0, 0), (0, -1), colors.HexColor("#1d4ed8")),
+        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+        ("FONTNAME", (1, 0), (1, -1), "Helvetica"),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#cbd5e1")),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+    ]))
+    elementos.append(tabla_datos)
+    elementos.append(Spacer(1, 12))
+
+    tabla_liquidacion = Table([
+        ["Concepto", "Monto"],
+        ["Salario base", _gs(nomina.salario_base)],
+        ["Bono base configurado", _gs(nomina.bono_base)],
+        ["Bono pagado según ICL", _gs(nomina.bono_icl)],
+        ["Salario bruto", _gs(nomina.salario_bruto)],
+        ["IPS", f"- {_gs(nomina.descuento_ips)}"],
+        ["Deudas", f"- {_gs(nomina.descuento_deudas)}"],
+        ["NETO FINAL A COBRAR", _gs(nomina.salario_neto)],
+    ], colWidths=[110 * mm, 50 * mm])
+
+    tabla_liquidacion.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#dbeafe")),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#dcfce7")),
+        ("TEXTCOLOR", (0, -1), (-1, -1), colors.HexColor("#166534")),
+        ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+        ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#cbd5e1")),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+    ]))
+    elementos.append(tabla_liquidacion)
+    elementos.append(Spacer(1, 26))
+
+    firmas = Table([
+        ["_______________________________", "_______________________________"],
+        ["Firma responsable", "Firma funcionario"],
+    ], colWidths=[80 * mm, 80 * mm])
+
+    firmas.setStyle(TableStyle([
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+    ]))
+    elementos.append(firmas)
+
+    doc.build(elementos)
+
+    pdf = buffer.getvalue()
+    buffer.close()
+
+    response = HttpResponse(content_type="application/pdf")
+    response["Content-Disposition"] = f'inline; filename="extracto_nomina_{funcionario.cedula}_{nomina.mes:02d}_{nomina.anio}.pdf"'
+    response.write(pdf)
+    return response
+
+
+@login_required
+def nomina_sucursal_pdf(request):
+    permiso = validar_permiso_o_redirigir(request, "nomina", "puede_ver")
+    if permiso:
+        return permiso
+
+    hoy = timezone.localdate()
+    mes = int(request.GET.get("mes", hoy.month))
+    anio = int(request.GET.get("anio", hoy.year))
+    sucursal_id = request.GET.get("sucursal", "").strip()
+
+    if not sucursal_id:
+        messages.error(request, "Debes seleccionar una sucursal para generar el extracto general.")
+        return redirect(f"/nomina/?mes={mes}&anio={anio}")
+
+    empresa_usuario = obtener_empresa_usuario(request.user)
+    admin_master = es_admin_master(request.user)
+
+    sucursal = get_object_or_404(Sucursal.objects.select_related("empresa"), pk=sucursal_id)
+
+    if not admin_master and sucursal.empresa != empresa_usuario:
+        messages.error(request, "No puedes exportar nóminas de otra empresa.")
+        return redirect("nomina_lista")
+
+    nominas = NominaMensual.objects.select_related(
+        "funcionario",
+        "funcionario__sucursal_rel",
+        "funcionario__sucursal_rel__empresa"
+    ).filter(
+        mes=mes,
+        anio=anio,
+        funcionario__sucursal_rel=sucursal
+    ).order_by("funcionario__apellido", "funcionario__nombre")
+
+    total_bruto = nominas.aggregate(total=Sum("salario_bruto"))["total"] or Decimal("0.00")
+    total_ips = nominas.aggregate(total=Sum("descuento_ips"))["total"] or Decimal("0.00")
+    total_deudas = nominas.aggregate(total=Sum("descuento_deudas"))["total"] or Decimal("0.00")
+    total_neto = nominas.aggregate(total=Sum("salario_neto"))["total"] or Decimal("0.00")
+    total_bono = nominas.aggregate(total=Sum("bono_icl"))["total"] or Decimal("0.00")
+
+    config = ConfiguracionGeneral.obtener()
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        leftMargin=12 * mm,
+        rightMargin=12 * mm,
+        topMargin=14 * mm,
+        bottomMargin=14 * mm,
+    )
+
+    styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle(
+        name="TituloSucursal",
+        parent=styles["Heading1"],
+        fontName="Helvetica-Bold",
+        fontSize=16,
+        leading=20,
+        alignment=TA_CENTER,
+        textColor=colors.HexColor("#111827"),
+        spaceAfter=8,
+    ))
+
+    elementos = []
+
+    elementos.append(Paragraph(config.nombre_sistema or "ClockIn", styles["TituloSucursal"]))
+    elementos.append(Paragraph("EXTRACTO GENERAL DE NÓMINA POR SUCURSAL", styles["TituloSucursal"]))
+    elementos.append(Spacer(1, 8))
+
+    resumen = Table([
+        ["Empresa", sucursal.empresa.nombre],
+        ["Sucursal", sucursal.nombre],
+        ["Período", f"{mes:02d}/{anio}"],
+        ["Cantidad de funcionarios", str(nominas.count())],
+        ["Total bruto", _gs(total_bruto)],
+        ["Total bono ICL", _gs(total_bono)],
+        ["Total IPS", _gs(total_ips)],
+        ["Total deudas", _gs(total_deudas)],
+        ["Total neto general", _gs(total_neto)],
+    ], colWidths=[65 * mm, 105 * mm])
+
+    resumen.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#eff6ff")),
+        ("TEXTCOLOR", (0, 0), (0, -1), colors.HexColor("#1d4ed8")),
+        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+        ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#cbd5e1")),
+        ("FONTSIZE", (0, 0), (-1, -1), 8.5),
+    ]))
+    elementos.append(resumen)
+    elementos.append(Spacer(1, 12))
+
+    data = [["Funcionario", "CI", "Bruto", "IPS", "Deudas", "Neto", "Estado"]]
+
+    for n in nominas:
+        data.append([
+            n.funcionario.nombre_completo,
+            n.funcionario.cedula,
+            _gs(n.salario_bruto),
+            _gs(n.descuento_ips),
+            _gs(n.descuento_deudas),
+            _gs(n.salario_neto),
+            n.get_estado_pago_display(),
+        ])
+
+    tabla = Table(data, colWidths=[45 * mm, 22 * mm, 24 * mm, 22 * mm, 24 * mm, 26 * mm, 24 * mm])
+    tabla.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#dbeafe")),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 7),
+        ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#cbd5e1")),
+        ("ALIGN", (2, 1), (5, -1), "RIGHT"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+    ]))
+    elementos.append(tabla)
+
+    doc.build(elementos)
+
+    pdf = buffer.getvalue()
+    buffer.close()
+
+    response = HttpResponse(content_type="application/pdf")
+    response["Content-Disposition"] = f'inline; filename="nomina_sucursal_{sucursal.id}_{mes:02d}_{anio}.pdf"'
+    response.write(pdf)
+    return response
 
 @login_required
 def configuracion_general(request):

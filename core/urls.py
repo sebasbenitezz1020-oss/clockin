@@ -59,10 +59,18 @@ from .views import (
     dia_libre_nuevo,
     dia_libre_editar,
     dia_libre_toggle_activo,
+    marcacion_manual,
+    nomina_extracto_pdf,
+    nomina_sucursal_pdf,
+    nomina_cerrar_periodo,
+    nomina_reabrir_periodo,
+    vacacion_notificacion_pdf,
 )
 
 urlpatterns = [
     path("", dashboard, name="dashboard"),
+
+    path("marcacion-manual/", marcacion_manual, name="marcacion_manual"),
 
     path("empresas/", empresas_lista, name="empresas_lista"),
     path("empresas/nueva/", empresa_nueva, name="empresa_nueva"),
@@ -82,6 +90,10 @@ urlpatterns = [
 
     path("nomina/", nomina_lista, name="nomina_lista"),
     path("nomina/<int:pk>/toggle-pagado/", nomina_toggle_pagado, name="nomina_toggle_pagado"),
+    path("nomina/<int:pk>/extracto-pdf/", nomina_extracto_pdf, name="nomina_extracto_pdf"),
+    path("nomina/sucursal/pdf/", nomina_sucursal_pdf, name="nomina_sucursal_pdf"),
+    path("nomina/cerrar-periodo/", nomina_cerrar_periodo, name="nomina_cerrar_periodo"),
+    path("nomina/reabrir-periodo/", nomina_reabrir_periodo, name="nomina_reabrir_periodo"),
 
     path("funcionarios/", funcionarios_lista, name="funcionarios_lista"),
     path("funcionarios/nuevo/", funcionario_nuevo, name="funcionario_nuevo"),
@@ -102,6 +114,7 @@ urlpatterns = [
     path("vacaciones/", vacaciones_lista, name="vacaciones_lista"),
     path("vacaciones/nueva/", vacacion_nueva, name="vacacion_nueva"),
     path("vacaciones/<int:pk>/editar/", vacacion_editar, name="vacacion_editar"),
+    path("vacaciones/<int:pk>/notificacion-pdf/", vacacion_notificacion_pdf, name="vacacion_notificacion_pdf"),
 
     path("icl/", icl_lista, name="icl_lista"),
     path("reportes/", reportes, name="reportes"),

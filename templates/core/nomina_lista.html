@@ -199,10 +199,65 @@
 
             <button type="submit" class="btn-main">Filtrar</button>
         </form>
+        <form method="get" action="{% url 'nomina_sucursal_pdf' %}" class="nom-toolbar" style="grid-template-columns:1fr 1fr 1fr auto;">
+            <input type="hidden" name="mes" value="{{ mes }}">
+            <input type="hidden" name="anio" value="{{ anio }}">
+
+            <select name="sucursal" required>
+                <option value="">Seleccionar sucursal</option>
+                {% for sucursal in sucursales %}
+                    <option value="{{ sucursal.id }}">{{ sucursal.nombre }}</option>
+                {% endfor %}
+            </select>
+
+            <div></div>
+            <div></div>
+
+            <button type="submit" class="btn-main" formtarget="_blank">
+                🏢 PDF general sucursal
+            </button>
+        </form>
+
+        {% if cierre_nomina %}
+        <div class="nom-toolbar" style="grid-template-columns:1fr auto;">
+            <div style="color:#86efac; font-weight:800;">
+                🔒 Nómina cerrada — {{ cierre_nomina.cerrado_en|date:"d/m/Y H:i" }}
+                {% if cierre_nomina.cerrado_por %}
+                    por {{ cierre_nomina.cerrado_por }}
+                {% endif %}
+            </div>
+
+            <a href="{% url 'nomina_reabrir_periodo' %}?mes={{ mes }}&anio={{ anio }}"
+            class="btn-main"
+            style="text-align:center; text-decoration:none; background:linear-gradient(135deg,#dc2626,#ef4444);">
+                🔓 Reabrir período
+            </a>
+        </div>
+    {% else %}
+        <div class="nom-toolbar" style="grid-template-columns:1fr auto;">
+            <div style="color:#fcd34d; font-weight:800;">
+                ⚠️ Nómina abierta — aún permite recalcular.
+            </div>
+
+            <a href="{% url 'nomina_cerrar_periodo' %}?mes={{ mes }}&anio={{ anio }}"
+            class="btn-main"
+            style="text-align:center; text-decoration:none; background:linear-gradient(135deg,#16a34a,#22c55e);">
+                🔒 Cerrar nómina del mes
+            </a>
+        </div>
+    {% endif %}
 
         <form method="post" class="nom-toolbar" style="grid-template-columns:1fr;">
             {% csrf_token %}
-            <button type="submit" class="btn-main">🔄 Generar / recalcular nómina del período</button>
+            {% if cierre_nomina %}
+                <button type="button" class="btn-main" disabled style="opacity:.45; cursor:not-allowed;">
+                    🔒 Nómina cerrada — no se puede recalcular
+                </button>
+            {% else %}
+                <button type="submit" class="btn-main">
+                    🔄 Generar / recalcular nómina del período
+                </button>
+            {% endif %}
         </form>
 
         <div class="nom-table-wrap">
@@ -289,6 +344,9 @@
                                     {% else %}
                                         ✅ Marcar pagado
                                     {% endif %}
+                                <a href="{% url 'nomina_extracto_pdf' nomina.id %}" class="btn-sm btn-pagar" target="_blank">
+                                    📄 Extracto
+                                </a>    
                                 </a>
                             </div>
                         </td>

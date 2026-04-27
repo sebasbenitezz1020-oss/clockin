@@ -4,6 +4,7 @@
 {% block title %}Asistencia | ClockIn{% endblock %}
 
 {% block content %}
+
 <style>
     .asis-page {
         padding: 24px 0;
@@ -282,6 +283,32 @@
             grid-template-columns: 1fr;
         }
     }
+    .badge-manual {
+    background: rgba(245,158,11,.12);
+    color: #fcd34d;
+    border-color: rgba(245,158,11,.28);
+    }
+
+    .badge-lector {
+        background: rgba(59,130,246,.12);
+        color: #93c5fd;
+        border-color: rgba(59,130,246,.24);
+    }
+
+    .audit-box {
+        min-width: 260px;
+        color: #cbd5e1;
+        font-size: 13px;
+        line-height: 1.45;
+    }
+
+    .audit-box strong {
+        color: #fff;
+    }
+
+    .audit-box .motivo {
+        color: #fcd34d;
+    }
 </style>
 
 <div class="container-fluid asis-page">
@@ -290,7 +317,15 @@
             <h2>⏱️ Asistencia</h2>
             <p>Registro manual de marcaciones y seguimiento detallado de la jornada.</p>
         </div>
-    </div>
+
+        {% if perms.app.add_asistencia or request.user.is_superuser %}
+        <div>
+            <a href="{% url 'marcacion_manual' %}" class="asis-btn" style="text-decoration:none; background:linear-gradient(135deg,#f59e0b,#f97316);">
+                📝 Marcación manual autorizada
+            </a>
+        </div>
+        {% endif %}
+</div>
 
     {% if messages %}
     <div class="alert-list">
@@ -388,6 +423,8 @@
                         <th>Horas Trabajadas</th>
                         <th>Atraso</th>
                         <th>Estado</th>
+                        <th>Origen</th>
+                        <th>Auditoría</th>
                         <th>Observación</th>
                     </tr>
                 </thead>
@@ -464,12 +501,37 @@
                                 <span class="badge-soft badge-ok">{{ a.estado_jornada }}</span>
                             {% endif %}
                         </td>
+                        <td>
+                            {% if a.es_manual %}
+                                <span class="badge-soft badge-manual">📝 Manual</span>
+                            {% else %}
+                                <span class="badge-soft badge-lector">👤 Lector</span>
+                            {% endif %}
+                        </td>
+
+                        <td>
+                            {% if a.es_manual %}
+                                <div class="audit-box">
+                                    <div><strong>Operador:</strong> {{ a.operador_manual_nombre }}</div>
+
+                                    {% if a.fecha_hora_real_sistema %}
+                                        <div><strong>Sistema:</strong> {{ a.fecha_hora_real_sistema|date:"d/m/Y H:i:s" }}</div>
+                                    {% endif %}
+
+                                    {% if a.motivo_marcacion_manual %}
+                                        <div class="motivo"><strong>Motivo:</strong> {{ a.motivo_marcacion_manual }}</div>
+                                    {% endif %}
+                                </div>
+                            {% else %}
+                                <span class="muted">—</span>
+                            {% endif %}
+                        </td>
 
                         <td>{{ a.observacion|default:"-" }}</td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="11" class="muted">No hay marcaciones registradas hoy.</td>
+                        <td colspan="13" class="muted">No hay marcaciones registradas hoy.</td>
                     </tr>
                     {% endfor %}
                 </tbody>

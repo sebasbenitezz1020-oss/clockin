@@ -21,6 +21,26 @@
     </div>
 {% endif %}
 
+{% if alertas_vacaciones %}
+<div class="card mb-20" style="border:1px solid rgba(245,158,11,.35);">
+    <div class="section-head">
+        <h3>🚨 Alertas de vacaciones</h3>
+        <span class="section-subtitle">Próximas a vencer o vencidas</span>
+    </div>
+
+    <div class="mini-list">
+        {% for item in alertas_vacaciones %}
+            <div class="mini-list-item mini-list-item-column">
+                <strong>{{ item.funcionario.nombre_completo }}</strong>
+                <p>CI: {{ item.funcionario.cedula }}</p>
+                <p>{{ item.alerta.texto }}</p>
+                <p>Saldo disponible: {{ item.funcionario.saldo_vacaciones }} día(s)</p>
+            </div>
+        {% endfor %}
+    </div>
+</div>
+{% endif %}
+
 {% if messages %}
     {% for message in messages %}
         <div class="alert-box success-box">{{ message }}</div>
@@ -77,6 +97,7 @@
                             </td>
                             <td>
                                 <a href="{% url 'vacacion_editar' v.pk %}" class="btn-table">Editar</a>
+                                <a href="{% url 'vacacion_notificacion_pdf' v.pk %}" class="btn-table" target="_blank">📄 Notificación</a>
                             </td>
                         </tr>
                     {% empty %}

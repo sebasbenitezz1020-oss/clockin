@@ -3,9 +3,145 @@
 {% block title %}{{ titulo_form }} | ClockIn{% endblock %}
 
 {% block content %}
+<style>
+    .vac-calendar-box {
+        margin-top: 14px;
+        background: rgba(15, 23, 34, .96);
+        border: 1px solid rgba(255,255,255,.08);
+        border-radius: 18px;
+        padding: 16px;
+    }
+
+    .vac-calendar-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 14px;
+    }
+
+    .vac-calendar-title {
+        color: #fff;
+        font-weight: 800;
+        font-size: 16px;
+    }
+
+    .vac-cal-btn {
+        border: none;
+        border-radius: 12px;
+        padding: 9px 12px;
+        background: rgba(37,99,235,.18);
+        color: #bfdbfe;
+        font-weight: 800;
+        cursor: pointer;
+    }
+
+    .vac-calendar-week,
+    .vac-calendar-grid {
+        display: grid;
+        grid-template-columns: repeat(7, 1fr);
+        gap: 8px;
+    }
+
+    .vac-calendar-week div {
+        color: #94a3b8;
+        font-size: 12px;
+        font-weight: 800;
+        text-align: center;
+    }
+
+    .vac-day {
+        min-height: 46px;
+        border-radius: 14px;
+        border: 1px solid rgba(255,255,255,.06);
+        background: rgba(255,255,255,.03);
+        color: #94a3b8;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: 800;
+        cursor: not-allowed;
+        position: relative;
+    }
+
+    .vac-day.enabled {
+        background: rgba(34,197,94,.16);
+        color: #86efac;
+        border-color: rgba(34,197,94,.35);
+        cursor: pointer;
+        box-shadow: 0 0 0 1px rgba(34,197,94,.08);
+    }
+
+    .vac-day.enabled:hover {
+        transform: translateY(-1px);
+        box-shadow: 0 0 20px rgba(34,197,94,.20);
+    }
+
+    .vac-day.selected {
+        background: rgba(59,130,246,.28);
+        color: #bfdbfe;
+        border-color: rgba(59,130,246,.65);
+        box-shadow: 0 0 22px rgba(59,130,246,.25);
+    }
+
+    .vac-day.today {
+        outline: 2px solid rgba(245,158,11,.55);
+    }
+
+    .vac-day.disabled::after {
+        content: "×";
+        position: absolute;
+        top: 3px;
+        right: 7px;
+        color: rgba(248,113,113,.8);
+        font-size: 12px;
+    }
+
+    .vac-calendar-legend {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 14px;
+        color: #cbd5e1;
+        font-size: 13px;
+    }
+
+    .vac-legend-item {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+    }
+
+    .vac-dot {
+        width: 12px;
+        height: 12px;
+        border-radius: 999px;
+        display: inline-block;
+    }
+
+    .dot-green { background: #22c55e; }
+    .dot-blue { background: #3b82f6; }
+    .dot-red { background: #ef4444; }
+    .dot-yellow { background: #f59e0b; }
+
+    .vac-auto-box {
+        margin-top: 12px;
+        display: none;
+    }
+
+    #id_fecha_desde {
+        display: none;
+    }
+</style>
+
 <div class="page-header">
     <h2>🏖️ {{ titulo_form }}</h2>
     <p>Completa los datos de la vacación.</p>
+
+    <div class="alert-box warning-box" style="margin-top:12px;">
+        ⚖️ Recordatorio legal: la notificación debe realizarse por escrito con al menos 15 días de anticipación.
+        Las vacaciones deben iniciar un día lunes o el siguiente día hábil si el lunes fuera feriado.
+    </div>
 </div>
 
 <div class="card form-card">
@@ -29,12 +165,41 @@
                 <label for="{{ form.fecha_desde.id_for_label }}">Fecha desde</label>
                 {{ form.fecha_desde }}
                 {{ form.fecha_desde.errors }}
+
+                <div class="vac-calendar-box">
+                    <div class="vac-calendar-head">
+                        <button type="button" class="vac-cal-btn" id="vacPrev">←</button>
+                        <div class="vac-calendar-title" id="vacCalendarTitle">Calendario</div>
+                        <button type="button" class="vac-cal-btn" id="vacNext">→</button>
+                    </div>
+
+                    <div class="vac-calendar-week">
+                        <div>Lun</div>
+                        <div>Mar</div>
+                        <div>Mié</div>
+                        <div>Jue</div>
+                        <div>Vie</div>
+                        <div>Sáb</div>
+                        <div>Dom</div>
+                    </div>
+
+                    <div class="vac-calendar-grid" id="vacCalendarGrid"></div>
+
+                    <div class="vac-calendar-legend">
+                        <span class="vac-legend-item"><span class="vac-dot dot-green"></span> Disponible</span>
+                        <span class="vac-legend-item"><span class="vac-dot dot-blue"></span> Seleccionado</span>
+                        <span class="vac-legend-item"><span class="vac-dot dot-red"></span> No permitido</span>
+                        <span class="vac-legend-item"><span class="vac-dot dot-yellow"></span> Hoy</span>
+                    </div>
+                </div>
             </div>
 
             <div class="form-field">
                 <label for="{{ form.fecha_hasta.id_for_label }}">Fecha hasta</label>
                 {{ form.fecha_hasta }}
                 {{ form.fecha_hasta.errors }}
+
+                <div id="vacAutoInfo" class="alert-box success-box vac-auto-box"></div>
             </div>
 
             <div class="form-field">
@@ -62,4 +227,221 @@
         </div>
     </form>
 </div>
+
+{{ funcionarios_json|json_script:"funcionarios-vacaciones-data" }}
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const funcionarioSelect = document.getElementById("id_funcionario");
+    const fechaDesde = document.getElementById("id_fecha_desde");
+    const fechaHasta = document.getElementById("id_fecha_hasta");
+    const diasInput = document.getElementById("id_dias_solicitados");
+
+    const calendarTitle = document.getElementById("vacCalendarTitle");
+    const calendarGrid = document.getElementById("vacCalendarGrid");
+    const btnPrev = document.getElementById("vacPrev");
+    const btnNext = document.getElementById("vacNext");
+    const info = document.getElementById("vacAutoInfo");
+
+    const dataElement = document.getElementById("funcionarios-vacaciones-data");
+    const funcionarios = dataElement ? JSON.parse(dataElement.textContent) : [];
+
+    fechaHasta.readOnly = true;
+    diasInput.readOnly = true;
+
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+
+    let mesActual = hoy.getMonth();
+    let anioActual = hoy.getFullYear();
+
+    const meses = [
+        "Enero", "Febrero", "Marzo", "Abril", "Mayo", "Junio",
+        "Julio", "Agosto", "Septiembre", "Octubre", "Noviembre", "Diciembre"
+    ];
+
+    function formatoInput(fecha) {
+        const y = fecha.getFullYear();
+        const m = String(fecha.getMonth() + 1).padStart(2, "0");
+        const d = String(fecha.getDate()).padStart(2, "0");
+        return `${y}-${m}-${d}`;
+    }
+
+    function formatoVisual(fecha) {
+        return fecha.toLocaleDateString("es-PY");
+    }
+
+    function sumarDias(fecha, dias) {
+        const nueva = new Date(fecha);
+        nueva.setDate(nueva.getDate() + dias);
+        return nueva;
+    }
+
+    function getFuncionarioSeleccionado() {
+        return funcionarios.find(f => String(f.id) === String(funcionarioSelect.value));
+    }
+
+    function diasDisponiblesFuncionario() {
+        const funcionario = getFuncionarioSeleccionado();
+        return funcionario ? parseInt(funcionario.dias || 0) : 0;
+    }
+
+    function esMismaFecha(a, b) {
+        return a && b && formatoInput(a) === formatoInput(b);
+    }
+
+    function fechaSeleccionadaActual() {
+        if (!fechaDesde.value) return null;
+        return new Date(fechaDesde.value + "T00:00:00");
+    }
+
+    function fechaHabilitada(fecha) {
+        const dias = diasDisponiblesFuncionario();
+
+        if (dias <= 0) return false;
+
+        const diferenciaDias = Math.floor((fecha - hoy) / (1000 * 60 * 60 * 24));
+
+        const esLunes = fecha.getDay() === 1;
+        const cumpleAnticipacion = diferenciaDias >= 15;
+
+        return esLunes && cumpleAnticipacion;
+    }
+
+    function recalcularVacacion() {
+        const funcionario = getFuncionarioSeleccionado();
+
+        if (!funcionario || !fechaDesde.value) {
+            info.style.display = "none";
+            fechaHasta.value = "";
+            diasInput.value = "";
+            return;
+        }
+
+        const dias = parseInt(funcionario.dias || 0);
+        const inicio = new Date(fechaDesde.value + "T00:00:00");
+
+        if (dias <= 0) {
+            fechaHasta.value = "";
+            diasInput.value = "0";
+            info.style.display = "block";
+            info.className = "alert-box error-box-strong vac-auto-box";
+            info.innerHTML = "⚠️ Este funcionario no tiene saldo de vacaciones disponible.";
+            return;
+        }
+
+        if (!fechaHabilitada(inicio)) {
+            fechaHasta.value = "";
+            diasInput.value = "";
+            info.style.display = "block";
+            info.className = "alert-box error-box-strong vac-auto-box";
+            info.innerHTML = "⚠️ Fecha no habilitada. Debe ser lunes y cumplir mínimo 15 días de anticipación.";
+            return;
+        }
+
+        const fin = sumarDias(inicio, dias - 1);
+        const regreso = sumarDias(fin, 1);
+
+        diasInput.value = dias;
+        fechaHasta.value = formatoInput(fin);
+
+        info.style.display = "block";
+        info.className = "alert-box success-box vac-auto-box";
+        info.innerHTML = `
+            ✅ Vacación calculada automáticamente.<br>
+            Días disponibles: <strong>${dias}</strong><br>
+            Inicio: <strong>${formatoVisual(inicio)}</strong><br>
+            Último día de vacaciones: <strong>${formatoVisual(fin)}</strong><br>
+            Fecha estimada de regreso: <strong>${formatoVisual(regreso)}</strong>
+        `;
+    }
+
+    function renderCalendario() {
+        calendarGrid.innerHTML = "";
+        calendarTitle.textContent = `${meses[mesActual]} ${anioActual}`;
+
+        const primerDia = new Date(anioActual, mesActual, 1);
+        const ultimoDia = new Date(anioActual, mesActual + 1, 0);
+
+        let inicioGrid = primerDia.getDay();
+        inicioGrid = inicioGrid === 0 ? 6 : inicioGrid - 1;
+
+        for (let i = 0; i < inicioGrid; i++) {
+            const empty = document.createElement("div");
+            calendarGrid.appendChild(empty);
+        }
+
+        const seleccionada = fechaSeleccionadaActual();
+
+        for (let dia = 1; dia <= ultimoDia.getDate(); dia++) {
+            const fecha = new Date(anioActual, mesActual, dia);
+            fecha.setHours(0, 0, 0, 0);
+
+            const btn = document.createElement("button");
+            btn.type = "button";
+            btn.className = "vac-day";
+            btn.textContent = dia;
+
+            if (esMismaFecha(fecha, hoy)) {
+                btn.classList.add("today");
+            }
+
+            if (fechaHabilitada(fecha)) {
+                btn.classList.add("enabled");
+                btn.title = "Disponible para iniciar vacaciones";
+
+                btn.addEventListener("click", function () {
+                    fechaDesde.value = formatoInput(fecha);
+                    recalcularVacacion();
+                    renderCalendario();
+                });
+            } else {
+                btn.classList.add("disabled");
+                btn.title = "No permitido: debe ser lunes y cumplir 15 días de anticipación";
+            }
+
+            if (seleccionada && esMismaFecha(fecha, seleccionada)) {
+                btn.classList.add("selected");
+            }
+
+            calendarGrid.appendChild(btn);
+        }
+    }
+
+    btnPrev.addEventListener("click", function () {
+        mesActual--;
+        if (mesActual < 0) {
+            mesActual = 11;
+            anioActual--;
+        }
+        renderCalendario();
+    });
+
+    btnNext.addEventListener("click", function () {
+        mesActual++;
+        if (mesActual > 11) {
+            mesActual = 0;
+            anioActual++;
+        }
+        renderCalendario();
+    });
+
+    funcionarioSelect.addEventListener("change", function () {
+        fechaDesde.value = "";
+        fechaHasta.value = "";
+        diasInput.value = "";
+        info.style.display = "none";
+        renderCalendario();
+    });
+
+    if (fechaDesde.value) {
+        const inicial = new Date(fechaDesde.value + "T00:00:00");
+        mesActual = inicial.getMonth();
+        anioActual = inicial.getFullYear();
+        recalcularVacacion();
+    }
+
+    renderCalendario();
+});
+</script>
 {% endblock %}

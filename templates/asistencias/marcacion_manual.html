@@ -1,0 +1,188 @@
+{% extends "base.html" %}
+
+{% block title %}Marcación Manual | ClockIn{% endblock %}
+
+{% block content %}
+<style>
+    .manual-page {
+        padding: 24px 0;
+    }
+
+    .manual-card {
+        max-width: 760px;
+        margin: 0 auto;
+        background: linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
+        border: 1px solid rgba(255,255,255,.06);
+        border-radius: 24px;
+        box-shadow: 0 12px 36px rgba(0,0,0,.24);
+        overflow: hidden;
+    }
+
+    .manual-header {
+        padding: 22px;
+        border-bottom: 1px solid rgba(255,255,255,.06);
+    }
+
+    .manual-header h2 {
+        margin: 0;
+        color: #fff;
+        font-weight: 800;
+    }
+
+    .manual-header p {
+        margin: 8px 0 0;
+        color: #94a3b8;
+    }
+
+    .manual-body {
+        padding: 22px;
+    }
+
+    .manual-alert {
+        background: rgba(245,158,11,.12);
+        color: #fcd34d;
+        border: 1px solid rgba(245,158,11,.22);
+        border-radius: 16px;
+        padding: 14px 16px;
+        margin-bottom: 18px;
+        font-weight: 600;
+    }
+
+    .manual-label {
+        display: block;
+        color: #cbd5e1;
+        font-weight: 700;
+        margin-bottom: 8px;
+    }
+
+    .manual-body select,
+    .manual-body input,
+    .manual-body textarea {
+        width: 100%;
+        background: #0f1722;
+        color: white;
+        border: 1px solid rgba(255,255,255,.08);
+        border-radius: 14px;
+        padding: 13px 15px;
+        outline: none;
+    }
+
+    .manual-body select:focus,
+    .manual-body input:focus,
+    .manual-body textarea:focus {
+        border-color: rgba(245,158,11,.55);
+        box-shadow: 0 0 0 3px rgba(245,158,11,.12);
+    }
+
+    .manual-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+    }
+
+    .manual-field {
+        margin-bottom: 16px;
+    }
+
+    .manual-actions {
+        display: flex;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-top: 8px;
+    }
+
+    .manual-btn {
+        border: none;
+        border-radius: 16px;
+        padding: 13px 18px;
+        color: white;
+        font-weight: 800;
+        text-decoration: none;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .manual-btn-save {
+        background: linear-gradient(135deg, #16a34a, #22c55e);
+    }
+
+    .manual-btn-back {
+        background: rgba(255,255,255,.08);
+        border: 1px solid rgba(255,255,255,.08);
+    }
+
+    .errorlist {
+        color: #fca5a5;
+        margin-top: 8px;
+    }
+
+    @media (max-width: 800px) {
+        .manual-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<div class="container-fluid manual-page">
+    <div class="manual-card">
+        <div class="manual-header">
+            <h2>📝 Marcación Manual Autorizada</h2>
+            <p>Registra la hora real de entrada o salida cuando el lector facial tenga inconvenientes.</p>
+        </div>
+
+        <div class="manual-body">
+            <div class="manual-alert">
+                ⚠️ Esta acción quedará auditada con el usuario operador, motivo, hora real registrada y hora real del sistema.
+            </div>
+
+            <form method="post">
+                {% csrf_token %}
+
+                <div class="manual-field">
+                    <label class="manual-label">Funcionario</label>
+                    {{ form.funcionario }}
+                    {{ form.funcionario.errors }}
+                </div>
+
+                <div class="manual-field">
+                    <label class="manual-label">Tipo de marcación</label>
+                    {{ form.tipo }}
+                    {{ form.tipo.errors }}
+                </div>
+
+                <div class="manual-grid">
+                    <div class="manual-field">
+                        <label class="manual-label">Fecha</label>
+                        {{ form.fecha }}
+                        {{ form.fecha.errors }}
+                    </div>
+
+                    <div class="manual-field">
+                        <label class="manual-label">Hora real</label>
+                        {{ form.hora }}
+                        {{ form.hora.errors }}
+                    </div>
+                </div>
+
+                <div class="manual-field">
+                    <label class="manual-label">Motivo obligatorio</label>
+                    {{ form.motivo }}
+                    {{ form.motivo.errors }}
+                </div>
+
+                <div class="manual-actions">
+                    <button type="submit" class="manual-btn manual-btn-save">
+                        ✅ Registrar marcación manual
+                    </button>
+
+                    <a href="{% url 'asistencia_marcar' %}" class="manual-btn manual-btn-back">
+                        ↩ Volver a asistencia
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
