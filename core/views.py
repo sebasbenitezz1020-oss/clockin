@@ -110,9 +110,22 @@ def marcacion_manual(request):
                 fecha=fecha,
             )
 
+            if tipo in ["salida_almuerzo", "regreso_almuerzo"] and (
+                not funcionario.turno or not funcionario.turno.usa_almuerzo
+            ):
+                messages.error(request, "Este funcionario no tiene un turno con almuerzo configurado.")
+                return redirect("marcacion_manual")
+
             if tipo == "entrada":
                 asistencia.hora_entrada = fecha_hora_manual
                 asistencia.calcular_atraso()
+
+            elif tipo == "salida_almuerzo":
+                asistencia.hora_salida_almuerzo = fecha_hora_manual
+
+            elif tipo == "regreso_almuerzo":
+                asistencia.hora_regreso_almuerzo = fecha_hora_manual
+
             elif tipo == "salida":
                 asistencia.hora_salida = fecha_hora_manual
 
@@ -126,8 +139,15 @@ def marcacion_manual(request):
                     asistencia.observacion = f"📝 Entrada manual. Llegó con {asistencia.minutos_atraso} minuto(s) de atraso."
                 else:
                     asistencia.observacion = "📝 Entrada manual registrada en horario."
+
+            elif tipo == "salida_almuerzo":
+                asistencia.observacion = "📝 Salida a almuerzo manual registrada."
+
+            elif tipo == "regreso_almuerzo":
+                asistencia.observacion = "📝 Regreso de almuerzo manual registrado."
+
             else:
-                asistencia.observacion = "📝 Salida manual registrada."
+                asistencia.observacion = "📝 Salida final manual registrada."
 
             asistencia.save()
 
@@ -1249,6 +1269,9 @@ def asistencia_marcar(request):
     hoy = timezone.localdate()
     resultado = None
 
+    sucursal_id = request.GET.get("sucursal", "").strip()
+    q = request.GET.get("q", "").strip()
+
     empresa_usuario = obtener_empresa_usuario(request.user)
     admin_master = es_admin_master(request.user)
 
@@ -1420,6 +1443,24 @@ def asistencia_marcar(request):
         else:
             asistencias_hoy = asistencias_hoy.none()
 
+    if sucursal_id:
+        asistencias_hoy = asistencias_hoy.filter(funcionario__sucursal_rel_id=sucursal_id)
+
+    if q:
+        asistencias_hoy = asistencias_hoy.filter(
+            Q(funcionario__nombre__icontains=q) |
+            Q(funcionario__apellido__icontains=q) |
+            Q(funcionario__cedula__icontains=q)
+        )
+
+    if admin_master:
+        sucursales = Sucursal.objects.filter(activo=True).order_by("empresa__nombre", "nombre")
+    else:
+        sucursales = Sucursal.objects.filter(
+            activo=True,
+            empresa=empresa_usuario
+        ).order_by("nombre") if empresa_usuario else Sucursal.objects.none()        
+
     asistencias_hoy = asistencias_hoy.order_by("-hora_entrada")
 
     return render(request, "core/asistencia_marcar.html", {
@@ -1427,6 +1468,9 @@ def asistencia_marcar(request):
         "resultado": resultado,
         "asistencias_hoy": asistencias_hoy,
         "hoy": hoy,
+        "sucursales": sucursales,
+        "sucursal_id": sucursal_id,
+        "q": q,
     })
 
 
@@ -2162,7 +2206,35 @@ def reportes(request):
     ids_justificados = set(permisos_dia.values_list("funcionario_id", flat=True))
     ids_justificados.update(vacaciones_dia.values_list("funcionario_id", flat=True))
 
-    ausentes_dia = funcionarios_con_turno.exclude(id__in=ids_con_asistencia).exclude(id__in=ids_justificados)
+    ahora = timezone.localtime()
+    ausentes_ids_inteligentes = []
+
+    for funcionario in funcionarios_con_turno:
+        if funcionario.id in ids_con_asistencia or funcionario.id in ids_justificados:
+            continue
+
+        if funcionario_tiene_dia_libre(funcionario, fecha_reporte):
+            continue
+
+        if not funcionario.turno or not funcionario.turno.hora_entrada:
+            continue
+
+        entrada_programada = timezone.make_aware(
+            datetime.combine(fecha_reporte, funcionario.turno.hora_entrada)
+        )
+
+        entrada_limite = entrada_programada + timezone.timedelta(
+            minutes=funcionario.turno.tolerancia_minutos or 0
+        )
+
+        if fecha_reporte < hoy:
+            ausentes_ids_inteligentes.append(funcionario.id)
+        elif fecha_reporte == hoy and ahora >= entrada_limite:
+            ausentes_ids_inteligentes.append(funcionario.id)
+        elif fecha_reporte > hoy:
+            pass
+
+    ausentes_dia = funcionarios_con_turno.filter(id__in=ausentes_ids_inteligentes)
 
     llegadas_tarde = asistencias_dia.filter(
         hora_entrada__isnull=False,
@@ -2193,6 +2265,9 @@ def reportes(request):
             "funcionario": item.funcionario,
             "obj": item,
         })
+
+    permisos_reporte_dia = permisos_dia
+    vacaciones_reporte_dia = vacaciones_dia    
 
     presentes_dia = asistencias_dia.filter(hora_entrada__isnull=False).count()
     tardanzas_dia = llegadas_tarde.count()
@@ -2308,6 +2383,8 @@ def reportes(request):
         "llegadas_tarde": llegadas_tarde,
         "ausentes_dia": ausentes_dia,
         "permisos_licencias_dia": permisos_licencias_dia,
+        "permisos_reporte_dia": permisos_reporte_dia,
+        "vacaciones_reporte_dia": vacaciones_reporte_dia,
         "sin_salida": sin_salida,
         "presentes_en_horario": presentes_en_horario,
         "mes": mes,

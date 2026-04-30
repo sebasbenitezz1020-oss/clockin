@@ -27,7 +27,9 @@ class MarcacionManualForm(forms.Form):
     tipo = forms.ChoiceField(
         choices=[
             ("entrada", "Entrada"),
-            ("salida", "Salida"),
+            ("salida_almuerzo", "Salida a almuerzo"),
+            ("regreso_almuerzo", "Regreso de almuerzo"),
+            ("salida", "Salida final"),
         ],
         label="Tipo de marcación",
         widget=forms.Select(attrs={"class": "form-control"})

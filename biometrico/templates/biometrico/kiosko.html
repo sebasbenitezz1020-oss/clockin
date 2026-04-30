@@ -1333,6 +1333,22 @@
         detailAtraso.textContent = "—";
     }
 
+    function hablar(texto) {
+        if (!CONFIG_SONIDOS_ACTIVOS) return;
+
+        try {
+            window.speechSynthesis.cancel();
+
+            const mensaje = new SpeechSynthesisUtterance(texto);
+            mensaje.lang = "es-ES";
+            mensaje.rate = 1;
+            mensaje.pitch = 1;
+            mensaje.volume = 1;
+
+            window.speechSynthesis.speak(mensaje);
+        } catch (e) {}
+    }
+
     function mostrarExito(data) {
         videoWrap.classList.remove("scan-error", "scan-warn");
         videoWrap.classList.add("scan-ok");
@@ -1358,6 +1374,7 @@
 
         aplicarPulse();
         beepSuccess();
+        hablar("Acceso correcto");
         activarPausa(PAUSA_EXITO_MS);
         programarReinicio(1400);
     }
@@ -1379,6 +1396,7 @@
         detailAtraso.textContent = "—";
 
         if (conSonido) beepWarn();
+        if (conSonido) hablar("Atención, revise la marcación");
         activarPausa(pausaMs);
         programarReinicio(1600);
     }
@@ -1400,6 +1418,7 @@
         detailAtraso.textContent = "—";
 
         if (conSonido) beepError();
+        if (conSonido) hablar("Acceso denegado");
         activarPausa(PAUSA_ERROR_MS);
         programarReinicio(1600);
     }

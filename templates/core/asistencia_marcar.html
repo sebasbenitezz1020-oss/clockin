@@ -408,6 +408,35 @@
             <p>Detalle completo de entrada, almuerzo, regreso, salida final y horas trabajadas.</p>
         </div>
 
+        <div style="padding: 0 22px 16px;">
+            <form method="get" style="display:grid; grid-template-columns: 1fr 1fr auto; gap:12px; align-items:end;">
+                <div>
+                    <label class="asis-label">Buscar funcionario</label>
+                    <input
+                        type="search"
+                        name="q"
+                        id="buscarAsistenciaLive"
+                        value="{{ q }}"
+                        placeholder="Nombre o cédula..."
+                    >
+                </div>
+
+                <div>
+                    <label class="asis-label">Sucursal</label>
+                    <select name="sucursal" style="width:100%; background:#0f1722; color:white; border:1px solid rgba(255,255,255,.08); border-radius:14px; padding:14px 16px;">
+                        <option value="">Todas las sucursales</option>
+                        {% for s in sucursales %}
+                            <option value="{{ s.id }}" {% if sucursal_id == s.id|stringformat:"s" %}selected{% endif %}>
+                                {{ s.nombre }}
+                            </option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <button type="submit" class="asis-btn">Filtrar</button>
+            </form>
+        </div>
+
         <div class="tabla-wrap">
             <table class="asis-table">
                 <thead>
@@ -538,4 +567,22 @@
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const buscador = document.getElementById("buscarAsistenciaLive");
+    const filas = document.querySelectorAll(".asis-table tbody tr");
+
+    if (!buscador) return;
+
+    buscador.addEventListener("input", function () {
+        const texto = buscador.value.toLowerCase().trim();
+
+        filas.forEach(function (fila) {
+            const contenido = fila.innerText.toLowerCase();
+            fila.style.display = contenido.includes(texto) ? "" : "none";
+        });
+    });
+});
+</script>
 {% endblock %}

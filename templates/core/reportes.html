@@ -415,6 +415,61 @@
         grid-template-columns: 1fr;
     }
 }
+.report-button-grid {
+    display: grid;
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.report-toggle-btn {
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 18px;
+    padding: 18px;
+    background: linear-gradient(145deg, #111a28, #0b111a);
+    color: white;
+    cursor: pointer;
+    text-align: left;
+    transition: .18s ease;
+}
+
+.report-toggle-btn:hover {
+    transform: translateY(-2px);
+    border-color: rgba(59,130,246,.32);
+}
+
+.report-toggle-btn span {
+    display: block;
+    color: #94a3b8;
+    font-size: 12px;
+    margin-top: 6px;
+}
+
+.report-toggle-btn strong {
+    display: block;
+    font-size: 28px;
+    margin-top: 8px;
+}
+
+.report-panel {
+    display: none;
+    margin-top: 18px;
+}
+
+.report-panel.active {
+    display: block;
+}
+
+@media (max-width: 1100px) {
+    .report-button-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 700px) {
+    .report-button-grid {
+        grid-template-columns: 1fr;
+    }
+}
 </style>
 
 <div class="page-header">
@@ -543,7 +598,46 @@
         </div>
     </div>
 
-    <div class="alert-cards-grid">
+    <div class="section-card-pro">
+        <div class="section-head">
+            <h3>📌 Reporte diario por categorías</h3>
+            <span class="section-subtitle">Haz clic en una categoría para ver el detalle</span>
+        </div>
+
+        <div class="report-button-grid">
+            <button type="button" class="report-toggle-btn" data-target="panel-atrasos">
+                ⏰ Atrasos
+                <span>Funcionarios que llegaron tarde</span>
+                <strong>{{ llegadas_tarde|length }}</strong>
+            </button>
+
+            <button type="button" class="report-toggle-btn" data-target="panel-ausentes">
+                🚫 Ausentes
+                <span>Solo quienes ya debían presentarse</span>
+                <strong>{{ ausentes_dia|length }}</strong>
+            </button>
+
+            <button type="button" class="report-toggle-btn" data-target="panel-presentes">
+                ✅ Presentes en hora
+                <span>Funcionarios puntuales</span>
+                <strong>{{ presentes_en_horario|length }}</strong>
+            </button>
+
+            <button type="button" class="report-toggle-btn" data-target="panel-permisos">
+                📄 Permisos
+                <span>Permisos/licencias aprobados</span>
+                <strong>{{ permisos_reporte_dia|length }}</strong>
+            </button>
+
+            <button type="button" class="report-toggle-btn" data-target="panel-vacaciones">
+                🏖️ Vacaciones
+                <span>Vacaciones activas del día</span>
+                <strong>{{ vacaciones_reporte_dia|length }}</strong>
+            </button>
+        </div>
+    </div>
+
+    <div class="alert-card-pro report-panel" id="panel-atrasos"></div>
         <div class="alert-card-pro">
             <div class="alert-card-head">
                 <h4>⏰ Llegadas tarde</h4>
@@ -571,7 +665,7 @@
             </div>
         </div>
 
-        <div class="alert-card-pro">
+        <div class="alert-card-pro report-panel" id="panel-ausentes"></div>
             <div class="alert-card-head">
                 <h4>🚫 Ausentes</h4>
                 <span class="alert-counter red">{{ ausentes_dia|length }}</span>
@@ -598,17 +692,18 @@
             </div>
         </div>
 
-        <div class="alert-card-pro">
+        <div class="alert-card-pro report-panel" id="panel-permisos"></div>
             <div class="alert-card-head">
                 <h4>📄 Permisos / licencias</h4>
                 <span class="alert-counter blue">{{ permisos_licencias_dia|length }}</span>
             </div>
 
             <div class="mini-list">
-                {% for item in permisos_licencias_dia %}
+                {% for item in permisos_reporte_dia %}
                     <div class="mini-item">
-                        <strong>{{ item.funcionario.nombre_completo }}</strong>
-                        <span>Tipo: {{ item.tipo }}</span>
+                       <strong>{{ item.funcionario.nombre_completo }}</strong>
+                        <span>Tipo: {{ item.get_tipo_display }}</span>
+                        <span>Desde: {{ item.fecha_desde|date:"d/m/Y" }} · Hasta: {{ item.fecha_hasta|date:"d/m/Y" }}</span>
                         <span>Turno: {{ item.funcionario.turno.nombre|default:"-" }}</span>
                         <span>Sucursal: {{ item.funcionario.sucursal_mostrar }}</span>
 
@@ -620,6 +715,33 @@
                     </div>
                 {% empty %}
                     <div class="empty-mini">No hay permisos, licencias o vacaciones cargadas para este día.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="alert-card-pro report-panel" id="panel-vacaciones">
+            <div class="alert-card-head">
+                <h4>🏖️ Vacaciones</h4>
+                <span class="alert-counter blue">{{ vacaciones_reporte_dia|length }}</span>
+            </div>
+
+            <div class="mini-list">
+                {% for item in vacaciones_reporte_dia %}
+                    <div class="mini-item">
+                        <strong>{{ item.funcionario.nombre_completo }}</strong>
+                        <span>CI: {{ item.funcionario.cedula }}</span>
+                        <span>Desde: {{ item.fecha_desde|date:"d/m/Y" }} · Hasta: {{ item.fecha_hasta|date:"d/m/Y" }}</span>
+                        <span>Días: {{ item.dias_solicitados }}</span>
+                        <span>Sucursal: {{ item.funcionario.sucursal_mostrar }}</span>
+
+                        <div class="quick-actions">
+                            <a href="{% url 'funcionarios_lista' %}?q={{ item.funcionario.cedula }}" class="quick-btn gray">👤 Ver funcionario</a>
+                            <a href="{% url 'vacaciones_lista' %}?q={{ item.funcionario.cedula }}" class="quick-btn orange">🏖 Ver vacaciones</a>
+                            <a href="{% url 'historial_lista' %}?q={{ item.funcionario.cedula }}" class="quick-btn green">🕘 Historial</a>
+                        </div>
+                    </div>
+                {% empty %}
+                    <div class="empty-mini">No hay vacaciones cargadas para este día.</div>
                 {% endfor %}
             </div>
         </div>
@@ -650,7 +772,7 @@
             </div>
         </div>
 
-        <div class="alert-card-pro" style="grid-column: 1 / -1;">
+        <div class="alert-card-pro report-panel" id="panel-presentes"></div>
             <div class="alert-card-head">
                 <h4>✅ Presentes en horario</h4>
                 <span class="alert-counter green">{{ presentes_en_horario|length }}</span>
@@ -735,6 +857,8 @@
         </div>
     </div>
 
+
+
     <div class="section-card-pro">
         <div class="section-head">
             <h3>📆 Reporte mensual</h3>
@@ -813,4 +937,29 @@
     </div>
 
 </div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const botones = document.querySelectorAll(".report-toggle-btn");
+    const paneles = document.querySelectorAll(".report-panel");
+
+    botones.forEach(function (boton) {
+        boton.addEventListener("click", function () {
+            const target = boton.dataset.target;
+            const panel = document.getElementById(target);
+
+            paneles.forEach(function (p) {
+                if (p !== panel) {
+                    p.classList.remove("active");
+                }
+            });
+
+            if (panel) {
+                panel.classList.toggle("active");
+                panel.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
+        });
+    });
+});
+</script>
 {% endblock %}
