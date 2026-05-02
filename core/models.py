@@ -9,6 +9,11 @@ from calendar import monthrange
 class Empresa(models.Model):
     nombre = models.CharField(max_length=150, unique=True)
     ruc = models.CharField(max_length=30, blank=True, default="")
+    direccion = models.CharField(max_length=255, blank=True, default="")
+    telefono = models.CharField(max_length=50, blank=True, default="")
+    email = models.EmailField(blank=True, default="")
+    logo = models.ImageField(upload_to="empresas/logos/", null=True, blank=True)
+    texto_legal_pdf = models.TextField(blank=True, default="")
     activo = models.BooleanField(default=True)
 
     creado_en = models.DateTimeField(auto_now_add=True)

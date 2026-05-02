@@ -9,7 +9,7 @@
 </div>
 
 <div class="card form-card">
-    <form method="post">
+    <form method="post" enctype="multipart/form-data">
         {% csrf_token %}
 
         <div class="form-grid">
@@ -23,6 +23,36 @@
                 <label for="{{ form.ruc.id_for_label }}">RUC</label>
                 {{ form.ruc }}
                 {{ form.ruc.errors }}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.direccion.id_for_label }}">Dirección</label>
+                {{ form.direccion }}
+                {{ form.direccion.errors }}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.telefono.id_for_label }}">Teléfono</label>
+                {{ form.telefono }}
+                {{ form.telefono.errors }}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.email.id_for_label }}">Email</label>
+                {{ form.email }}
+                {{ form.email.errors }}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.logo.id_for_label }}">Logo</label>
+                {{ form.logo }}
+                {{ form.logo.errors }}
+            </div>
+
+            <div class="form-field full-width">
+                <label for="{{ form.texto_legal_pdf.id_for_label }}">Texto legal para PDF</label>
+                {{ form.texto_legal_pdf }}
+                {{ form.texto_legal_pdf.errors }}
             </div>
         </div>
 

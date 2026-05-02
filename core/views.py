@@ -456,7 +456,7 @@ def empresa_nueva(request):
         return bloqueo
 
     if request.method == "POST":
-        form = EmpresaForm(request.POST)
+        form = EmpresaForm(request.POST, request.FILES)
         if form.is_valid():
             empresa = form.save()
             registrar_historial(
@@ -489,7 +489,7 @@ def empresa_editar(request, pk):
     empresa = get_object_or_404(Empresa, pk=pk)
 
     if request.method == "POST":
-        form = EmpresaForm(request.POST, instance=empresa)
+        form = EmpresaForm(request.POST, request.FILES, instance=empresa)
         if form.is_valid():
             form.save()
             registrar_historial(
@@ -2363,6 +2363,12 @@ def reportes(request):
     ]
     anios = list(range(hoy.year - 2, hoy.year + 2))
 
+    dias_libres_reporte_dia = []
+
+    for funcionario in funcionarios:
+        if funcionario_tiene_dia_libre(funcionario, fecha_reporte):
+            dias_libres_reporte_dia.append(funcionario)
+
     return render(request, "core/reportes.html", {
         "fecha_reporte": fecha_reporte,
         "funcionarios": funcionarios,
@@ -2385,6 +2391,7 @@ def reportes(request):
         "permisos_licencias_dia": permisos_licencias_dia,
         "permisos_reporte_dia": permisos_reporte_dia,
         "vacaciones_reporte_dia": vacaciones_reporte_dia,
+        "dias_libres_reporte_dia": dias_libres_reporte_dia,
         "sin_salida": sin_salida,
         "presentes_en_horario": presentes_en_horario,
         "mes": mes,
@@ -2992,7 +2999,23 @@ def configuracion_general(request):
         if permiso_post:
             return permiso_post
 
-        form = ConfiguracionGeneralForm(request.POST, instance=config)
+        post_data = request.POST.copy()
+
+        for campo in [
+            "bancos_personalizados",
+            "cargos_personalizados",
+            "sectores_personalizados",
+        ]:
+            valor = post_data.get(campo, "")
+            items = []
+            for linea in valor.splitlines():
+                item = linea.strip()
+                if item and item not in items:
+                    items.append(item)
+            post_data[campo] = "\n".join(items)
+
+        form = ConfiguracionGeneralForm(post_data, instance=config)
+
         if form.is_valid():
             config = form.save()
 
@@ -3015,6 +3038,10 @@ def configuracion_general(request):
 
             messages.success(request, "Configuración PRO Plus actualizada correctamente.")
             return redirect("configuracion_general")
+
+        messages.error(request, "No se pudo guardar la configuración. Revisa los campos marcados.")
+        print(form.errors)
+
     else:
         form = ConfiguracionGeneralForm(instance=config)
 
@@ -3022,7 +3049,6 @@ def configuracion_general(request):
         "form": form,
         "config": config,
     })
-
 
 @login_required
 def liquidaciones_lista(request):
@@ -3633,21 +3659,31 @@ def dias_libres_lista(request):
         "sucursal",
     ).filter(activo=True)
 
+    funcionarios_activos = Funcionario.objects.filter(activo=True).select_related(
+        "sucursal_rel",
+        "sucursal_rel__empresa"
+    )
+
     if not admin_master:
         if empresa_usuario:
-            dias_libres = dias_libres.filter(empresa=empresa_usuario)
             empresa_id = str(empresa_usuario.id)
+            dias_libres = dias_libres.filter(empresa=empresa_usuario)
+            funcionarios_activos = funcionarios_activos.filter(sucursal_rel__empresa=empresa_usuario)
         else:
             dias_libres = dias_libres.none()
+            funcionarios_activos = funcionarios_activos.none()
 
     if empresa_id:
         dias_libres = dias_libres.filter(empresa_id=empresa_id)
+        funcionarios_activos = funcionarios_activos.filter(sucursal_rel__empresa_id=empresa_id)
 
     if sucursal_id:
         dias_libres = dias_libres.filter(sucursal_id=sucursal_id)
+        funcionarios_activos = funcionarios_activos.filter(sucursal_rel_id=sucursal_id)
 
     if sector:
         dias_libres = dias_libres.filter(sector=sector)
+        funcionarios_activos = funcionarios_activos.filter(sector=sector)
 
     if q:
         dias_libres = dias_libres.filter(
@@ -3657,24 +3693,64 @@ def dias_libres_lista(request):
             Q(sector__icontains=q)
         )
 
+        funcionarios_activos = funcionarios_activos.filter(
+            Q(nombre__icontains=q) |
+            Q(apellido__icontains=q) |
+            Q(cedula__icontains=q) |
+            Q(sector__icontains=q)
+        )
+
+    if request.method == "POST":
+        permiso_post = validar_permiso_o_redirigir(request, "dias_libres", "puede_crear")
+        if permiso_post:
+            return permiso_post
+
+        for funcionario in funcionarios_activos:
+            dia_valor = request.POST.get(f"dia_libre_{funcionario.id}", "").strip()
+
+            if dia_valor == "":
+                continue
+
+            dia_semana = int(dia_valor)
+
+            dia_libre_actual = DiaLibre.objects.filter(
+                funcionario=funcionario,
+                activo=True
+            ).first()
+
+            if dia_libre_actual:
+                dia_libre_actual.dia_semana = dia_semana
+                dia_libre_actual.empresa = funcionario.empresa
+                dia_libre_actual.sucursal = funcionario.sucursal_rel
+                dia_libre_actual.sector = funcionario.sector or ""
+                dia_libre_actual.fecha_inicio = timezone.localdate()
+                dia_libre_actual.save()
+            else:
+                DiaLibre.objects.create(
+                    funcionario=funcionario,
+                    empresa=funcionario.empresa,
+                    sucursal=funcionario.sucursal_rel,
+                    sector=funcionario.sector or "",
+                    dia_semana=dia_semana,
+                    fecha_inicio=timezone.localdate(),
+                    activo=True,
+                )
+
+        registrar_historial(
+            request,
+            "Días Libres",
+            "Asignación rápida",
+            f"Se actualizaron días libres por sector/sucursal. Sector: {sector or 'Todos'}."
+        )
+
+        messages.success(request, "Días libres actualizados correctamente.")
+        return redirect(f"/dias-libres/?empresa={empresa_id}&sucursal={sucursal_id}&sector={sector}&q={q}")
+
     if admin_master:
         empresas = Empresa.objects.filter(activo=True).order_by("nombre")
         sucursales = Sucursal.objects.filter(activo=True).order_by("nombre")
         if empresa_id:
             sucursales = sucursales.filter(empresa_id=empresa_id)
-
-        sectores = (
-            Funcionario.objects.filter(activo=True)
-            .exclude(sector="")
-            .values_list("sector", flat=True)
-            .distinct()
-            .order_by("sector")
-        )
-
-        funcionarios_activos = Funcionario.objects.filter(activo=True)
-        total_funcionarios = funcionarios_activos.count()
-        total_asignados = DiaLibre.objects.filter(activo=True).values("funcionario").distinct().count()
-
     else:
         empresas = Empresa.objects.filter(id=empresa_usuario.id) if empresa_usuario else Empresa.objects.none()
         sucursales = Sucursal.objects.filter(
@@ -3682,32 +3758,43 @@ def dias_libres_lista(request):
             empresa=empresa_usuario
         ).order_by("nombre") if empresa_usuario else Sucursal.objects.none()
 
-        sectores = (
-            Funcionario.objects.filter(
-                activo=True,
-                sucursal_rel__empresa=empresa_usuario
-            )
-            .exclude(sector="")
-            .values_list("sector", flat=True)
-            .distinct()
-            .order_by("sector")
-        ) if empresa_usuario else []
+    sectores_qs = Funcionario.objects.filter(activo=True).exclude(sector="")
 
-        funcionarios_activos = Funcionario.objects.filter(
-            activo=True,
-            sucursal_rel__empresa=empresa_usuario
-        ) if empresa_usuario else Funcionario.objects.none()
+    if not admin_master and empresa_usuario:
+        sectores_qs = sectores_qs.filter(sucursal_rel__empresa=empresa_usuario)
 
-        total_funcionarios = funcionarios_activos.count()
-        total_asignados = DiaLibre.objects.filter(
-            activo=True,
-            empresa=empresa_usuario
-        ).values("funcionario").distinct().count() if empresa_usuario else 0
+    if empresa_id:
+        sectores_qs = sectores_qs.filter(sucursal_rel__empresa_id=empresa_id)
 
+    if sucursal_id:
+        sectores_qs = sectores_qs.filter(sucursal_rel_id=sucursal_id)
+
+    sectores = sectores_qs.values_list("sector", flat=True).distinct().order_by("sector")
+
+    total_funcionarios = funcionarios_activos.count()
+    total_asignados = DiaLibre.objects.filter(
+        activo=True,
+        funcionario__in=funcionarios_activos
+    ).values("funcionario").distinct().count()
     total_pendientes = max(total_funcionarios - total_asignados, 0)
 
+    funcionarios_rapidos = []
+
+    for funcionario in funcionarios_activos.order_by("apellido", "nombre"):
+        dia_actual = DiaLibre.objects.filter(
+            funcionario=funcionario,
+            activo=True
+        ).first()
+
+        funcionarios_rapidos.append({
+            "funcionario": funcionario,
+            "dia_actual": dia_actual.dia_semana if dia_actual else "",
+        })
+
     return render(request, "core/dias_libres_lista.html", {
-        "dias_libres": dias_libres,
+        "dias_libres": dias_libres.order_by("sector", "dia_semana", "funcionario__apellido"),
+        "funcionarios_rapidos": funcionarios_rapidos,
+        "dias_semana_choices": DiaLibre.DiasSemana.choices,
         "empresas": empresas,
         "sucursales": sucursales,
         "sectores": sectores,
@@ -3718,6 +3805,8 @@ def dias_libres_lista(request):
         "total_funcionarios": total_funcionarios,
         "total_asignados": total_asignados,
         "total_pendientes": total_pendientes,
+        "empresa_usuario": empresa_usuario,
+        "es_admin_master": admin_master,
     })
 
 
@@ -3874,3 +3963,44 @@ def dia_libre_toggle_activo(request, pk):
 
     messages.success(request, "Estado del día libre actualizado correctamente.")
     return redirect("dias_libres_lista")
+
+@login_required
+def asistencia_eliminar(request, pk):
+    if not es_admin_master(request.user):
+        messages.error(request, "Solo el administrador global puede eliminar asistencias.")
+        return redirect("asistencia_marcar")
+
+    asistencia = get_object_or_404(
+        Asistencia.objects.select_related("funcionario"),
+        pk=pk
+    )
+
+    funcionario = asistencia.funcionario
+    fecha = asistencia.fecha
+
+    if request.method == "POST":
+        motivo = request.POST.get("motivo", "").strip()
+
+        if not motivo:
+            messages.error(request, "Debes indicar el motivo de eliminación.")
+            return redirect("asistencia_marcar")
+
+        registrar_historial(
+            request,
+            "Asistencia",
+            "Eliminar",
+            f"Se eliminó asistencia de {funcionario.nombre_completo} "
+            f"del día {fecha.strftime('%d/%m/%Y')}. Motivo: {motivo}"
+        )
+
+        asistencia.delete()
+
+        messages.success(
+            request,
+            f"Asistencia de {funcionario.nombre_completo} eliminada correctamente."
+        )
+        return redirect("asistencia_marcar")
+
+    return render(request, "core/asistencia_eliminar.html", {
+        "asistencia": asistencia,
+    })

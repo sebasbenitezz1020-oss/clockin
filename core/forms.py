@@ -64,10 +64,24 @@ class MarcacionManualForm(forms.Form):
 class EmpresaForm(forms.ModelForm):
     class Meta:
         model = Empresa
-        fields = ["nombre", "ruc", "activo"]
+        fields = [
+            "nombre",
+            "ruc",
+            "direccion",
+            "telefono",
+            "email",
+            "logo",
+            "texto_legal_pdf",
+            "activo",
+        ]
         widgets = {
             "nombre": forms.TextInput(attrs={"class": "form-control"}),
             "ruc": forms.TextInput(attrs={"class": "form-control"}),
+            "direccion": forms.TextInput(attrs={"class": "form-control"}),
+            "telefono": forms.TextInput(attrs={"class": "form-control"}),
+            "email": forms.EmailInput(attrs={"class": "form-control"}),
+            "logo": forms.ClearableFileInput(attrs={"class": "form-control"}),
+            "texto_legal_pdf": forms.Textarea(attrs={"class": "form-control", "rows": 4}),
             "activo": forms.CheckboxInput(attrs={"class": "form-check-input"}),
         }
 
@@ -215,7 +229,6 @@ class ConfiguracionGeneralForm(forms.ModelForm):
         fields = [
             "nombre_sistema",
             "subtitulo_sistema",
-            "color_primario",
             "logo_url",
 
             "salario_base_default",
@@ -238,7 +251,6 @@ class ConfiguracionGeneralForm(forms.ModelForm):
         widgets = {
             "nombre_sistema": forms.TextInput(attrs={"class": "form-control"}),
             "subtitulo_sistema": forms.TextInput(attrs={"class": "form-control"}),
-            "color_primario": forms.Select(attrs={"class": "form-control"}),
             "logo_url": forms.URLInput(attrs={"class": "form-control", "placeholder": "https://..."}),
 
             "salario_base_default": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
@@ -262,7 +274,6 @@ class ConfiguracionGeneralForm(forms.ModelForm):
         labels = {
             "nombre_sistema": "Nombre del sistema",
             "subtitulo_sistema": "Subtítulo del sistema",
-            "color_primario": "Tema visual",
             "logo_url": "URL del logo",
 
             "salario_base_default": "Salario base global",
@@ -283,41 +294,14 @@ class ConfiguracionGeneralForm(forms.ModelForm):
             "observacion_general": "Observación general",
         }
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
 
-        self.fields["color_primario"].choices = list(ConfiguracionGeneral.TEMAS_CHOICES)
-
-        mapa_hex_a_tema = {
-            "#2563eb": ConfiguracionGeneral.TEMA_AZUL,
-            "#16a34a": ConfiguracionGeneral.TEMA_VERDE,
-            "#dc2626": ConfiguracionGeneral.TEMA_ROJO,
-            "#ea580c": ConfiguracionGeneral.TEMA_NARANJA,
-            "#7c3aed": ConfiguracionGeneral.TEMA_MORADO,
-            "#0891b2": ConfiguracionGeneral.TEMA_TURQUESA,
-            "#475569": ConfiguracionGeneral.TEMA_GRIS,
-        }
-
-        valores_validos = {item[0] for item in ConfiguracionGeneral.TEMAS_CHOICES}
-        valor_actual = getattr(self.instance, "color_primario", None)
-
-        if valor_actual in mapa_hex_a_tema:
-            valor_actual = mapa_hex_a_tema[valor_actual]
-
-        if valor_actual not in valores_validos:
-            valor_actual = ConfiguracionGeneral.TEMA_AZUL
-
-        self.initial["color_primario"] = valor_actual
-
-    def _validar_lista(self, valor, nombre, minimo=1):
+    def _validar_lista(self, valor, nombre, minimo=0):
         items = [x.strip() for x in (valor or "").splitlines() if x.strip()]
         items_unicos = []
+
         for item in items:
             if item not in items_unicos:
                 items_unicos.append(item)
-
-        if len(items_unicos) < minimo:
-            raise forms.ValidationError(f"Debes cargar al menos {minimo} opción(es) en {nombre}.")
 
         if len(items_unicos) > 150:
             raise forms.ValidationError(f"{nombre} tiene demasiadas opciones. Reduce la lista.")
@@ -342,29 +326,25 @@ class ConfiguracionGeneralForm(forms.ModelForm):
             raise forms.ValidationError("La tolerancia no puede ser negativa.")
         return valor
 
-    def clean_color_primario(self):
-        valor = (self.cleaned_data.get("color_primario") or "").strip()
-        valores_validos = {item[0] for item in ConfiguracionGeneral.TEMAS_CHOICES}
-        if valor not in valores_validos:
-            return ConfiguracionGeneral.TEMA_AZUL
-        return valor
-
     def clean_bancos_personalizados(self):
         return self._validar_lista(
             self.cleaned_data.get("bancos_personalizados"),
-            "bancos personalizados"
+            "bancos personalizados",
+            minimo=0
         )
 
     def clean_cargos_personalizados(self):
         return self._validar_lista(
             self.cleaned_data.get("cargos_personalizados"),
-            "cargos personalizados"
+            "cargos personalizados",
+            minimo=0
         )
 
     def clean_sectores_personalizados(self):
         return self._validar_lista(
             self.cleaned_data.get("sectores_personalizados"),
-            "sectores personalizados"
+            "sectores personalizados",
+            minimo=0
         )
 
 

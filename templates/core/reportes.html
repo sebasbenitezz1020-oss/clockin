@@ -634,6 +634,12 @@
                 <span>Vacaciones activas del día</span>
                 <strong>{{ vacaciones_reporte_dia|length }}</strong>
             </button>
+
+            <button type="button" class="report-toggle-btn" data-target="panel-dias-libres">
+                🗓️ Día Libre
+                <span>Funcionarios libres hoy</span>
+                <strong>{{ dias_libres_reporte_dia|length }}</strong>
+            </button>
         </div>
     </div>
 
@@ -742,6 +748,26 @@
                     </div>
                 {% empty %}
                     <div class="empty-mini">No hay vacaciones cargadas para este día.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="alert-card-pro report-panel" id="panel-dias-libres">
+            <div class="alert-card-head">
+                <h4>🗓️ Funcionarios con día libre</h4>
+                <span class="alert-counter blue">{{ dias_libres_reporte_dia|length }}</span>
+            </div>
+
+            <div class="mini-list">
+                {% for f in dias_libres_reporte_dia %}
+                    <div class="mini-item">
+                        <strong>{{ f.nombre_completo }}</strong>
+                        <span>CI: {{ f.cedula }}</span>
+                        <span>Sector: {{ f.sector|default:"-" }}</span>
+                        <span>Sucursal: {{ f.sucursal_mostrar }}</span>
+                    </div>
+                {% empty %}
+                    <div class="empty-mini">No hay funcionarios con día libre en la fecha seleccionada.</div>
                 {% endfor %}
             </div>
         </div>

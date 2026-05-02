@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+
+{% block title %}Eliminar asistencia | ClockIn{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>🗑️ Eliminar asistencia</h2>
+    <p>Esta acción solo está disponible para el administrador global.</p>
+</div>
+
+<div class="card form-card">
+    <div class="alert-box error-box-strong">
+        ⚠️ Estás por eliminar una asistencia. Esta acción quedará registrada en el historial.
+    </div>
+
+    <div style="margin: 18px 0; color: #fff;">
+        <p><strong>Funcionario:</strong> {{ asistencia.funcionario.nombre_completo }}</p>
+        <p><strong>Cédula:</strong> {{ asistencia.funcionario.cedula }}</p>
+        <p><strong>Fecha:</strong> {{ asistencia.fecha|date:"d/m/Y" }}</p>
+        <p><strong>Entrada:</strong> {{ asistencia.hora_entrada|time:"H:i:s"|default:"-" }}</p>
+        <p><strong>Salida almuerzo:</strong> {{ asistencia.hora_salida_almuerzo|time:"H:i:s"|default:"-" }}</p>
+        <p><strong>Regreso almuerzo:</strong> {{ asistencia.hora_regreso_almuerzo|time:"H:i:s"|default:"-" }}</p>
+        <p><strong>Salida final:</strong> {{ asistencia.hora_salida|time:"H:i:s"|default:"-" }}</p>
+    </div>
+
+    <form method="post">
+        {% csrf_token %}
+
+        <div class="form-field">
+            <label>Motivo obligatorio</label>
+            <textarea name="motivo" class="form-control" rows="4" required placeholder="Ej: Marcación realizada por error antes del horario correspondiente."></textarea>
+        </div>
+
+        <div class="form-actions">
+            <a href="{% url 'asistencia_marcar' %}" class="btn-secondary">Cancelar</a>
+            <button type="submit" class="btn-primary btn-link" style="background:#dc2626;">
+                🗑️ Confirmar eliminación
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

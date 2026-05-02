@@ -162,6 +162,14 @@
             </div>
 
             <div class="form-field">
+                <label>Modalidad de vacaciones</label>
+                <select id="modoVacacion" class="form-control">
+                    <option value="total">Total disponible</option>
+                    <option value="mitad">Mitad disponible</option>
+                </select>
+            </div>    
+
+            <div class="form-field">
                 <label for="{{ form.fecha_desde.id_for_label }}">Fecha desde</label>
                 {{ form.fecha_desde }}
                 {{ form.fecha_desde.errors }}
@@ -318,7 +326,12 @@ document.addEventListener("DOMContentLoaded", function () {
             return;
         }
 
-        const dias = parseInt(funcionario.dias || 0);
+        let dias = parseInt(funcionario.dias || 0);
+        const modoVacacion = document.getElementById("modoVacacion");
+
+        if (modoVacacion && modoVacacion.value === "mitad") {
+            dias = Math.ceil(dias / 2);
+        }
         const inicio = new Date(fechaDesde.value + "T00:00:00");
 
         if (dias <= 0) {
@@ -433,6 +446,15 @@ document.addEventListener("DOMContentLoaded", function () {
         info.style.display = "none";
         renderCalendario();
     });
+
+    const modoVacacion = document.getElementById("modoVacacion");
+
+    if (modoVacacion) {
+        modoVacacion.addEventListener("change", function () {
+            recalcularVacacion();
+            renderCalendario();
+        });
+    }
 
     if (fechaDesde.value) {
         const inicial = new Date(fechaDesde.value + "T00:00:00");

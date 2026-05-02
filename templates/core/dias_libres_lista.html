@@ -10,7 +10,7 @@
         align-items: flex-end;
         gap: 16px;
         flex-wrap: wrap;
-        margin-bottom: 20px;
+        margin-bottom: 16px;
     }
 
     .dl-head h2 {
@@ -39,27 +39,27 @@
     .dl-stats {
         display: grid;
         grid-template-columns: repeat(3, 1fr);
-        gap: 16px;
-        margin-bottom: 18px;
+        gap: 14px;
+        margin: 14px 0;
     }
 
     .dl-stat {
         background: linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
         border: 1px solid rgba(255,255,255,.06);
-        border-radius: 22px;
-        padding: 18px;
-        box-shadow: 0 12px 36px rgba(0,0,0,.22);
+        border-radius: 18px;
+        padding: 14px;
+        box-shadow: 0 12px 36px rgba(0,0,0,.18);
     }
 
     .dl-stat .lab {
         color: #94a3b8;
-        font-size: 13px;
-        margin-bottom: 10px;
+        font-size: 12px;
+        margin-bottom: 8px;
     }
 
     .dl-stat .val {
         color: #fff;
-        font-size: 30px;
+        font-size: 26px;
         font-weight: 900;
     }
 
@@ -69,31 +69,62 @@
         border-radius: 24px;
         padding: 18px;
         box-shadow: 0 12px 36px rgba(0,0,0,.22);
-    }
-
-    .dl-filter {
-        display: grid;
-        grid-template-columns: 1fr 1fr 1fr 1.2fr 160px;
-        gap: 12px;
         margin-bottom: 16px;
     }
 
-    .dl-filter input,
-    .dl-filter select {
-        width: 100%;
+    .dl-quick-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        flex-wrap: wrap;
+        margin-bottom: 12px;
+    }
+
+    .dl-quick-head h3 {
+        color: #fff;
+        margin: 0;
+        font-size: 20px;
+        font-weight: 900;
+    }
+
+    .dl-quick-head p {
+        color: #94a3b8;
+        margin: 4px 0 0;
+        font-size: 13px;
+    }
+
+    .dl-filter-compact {
+        display: flex;
+        gap: 8px;
+        flex-wrap: wrap;
+        align-items: center;
+        margin: 0;
+    }
+
+    .dl-filter-compact input,
+    .dl-filter-compact select {
+        min-width: 145px;
         border: 1px solid rgba(255,255,255,.08);
         background: #0f1722;
         color: #fff;
-        border-radius: 14px;
-        padding: 13px 14px;
+        border-radius: 12px;
+        padding: 10px 12px;
+        outline: none;
+        font-size: 13px;
     }
 
-    .dl-filter button {
+    .dl-filter-compact input {
+        min-width: 190px;
+    }
+
+    .dl-filter-compact button {
         border: none;
-        border-radius: 14px;
+        border-radius: 12px;
         background: linear-gradient(135deg, var(--brand-primary), var(--brand-primary-dark));
         color: #fff;
         font-weight: 800;
+        padding: 10px 18px;
     }
 
     .dl-table-wrap {
@@ -134,6 +165,15 @@
         border-right: 1px solid rgba(255,255,255,.04);
         border-top-right-radius: 16px;
         border-bottom-right-radius: 16px;
+    }
+
+    .dl-select-dia {
+        width: 100%;
+        background: #0f1722;
+        color: white;
+        border: 1px solid rgba(255,255,255,.08);
+        border-radius: 12px;
+        padding: 10px;
     }
 
     .dl-actions {
@@ -183,6 +223,22 @@
         color: #fecaca;
         border: 1px solid rgba(239,68,68,.22);
     }
+
+    @media (max-width: 900px) {
+        .dl-stats {
+            grid-template-columns: 1fr;
+        }
+
+        .dl-filter-compact {
+            width: 100%;
+        }
+
+        .dl-filter-compact input,
+        .dl-filter-compact select,
+        .dl-filter-compact button {
+            width: 100%;
+        }
+    }
 </style>
 
 <div class="dl-head">
@@ -203,6 +259,100 @@
     </div>
 {% endif %}
 
+<div class="dl-card">
+    <div class="dl-quick-head">
+        <div>
+            <h3>⚡ Asignación rápida</h3>
+            <p>Filtra por empresa, sucursal, sector o funcionario y asigna el día libre en una sola vista.</p>
+        </div>
+
+        <form method="get" class="dl-filter-compact" id="filtroDiasLibresRapido">
+            {% if es_admin_master %}
+            <select name="empresa">
+                <option value="">Empresa</option>
+                {% for empresa in empresas %}
+                    <option value="{{ empresa.id }}" {% if empresa_id == empresa.id|stringformat:"s" %}selected{% endif %}>
+                        {{ empresa.nombre }}
+                    </option>
+                {% endfor %}
+            </select>
+            {% endif %}
+
+            <select name="sucursal">
+                <option value="">Sucursal</option>
+                {% for sucursal in sucursales %}
+                    <option value="{{ sucursal.id }}" {% if sucursal_id == sucursal.id|stringformat:"s" %}selected{% endif %}>
+                        {{ sucursal.nombre }}
+                    </option>
+                {% endfor %}
+            </select>
+
+            <select name="sector">
+                <option value="">Sector</option>
+                {% for s in sectores %}
+                    <option value="{{ s }}" {% if sector == s %}selected{% endif %}>
+                        {{ s }}
+                    </option>
+                {% endfor %}
+            </select>
+
+            <input type="text" name="q" value="{{ q }}" placeholder="Buscar nombre o cédula">
+
+            <button type="submit">Filtrar</button>
+        </form>
+    </div>
+
+    <form method="post">
+        {% csrf_token %}
+
+        <div class="dl-table-wrap">
+            <table class="dl-table">
+                <thead>
+                    <tr>
+                        <th>Funcionario</th>
+                        <th>Cédula</th>
+                        <th>Sector</th>
+                        <th>Sucursal</th>
+                        <th>Día libre</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in funcionarios_rapidos %}
+                    <tr>
+                        <td>{{ item.funcionario.nombre_completo }}</td>
+                        <td>{{ item.funcionario.cedula }}</td>
+                        <td>{{ item.funcionario.sector|default:"-" }}</td>
+                        <td>{{ item.funcionario.sucursal_mostrar }}</td>
+                        <td>
+                            <select name="dia_libre_{{ item.funcionario.id }}" class="dl-select-dia">
+                                <option value="">Sin cambios</option>
+                                {% for value, label in dias_semana_choices %}
+                                    <option value="{{ value }}" {% if item.dia_actual == value %}selected{% endif %}>
+                                        {{ label }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" style="text-align:center; color:#94a3b8; padding:22px;">
+                            Selecciona una sucursal, sector o busca un funcionario para asignar días libres.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div style="margin-top:12px;">
+            <button type="submit" class="dl-btn" style="border:none; cursor:pointer;">
+                💾 Guardar días libres
+            </button>
+        </div>
+    </form>
+</div>
+
 <div class="dl-stats">
     <div class="dl-stat">
         <div class="lab">Funcionarios activos</div>
@@ -219,38 +369,12 @@
 </div>
 
 <div class="dl-card">
-    <form method="get" class="dl-filter">
-        {% if es_admin_master %}
-        <select name="empresa">
-            <option value="">Todas las empresas</option>
-            {% for empresa in empresas %}
-                <option value="{{ empresa.id }}" {% if empresa_id == empresa.id|stringformat:"s" %}selected{% endif %}>
-                    {{ empresa.nombre }}
-                </option>
-            {% endfor %}
-        </select>
-        {% endif %}
-
-        <select name="sucursal">
-            <option value="">Todas las sucursales</option>
-            {% for sucursal in sucursales %}
-                <option value="{{ sucursal.id }}" {% if sucursal_id == sucursal.id|stringformat:"s" %}selected{% endif %}>
-                    {{ sucursal.nombre }}
-                </option>
-            {% endfor %}
-        </select>
-
-        <select name="sector">
-            <option value="">Todos los sectores</option>
-            {% for s in sectores %}
-                <option value="{{ s }}" {% if sector == s %}selected{% endif %}>{{ s }}</option>
-            {% endfor %}
-        </select>
-
-        <input type="text" name="q" value="{{ q }}" placeholder="Buscar por funcionario, cédula o sector">
-
-        <button type="submit">Filtrar</button>
-    </form>
+    <div class="dl-quick-head">
+        <div>
+            <h3>📋 Días libres registrados</h3>
+            <p>Listado general de días libres activos e inactivos.</p>
+        </div>
+    </div>
 
     <div class="dl-table-wrap">
         <table class="dl-table">
@@ -291,11 +415,28 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="7" style="text-align:center; color:#94a3b8; padding:22px;">No hay días libres cargados.</td>
+                    <td colspan="7" style="text-align:center; color:#94a3b8; padding:22px;">
+                        No hay días libres cargados.
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
     </div>
 </div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const filtro = document.getElementById("filtroDiasLibresRapido");
+    if (!filtro) return;
+
+    const selects = filtro.querySelectorAll("select");
+
+    selects.forEach(function (select) {
+        select.addEventListener("change", function () {
+            filtro.submit();
+        });
+    });
+});
+</script>
 {% endblock %}

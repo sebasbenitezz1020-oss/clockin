@@ -13,7 +13,7 @@
 .card-config {
     background: linear-gradient(145deg, #0f1722, #0b111a);
     border-radius: 18px;
-    padding: 28px;
+    padding: 22px;
     box-shadow: 0 0 30px rgba(0,0,0,.55);
     border: 1px solid rgba(255,255,255,.05);
 }
@@ -28,13 +28,13 @@
 .subtitle-page {
     font-size: 14px;
     opacity: .75;
-    margin-bottom: 24px;
+    margin-bottom: 18px;
     color: #cbd5e1;
 }
 
 .section-block {
-    margin-top: 28px;
-    padding-top: 18px;
+    margin-top: 20px;
+    padding-top: 16px;
     border-top: 1px solid rgba(255,255,255,.06);
 }
 
@@ -47,26 +47,26 @@
 .section-title {
     color: #3b82f6;
     font-weight: 800;
-    font-size: 24px;
-    margin-bottom: 16px;
+    font-size: 22px;
+    margin-bottom: 8px;
 }
 
 .section-desc {
     font-size: 13px;
     color: #94a3b8;
-    margin-bottom: 18px;
+    margin-bottom: 14px;
 }
 
 .config-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 20px;
+    gap: 16px;
 }
 
 .config-field {
     display: flex;
     flex-direction: column;
-    margin-bottom: 16px;
+    margin-bottom: 12px;
 }
 
 .config-field.full {
@@ -99,7 +99,7 @@
 }
 
 .config-field textarea {
-    min-height: 120px;
+    min-height: 90px;
     resize: vertical;
 }
 
@@ -109,10 +109,27 @@
 }
 
 .color-preview-box {
-    height: 42px;
+    height: 38px;
     border-radius: 12px;
     margin-top: 10px;
     border: 1px solid rgba(255,255,255,.08);
+}
+
+.color-option {
+    background: rgba(255,255,255,.04);
+    color: #e5e7eb;
+    font-size: 13px;
+    font-weight: 800;
+    transition: .18s ease;
+}
+
+.color-option:hover {
+    transform: translateY(-1px);
+    background: rgba(59,130,246,.14);
+}
+
+#id_color_primario {
+    display: none;
 }
 
 .theme-help,
@@ -127,17 +144,17 @@
     background: rgba(59,130,246,.08);
     border: 1px solid rgba(59,130,246,.18);
     color: #dbeafe;
-    padding: 14px 16px;
+    padding: 12px 14px;
     border-radius: 14px;
     font-size: 13px;
     line-height: 1.5;
-    margin-bottom: 18px;
+    margin-bottom: 14px;
 }
 
 .check-grid {
     display: grid;
     grid-template-columns: 1fr 1fr;
-    gap: 14px;
+    gap: 12px;
     margin-top: 4px;
 }
 
@@ -166,13 +183,21 @@
     color: white;
     font-weight: 800;
     width: 100%;
-    margin-top: 28px;
+    margin-top: 20px;
     font-size: 15px;
     box-shadow: 0 10px 25px rgba(37,99,235,.25);
+    cursor: pointer;
 }
 
 .btn-guardar:hover {
     filter: brightness(1.04);
+}
+
+.btn-add-chip {
+    width: auto;
+    margin-top: 0;
+    padding: 12px 15px;
+    border-radius: 12px;
 }
 
 .error-box {
@@ -182,6 +207,11 @@
     color: #fecaca;
     padding: 14px;
     border-radius: 12px;
+}
+
+.error-box ul {
+    margin: 8px 0 0;
+    padding-left: 18px;
 }
 
 .errorlist {
@@ -200,7 +230,43 @@
     background: rgba(59,130,246,.10);
     color: #bfdbfe;
     border: 1px solid rgba(59,130,246,.18);
-    margin-bottom: 10px;
+    margin-bottom: 8px;
+}
+
+.chips-container {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 10px;
+    margin-bottom: 8px;
+}
+
+.chip {
+    background: rgba(59,130,246,.15);
+    border: 1px solid rgba(59,130,246,.25);
+    color: #dbeafe;
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 800;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.chip button {
+    background: transparent;
+    border: none;
+    color: #f87171;
+    cursor: pointer;
+    font-weight: bold;
+    padding: 0;
+}
+
+.catalog-textarea {
+    min-height: 70px !important;
+    font-size: 12px;
+    opacity: .75;
 }
 
 @media (max-width: 900px) {
@@ -210,7 +276,7 @@
     }
 
     .card-config {
-        padding: 20px;
+        padding: 18px;
     }
 
     .title {
@@ -236,7 +302,17 @@
 
             {% if form.errors %}
                 <div class="error-box">
-                    No se pudo guardar la configuración. Revisa los campos marcados y vuelve a intentar.
+                    <strong>No se pudo guardar la configuración.</strong>
+                    <ul>
+                        {% for field in form %}
+                            {% for error in field.errors %}
+                                <li>{{ field.label }}: {{ error }}</li>
+                            {% endfor %}
+                        {% endfor %}
+                        {% for error in form.non_field_errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
                 </div>
             {% endif %}
 
@@ -260,15 +336,8 @@
                         {{ form.subtitulo_sistema.errors }}
                     </div>
 
-                    <div class="config-field">
-                        <label for="id_color_primario">Tema visual</label>
-                        {{ form.color_primario }}
-                        {{ form.color_primario.errors }}
-                        <div class="color-preview-box" id="themePreview"></div>
-                        <div class="theme-help">Selecciona un color estándar sin usar códigos HEX.</div>
-                    </div>
 
-                    <div class="config-field">
+                    <div class="config-field full">
                         <label for="{{ form.logo_url.id_for_label }}">Logo URL</label>
                         {{ form.logo_url }}
                         {{ form.logo_url.errors }}
@@ -309,7 +378,7 @@
                     </div>
                 </div>
             </div>
-     
+
             <div class="section-block">
                 <div class="mini-badge">Catálogos PRO</div>
                 <div class="section-title">Gestión dinámica de bancos, cargos y sectores</div>
@@ -318,57 +387,55 @@
                 </div>
 
                 <div class="helper-card">
-                    Usa el botón ➕ para agregar elementos. Puedes eliminarlos con ❌.
+                    Usa el botón ➕ para agregar elementos. Puedes eliminarlos con ❌. El sistema guardará las listas automáticamente.
                 </div>
 
                 <div class="config-grid">
 
-                    <!-- BANCOS -->
                     <div class="config-field">
                         <label>Bancos</label>
 
                         <div style="display:flex; gap:10px;">
                             <input type="text" id="input_banco" class="form-control" placeholder="Ej: Continental">
-                            <button type="button" onclick="agregarItem('banco')" class="btn-guardar" style="width:auto;">➕</button>
+                            <button type="button" onclick="agregarItem('banco')" class="btn-guardar btn-add-chip">➕</button>
                         </div>
 
                         <div id="lista_banco" class="chips-container"></div>
 
                         {{ form.bancos_personalizados }}
+                        {{ form.bancos_personalizados.errors }}
                     </div>
 
-                    <!-- CARGOS -->
                     <div class="config-field">
                         <label>Cargos</label>
 
                         <div style="display:flex; gap:10px;">
                             <input type="text" id="input_cargo" class="form-control" placeholder="Ej: Cajera/o">
-                            <button type="button" onclick="agregarItem('cargo')" class="btn-guardar" style="width:auto;">➕</button>
+                            <button type="button" onclick="agregarItem('cargo')" class="btn-guardar btn-add-chip">➕</button>
                         </div>
 
                         <div id="lista_cargo" class="chips-container"></div>
 
                         {{ form.cargos_personalizados }}
+                        {{ form.cargos_personalizados.errors }}
                     </div>
 
-                    <!-- SECTORES -->
                     <div class="config-field full">
                         <label>Sectores</label>
 
                         <div style="display:flex; gap:10px;">
                             <input type="text" id="input_sector" class="form-control" placeholder="Ej: Administración">
-                            <button type="button" onclick="agregarItem('sector')" class="btn-guardar" style="width:auto;">➕</button>
+                            <button type="button" onclick="agregarItem('sector')" class="btn-guardar btn-add-chip">➕</button>
                         </div>
 
                         <div id="lista_sector" class="chips-container"></div>
 
                         {{ form.sectores_personalizados }}
+                        {{ form.sectores_personalizados.errors }}
                     </div>
 
                 </div>
-            </div>         
-
-                
+            </div>
 
             <div class="section-block">
                 <div class="mini-badge">Biometría</div>
@@ -424,7 +491,7 @@
             </div>
 
             <button type="submit" class="btn-guardar">
-                Guardar Configuración
+                💾 Guardar Configuración
             </button>
         </form>
 
@@ -448,7 +515,7 @@
         gris: "#475569"
     };
 
-    function actualizarPreview() {
+    window.actualizarPreviewTema = function () {
         let valor = selectTema.value;
 
         if (!mapa[valor]) {
@@ -456,75 +523,170 @@
             selectTema.value = "azul";
         }
 
-        preview.style.backgroundColor = mapa[valor];
+        preview.style.background = `linear-gradient(135deg, ${mapa[valor]}, #0f1722)`;
+
+        document.querySelectorAll(".color-option").forEach(el => {
+            el.style.border = "1px solid rgba(255,255,255,.08)";
+            el.style.boxShadow = "none";
+        });
+
+        const activo = document.querySelector(`[data-color="${valor}"]`);
+        if (activo) {
+            activo.style.border = "2px solid #3b82f6";
+            activo.style.boxShadow = "0 0 0 3px rgba(59,130,246,.18)";
+        }
     }
 
-    selectTema.addEventListener("change", actualizarPreview);
-    actualizarPreview();
+    selectTema.addEventListener("change", window.actualizarPreviewTema);
+    window.actualizarPreviewTema();
 })();
 </script>
 
 <script>
+function seleccionarColor(color) {
+    const select = document.getElementById("id_color_primario");
+    if (!select) return;
+
+    select.value = color;
+    select.dispatchEvent(new Event("change"));
+
+    if (window.actualizarPreviewTema) {
+        window.actualizarPreviewTema();
+    }
+}
+
+const MAPA_CAMPOS = {
+    banco: "id_bancos_personalizados",
+    cargo: "id_cargos_personalizados",
+    sector: "id_sectores_personalizados"
+};
+
+function obtenerHidden(tipo) {
+    return document.getElementById(MAPA_CAMPOS[tipo]);
+}
+
+function obtenerItems(hidden) {
+    if (!hidden || !hidden.value) return [];
+
+    return hidden.value
+        .split("\n")
+        .map(item => item.trim())
+        .filter(item => item.length > 0);
+}
+
+function guardarItems(hidden, items) {
+    if (!hidden) return;
+
+    const unicos = [];
+
+    items.forEach(item => {
+        const limpio = item.trim();
+        if (limpio && !unicos.includes(limpio)) {
+            unicos.push(limpio);
+        }
+    });
+
+    hidden.value = unicos.join("\n");
+    hidden.dispatchEvent(new Event("change"));
+}
+
 function agregarItem(tipo) {
     const input = document.getElementById("input_" + tipo);
-    const lista = document.getElementById("lista_" + tipo);
-    const hidden = document.getElementById("id_" + tipo + "s_personalizados");
+    const hidden = obtenerHidden(tipo);
 
-    let valor = input.value.trim();
+    if (!input || !hidden) return;
+
+    const valor = input.value.trim();
     if (!valor) return;
 
-    let items = hidden.value ? hidden.value.split("\n") : [];
+    const items = obtenerItems(hidden);
 
-    if (items.includes(valor)) {
-        input.value = "";
-        return;
+    if (!items.includes(valor)) {
+        items.push(valor);
     }
 
-    items.push(valor);
-    hidden.value = items.join("\n");
-
-    renderLista(tipo, items);
+    guardarItems(hidden, items);
+    renderLista(tipo);
     input.value = "";
+    input.focus();
 }
 
 function eliminarItem(tipo, valor) {
-    const hidden = document.getElementById("id_" + tipo + "s_personalizados");
+    const hidden = obtenerHidden(tipo);
+    if (!hidden) return;
 
-    let items = hidden.value.split("\n").filter(i => i !== valor);
-    hidden.value = items.join("\n");
+    const items = obtenerItems(hidden).filter(item => item !== valor);
 
-    renderLista(tipo, items);
+    guardarItems(hidden, items);
+    renderLista(tipo);
 }
 
-function renderLista(tipo, items) {
+function renderLista(tipo) {
     const lista = document.getElementById("lista_" + tipo);
+    const hidden = obtenerHidden(tipo);
+
+    if (!lista || !hidden) return;
+
     lista.innerHTML = "";
 
+    const items = obtenerItems(hidden);
+
     items.forEach(item => {
-        let chip = document.createElement("div");
+        const chip = document.createElement("div");
         chip.className = "chip";
 
-        chip.innerHTML = `
-            ${item}
-            <button onclick="eliminarItem('${tipo}', '${item}')">✕</button>
-        `;
+        const span = document.createElement("span");
+        span.textContent = item;
 
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.textContent = "✕";
+        btn.onclick = function () {
+            eliminarItem(tipo, item);
+        };
+
+        chip.appendChild(span);
+        chip.appendChild(btn);
         lista.appendChild(chip);
     });
 }
 
-function inicializar(tipo) {
-    const hidden = document.getElementById("id_" + tipo + "s_personalizados");
-    if (!hidden || !hidden.value) return;
+function inicializarCatalogo(tipo) {
+    const hidden = obtenerHidden(tipo);
+    if (!hidden) return;
 
-    let items = hidden.value.split("\n").filter(i => i.trim());
-    renderLista(tipo, items);
+    hidden.classList.add("catalog-textarea");
+    guardarItems(hidden, obtenerItems(hidden));
+    renderLista(tipo);
+
+    const input = document.getElementById("input_" + tipo);
+    if (input) {
+        input.addEventListener("keydown", function (e) {
+            if (e.key === "Enter") {
+                e.preventDefault();
+                agregarItem(tipo);
+            }
+        });
+    }
 }
 
 document.addEventListener("DOMContentLoaded", function () {
-    inicializar("banco");
-    inicializar("cargo");
-    inicializar("sector");
+    inicializarCatalogo("banco");
+    inicializarCatalogo("cargo");
+    inicializarCatalogo("sector");
+
+    const form = document.querySelector("form");
+
+    if (form) {
+        form.addEventListener("submit", function () {
+            ["banco", "cargo", "sector"].forEach(function (tipo) {
+                const hidden = obtenerHidden(tipo);
+                if (hidden) {
+                    guardarItems(hidden, obtenerItems(hidden));
+                }
+            });
+        });
+    }
 });
 </script>
 

@@ -32,6 +32,7 @@ from .views import (
     turno_toggle_activo,
 
     asistencia_marcar,
+    asistencia_eliminar,
 
     permisos_lista,
     permiso_nuevo,
@@ -106,6 +107,7 @@ urlpatterns = [
     path("turnos/<int:pk>/toggle-activo/", turno_toggle_activo, name="turno_toggle_activo"),
 
     path("asistencia/", asistencia_marcar, name="asistencia_marcar"),
+    path("asistencia/<int:pk>/eliminar/", asistencia_eliminar, name="asistencia_eliminar"),
 
     path("permisos/", permisos_lista, name="permisos_lista"),
     path("permisos/nuevo/", permiso_nuevo, name="permiso_nuevo"),

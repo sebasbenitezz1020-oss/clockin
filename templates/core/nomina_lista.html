@@ -133,6 +133,20 @@
     @media (max-width: 700px) {
         .nom-stats { grid-template-columns:1fr; }
     }
+    .nom-live-search {
+    padding: 18px;
+    border-bottom: 1px solid rgba(255,255,255,.05);
+    background: rgba(255,255,255,.02);
+}
+
+.nom-live-search input {
+    width: 100%;
+    border-radius: 14px;
+    padding: 14px 16px;
+    background: #0f1722;
+    color: #fff;
+    border: 1px solid rgba(255,255,255,.08);
+}
 </style>
 
 <div class="container-fluid nom-page">
@@ -174,6 +188,10 @@
             <div class="lab">Pendientes</div>
             <div class="val">{{ total_pendientes|millares }}</div>
         </div>
+    </div>
+
+    <div class="nom-live-search">
+        <input type="search" id="buscarNominaLive" placeholder="Buscar funcionario por nombre o cédula...">
     </div>
 
     <div class="nom-card">
@@ -363,4 +381,22 @@
         </div>
     </div>
 </div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const buscador = document.getElementById("buscarNominaLive");
+    const filas = document.querySelectorAll(".nom-table tbody tr");
+
+    if (!buscador) return;
+
+    buscador.addEventListener("input", function () {
+        const texto = buscador.value.toLowerCase().trim();
+
+        filas.forEach(function (fila) {
+            const contenido = fila.innerText.toLowerCase();
+            fila.style.display = contenido.includes(texto) ? "" : "none";
+        });
+    });
+});
+</script>
 {% endblock %}
