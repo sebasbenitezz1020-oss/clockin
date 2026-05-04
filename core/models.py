@@ -133,7 +133,10 @@ class ConfiguracionGeneral(models.Model):
             "Recepcionista de Mercaderías\n"
             "Gerente\n"
             "Informático\n"
-            "Técnico de Mantenimiento"
+            "Técnico de Mantenimiento\n"
+            "Inventario\n"
+            "Logistica"
+
         )
     )
 
@@ -154,6 +157,7 @@ class ConfiguracionGeneral(models.Model):
             "Limpieza\n"
             "Cocina\n"
             "Copa\n"
+            "Fríos\n"
             "Churrasquería"
         )
     )

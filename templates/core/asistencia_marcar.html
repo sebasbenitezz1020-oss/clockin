@@ -149,6 +149,7 @@
 
     .asis-table {
         width: 100%;
+        table-layout: fixed;
         min-width: 1580px;
         border-collapse: separate;
         border-spacing: 0 10px;
@@ -333,6 +334,144 @@
             grid-template-columns: 1fr;
         }
     }
+/* ===== MEJORAS PRO FILTROS ASISTENCIA ===== */
+.asis-filter-card {
+    padding: 0 22px 16px;
+}
+
+.asis-filter-pro {
+    display: grid;
+    grid-template-columns: 1.2fr 180px 1fr auto auto;
+    gap: 12px;
+    align-items: end;
+    background: rgba(255,255,255,.025);
+    border: 1px solid rgba(255,255,255,.06);
+    border-radius: 18px;
+    padding: 14px;
+}
+
+.asis-filter-pro input,
+.asis-filter-pro select {
+    width: 100%;
+    background: #0f1722;
+    color: white;
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 14px;
+    padding: 14px 16px;
+    outline: none;
+}
+
+.asis-filter-pro input:focus,
+.asis-filter-pro select:focus {
+    border-color: rgba(59,130,246,.45);
+    box-shadow: 0 0 0 3px rgba(59,130,246,.12);
+}
+
+.asis-btn-hoy {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 47px;
+    padding: 0 16px;
+    border-radius: 14px;
+    background: rgba(34,197,94,.14);
+    color: #86efac;
+    border: 1px solid rgba(34,197,94,.28);
+    font-weight: 800;
+    text-decoration: none;
+    white-space: nowrap;
+}
+
+.asis-btn-hoy:hover {
+    background: rgba(34,197,94,.22);
+    color: #fff;
+    text-decoration: none;
+}
+
+.asis-date-title {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+}
+
+.asis-date-pill {
+    display: inline-flex;
+    padding: 8px 12px;
+    border-radius: 999px;
+    background: rgba(59,130,246,.12);
+    color: #bfdbfe;
+    border: 1px solid rgba(59,130,246,.22);
+    font-size: 13px;
+    font-weight: 800;
+}
+
+@media (max-width: 1100px) {
+    .asis-filter-pro {
+        grid-template-columns: 1fr 1fr;
+    }
+}
+
+@media (max-width: 700px) {
+    .asis-filter-pro {
+        grid-template-columns: 1fr;
+    }
+}
+/* ===== TABLA ASISTENCIA EQUILIBRADA ===== */
+
+.asis-table {
+    min-width: 1850px !important;
+    table-layout: auto !important;
+    border-spacing: 0 8px !important;
+}
+
+.asis-table thead th {
+    padding: 0 12px 8px !important;
+    font-size: 12px !important;
+    white-space: nowrap !important;
+}
+
+.asis-table tbody td {
+    padding: 12px 12px !important;
+    font-size: 13px !important;
+    white-space: nowrap !important;
+    vertical-align: middle !important;
+}
+
+.nombre-box strong {
+    font-size: 14px !important;
+    line-height: 1.2;
+}
+
+.nombre-box span {
+    font-size: 12px !important;
+}
+
+.audit-box {
+    min-width: 230px !important;
+    max-width: 270px !important;
+    white-space: normal !important;
+    font-size: 11px !important;
+    line-height: 1.3 !important;
+}
+
+.asis-table td:nth-child(13) {
+    min-width: 320px !important;
+    max-width: 420px !important;
+    white-space: normal !important;
+    line-height: 1.35 !important;
+}
+
+.badge-soft {
+    font-size: 11px !important;
+    padding: 5px 9px !important;
+}
+
+.tabla-wrap {
+    padding: 0 16px 18px !important;
+    overflow-x: auto !important;
+}
 </style>
 
 <div class="container-fluid asis-page">
@@ -425,14 +564,19 @@
         </div>
     </div>
 
-    <div class="asis-card">
-        <div class="asis-card-header">
-            <h3>📋 Marcaciones de hoy — {{ hoy|date:"d/m/Y" }}</h3>
+    <div class="asis-card-header asis-date-title">
+        <div>
+            <h3>📋 Marcaciones — {{ fecha_filtro|date:"d/m/Y" }}</h3>
             <p>Detalle completo de entrada, almuerzo, regreso, salida final y horas trabajadas.</p>
         </div>
 
-        <div style="padding: 0 22px 16px;">
-            <form method="get" style="display:grid; grid-template-columns: 1fr 1fr auto; gap:12px; align-items:end;">
+        <span class="asis-date-pill">
+            📅 Fecha consultada: {{ fecha_filtro|date:"d/m/Y" }}
+        </span>
+    </div>
+
+       <div class="asis-filter-card">
+            <form method="get" class="asis-filter-pro" id="formFiltrosAsistencia">
                 <div>
                     <label class="asis-label">Buscar funcionario</label>
                     <input
@@ -445,8 +589,18 @@
                 </div>
 
                 <div>
+                    <label class="asis-label">Fecha</label>
+                    <input
+                        type="date"
+                        name="fecha"
+                        value="{{ fecha_filtro|date:'Y-m-d' }}"
+                        onchange="this.form.submit()"
+                    >
+                </div>
+
+                <div>
                     <label class="asis-label">Sucursal</label>
-                    <select name="sucursal" style="width:100%; background:#0f1722; color:white; border:1px solid rgba(255,255,255,.08); border-radius:14px; padding:14px 16px;">
+                    <select name="sucursal" onchange="this.form.submit()">
                         <option value="">Todas las sucursales</option>
                         {% for s in sucursales %}
                             <option value="{{ s.id }}" {% if sucursal_id == s.id|stringformat:"s" %}selected{% endif %}>
@@ -457,6 +611,10 @@
                 </div>
 
                 <button type="submit" class="asis-btn">Filtrar</button>
+
+                <a href="{% url 'asistencia_marcar' %}" class="asis-btn-hoy">
+                    Hoy
+                </a>
             </form>
         </div>
 

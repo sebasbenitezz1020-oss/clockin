@@ -16,6 +16,7 @@ from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import Image
 
 from usuarios.utils import validar_permiso_o_redirigir, tiene_permiso
 from usuarios.multiempresa import es_admin_master, obtener_empresa_usuario, filtrar_por_empresa_relacion
@@ -105,6 +106,12 @@ def marcacion_manual(request):
                 datetime.combine(fecha, hora)
             )
 
+            if funcionario.turno and funcionario.turno.hora_salida <= funcionario.turno.hora_entrada:
+                if tipo in ["salida", "salida_almuerzo", "regreso_almuerzo"] and hora < funcionario.turno.hora_entrada:
+                    fecha_hora_manual = timezone.make_aware(
+                        datetime.combine(fecha + timezone.timedelta(days=1), hora)
+                    )
+
             asistencia, creada = Asistencia.objects.get_or_create(
                 funcionario=funcionario,
                 fecha=fecha,
@@ -187,6 +194,100 @@ def registrar_historial(request, modulo, accion, descripcion):
         descripcion=descripcion,
     )
 
+def obtener_empresa_documento(funcionario=None, empresa=None):
+    if empresa:
+        return empresa
+    if funcionario and getattr(funcionario, "sucursal_rel", None):
+        return funcionario.sucursal_rel.empresa
+    return None
+
+
+def construir_encabezado_empresa_pdf(empresa, titulo):
+    elementos = []
+
+    datos_empresa = []
+    logo_elemento = ""
+
+    if empresa and getattr(empresa, "logo", None):
+        try:
+            if empresa.logo and empresa.logo.path:
+                logo_elemento = Image(empresa.logo.path, width=28 * mm, height=28 * mm)
+        except Exception:
+            logo_elemento = ""
+
+    nombre = empresa.nombre if empresa else "ClockIn"
+    ruc = getattr(empresa, "ruc", "") if empresa else ""
+    direccion = getattr(empresa, "direccion", "") if empresa else ""
+    telefono = getattr(empresa, "telefono", "") if empresa else ""
+    email = getattr(empresa, "email", "") if empresa else ""
+
+    texto_empresa = f"""
+    <b>{nombre}</b><br/>
+    RUC: {ruc or "-"}<br/>
+    Dirección: {direccion or "-"}<br/>
+    Teléfono: {telefono or "-"}<br/>
+    Email: {email or "-"}
+    """
+
+    styles = getSampleStyleSheet()
+    empresa_style = ParagraphStyle(
+        name="EmpresaHeader",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=8,
+        leading=11,
+        textColor=colors.HexColor("#111827"),
+    )
+
+    titulo_style = ParagraphStyle(
+        name="TituloDocumentoEmpresa",
+        parent=styles["Heading1"],
+        fontName="Helvetica-Bold",
+        fontSize=14,
+        leading=17,
+        alignment=TA_CENTER,
+        textColor=colors.HexColor("#111827"),
+    )
+
+    datos_empresa.append([
+        logo_elemento,
+        Paragraph(texto_empresa, empresa_style),
+        Paragraph(f"<b>{titulo}</b>", titulo_style),
+    ])
+
+    tabla = Table(datos_empresa, colWidths=[32 * mm, 70 * mm, 68 * mm])
+    tabla.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
+        ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+        ("INNERGRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#e5e7eb")),
+        ("TOPPADDING", (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+    ]))
+
+    elementos.append(tabla)
+    elementos.append(Spacer(1, 10))
+    return elementos
+
+
+def agregar_texto_legal_empresa_pdf(elementos, empresa):
+    texto = getattr(empresa, "texto_legal_pdf", "") if empresa else ""
+
+    if not texto:
+        return
+
+    styles = getSampleStyleSheet()
+    legal_style = ParagraphStyle(
+        name="TextoLegalEmpresa",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=8,
+        leading=11,
+        textColor=colors.HexColor("#374151"),
+    )
+
+    elementos.append(Spacer(1, 8))
+    elementos.append(Paragraph(f"<b>Observación legal / empresarial:</b><br/>{texto}", legal_style))
 
 def funcionario_tiene_dia_libre(funcionario, fecha=None):
     fecha = fecha or timezone.localdate()
@@ -200,6 +301,34 @@ def funcionario_tiene_dia_libre(funcionario, fecha=None):
         Q(fecha_inicio__isnull=True) | Q(fecha_inicio__lte=fecha),
         Q(fecha_fin__isnull=True) | Q(fecha_fin__gte=fecha),
     ).exists()
+
+def obtener_fecha_operativa_asistencia(funcionario, ahora=None):
+    ahora = ahora or timezone.localtime()
+    hoy = ahora.date()
+
+    if not funcionario.turno:
+        return hoy
+
+    turno = funcionario.turno
+
+    # Turno normal
+    if turno.hora_salida > turno.hora_entrada:
+        return hoy
+
+    # Turno nocturno: sale al día siguiente
+    ayer = hoy - timezone.timedelta(days=1)
+
+    asistencia_ayer = Asistencia.objects.filter(
+        funcionario=funcionario,
+        fecha=ayer,
+        hora_entrada__isnull=False,
+        hora_salida__isnull=True,
+    ).first()
+
+    if asistencia_ayer:
+        return ayer
+
+    return hoy
 
 
 def contar_dias_libres_mes(funcionario, mes, anio):
@@ -1266,7 +1395,15 @@ def asistencia_marcar(request):
     if permiso:
         return permiso
 
-    hoy = timezone.localdate()
+    fecha_filtro_str = request.GET.get("fecha", "").strip()
+
+    try:
+        fecha_filtro = datetime.strptime(fecha_filtro_str, "%Y-%m-%d").date() if fecha_filtro_str else timezone.localdate()
+    except ValueError:
+        fecha_filtro = timezone.localdate()
+
+    hoy = fecha_filtro
+
     resultado = None
 
     sucursal_id = request.GET.get("sucursal", "").strip()
@@ -1313,12 +1450,13 @@ def asistencia_marcar(request):
                         "llego_tarde": False,
                     }
                 else:
+                    ahora = timezone.localtime()
+                    fecha_operativa = obtener_fecha_operativa_asistencia(funcionario, ahora)
+
                     asistencia, creada = Asistencia.objects.get_or_create(
                         funcionario=funcionario,
-                        fecha=hoy
+                        fecha=fecha_operativa
                     )
-
-                    ahora = timezone.localtime()
 
                     if not funcionario.turno:
                         messages.error(request, "El funcionario no tiene un turno asignado.")
@@ -1433,9 +1571,8 @@ def asistencia_marcar(request):
     asistencias_hoy = Asistencia.objects.select_related(
         "funcionario",
         "funcionario__turno",
-        "funcionario__sucursal_rel",
-        "funcionario__sucursal_rel__empresa"
-    ).filter(fecha=hoy)
+        "marcado_manual_por",
+    ).filter(fecha=fecha_filtro)
 
     if not admin_master:
         if empresa_usuario:
@@ -1467,6 +1604,7 @@ def asistencia_marcar(request):
         "form": form,
         "resultado": resultado,
         "asistencias_hoy": asistencias_hoy,
+        "fecha_filtro": fecha_filtro,
         "hoy": hoy,
         "sucursales": sucursales,
         "sucursal_id": sucursal_id,
@@ -1887,8 +2025,8 @@ def vacacion_notificacion_pdf(request, pk):
     sucursal_nombre = funcionario.sucursal_mostrar
     fecha_emision = timezone.localdate()
 
-    elementos.append(Paragraph(config.nombre_sistema or "ClockIn", styles["TituloVacaciones"]))
-    elementos.append(Paragraph("NOTIFICACIÓN DE VACACIONES ANUALES REMUNERADAS", styles["TituloVacaciones"]))
+    empresa_pdf = obtener_empresa_documento(funcionario=funcionario)
+    elementos += construir_encabezado_empresa_pdf(empresa_pdf, "NOTIFICACIÓN DE VACACIONES")
     elementos.append(Spacer(1, 10))
 
     datos = [
@@ -1945,6 +2083,8 @@ def vacacion_notificacion_pdf(request, pk):
         ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
     ]))
     elementos.append(firmas)
+
+    agregar_texto_legal_empresa_pdf(elementos, empresa_pdf)
 
     doc.build(elementos)
 
@@ -2761,8 +2901,8 @@ def nomina_extracto_pdf(request, pk):
 
     elementos = []
 
-    elementos.append(Paragraph(config.nombre_sistema or "ClockIn", styles["TituloNomina"]))
-    elementos.append(Paragraph("EXTRACTO DE NÓMINA INDIVIDUAL", styles["TituloNomina"]))
+    empresa_pdf = obtener_empresa_documento(funcionario=nomina.funcionario)
+    elementos += construir_encabezado_empresa_pdf(empresa_pdf, "EXTRACTO DE NÓMINA")
     elementos.append(Spacer(1, 8))
 
     datos = [
@@ -2829,6 +2969,8 @@ def nomina_extracto_pdf(request, pk):
         ("FONTSIZE", (0, 0), (-1, -1), 9),
     ]))
     elementos.append(firmas)
+
+    agregar_texto_legal_empresa_pdf(elementos, empresa_pdf)
 
     doc.build(elementos)
 
@@ -3486,8 +3628,8 @@ def liquidacion_pdf(request, pk):
     nombre_sistema = config.nombre_sistema if config and config.nombre_sistema else "ClockIn"
     subtitulo = config.subtitulo_sistema if config and config.subtitulo_sistema else "Sistema Web RRHH"
 
-    elementos.append(Paragraph(f"{nombre_sistema}", styles["TituloClockIn"]))
-    elementos.append(Paragraph(f"{subtitulo}", styles["SubtituloClockIn"]))
+    empresa_pdf = obtener_empresa_documento(funcionario=liquidacion.funcionario)
+    elementos += construir_encabezado_empresa_pdf(empresa_pdf, "LIQUIDACIÓN LABORAL")
     elementos.append(Paragraph("LIQUIDACIÓN FINAL", styles["TituloClockIn"]))
     elementos.append(Spacer(1, 4))
 
@@ -3627,6 +3769,8 @@ def liquidacion_pdf(request, pk):
         ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
     ]))
     elementos.append(firmas)
+
+    agregar_texto_legal_empresa_pdf(elementos, empresa_pdf)
 
     doc.build(elementos)
 

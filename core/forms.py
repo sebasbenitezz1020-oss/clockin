@@ -198,8 +198,12 @@ class TurnoForm(forms.ModelForm):
         if not hora_salida:
             self.add_error("hora_salida", "Debes seleccionar la hora de salida.")
 
-        if hora_entrada and hora_salida and hora_salida <= hora_entrada:
-            self.add_error("hora_salida", "La hora de salida debe ser mayor que la hora de entrada.")
+        # Permitir turnos nocturnos que cruzan medianoche.
+        # Ejemplo: 17:00 a 01:00 del día siguiente.
+        cruza_medianoche = False
+
+        if hora_entrada and hora_salida:
+            cruza_medianoche = hora_salida <= hora_entrada
 
         if usa_almuerzo:
             if not hora_inicio_almuerzo:
@@ -214,8 +218,9 @@ class TurnoForm(forms.ModelForm):
             if hora_inicio_almuerzo and hora_fin_almuerzo and hora_fin_almuerzo <= hora_inicio_almuerzo:
                 self.add_error("hora_fin_almuerzo", "El fin de almuerzo debe ser mayor que el inicio de almuerzo.")
 
-            if hora_salida and hora_fin_almuerzo and hora_fin_almuerzo >= hora_salida:
-                self.add_error("hora_fin_almuerzo", "El fin de almuerzo debe ser anterior a la salida.")
+            if not cruza_medianoche:
+                if hora_salida and hora_fin_almuerzo and hora_fin_almuerzo >= hora_salida:
+                    self.add_error("hora_fin_almuerzo", "El fin de almuerzo debe ser anterior a la salida.")
         else:
             cleaned_data["hora_inicio_almuerzo"] = None
             cleaned_data["hora_fin_almuerzo"] = None

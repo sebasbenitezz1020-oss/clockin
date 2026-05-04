@@ -357,9 +357,38 @@ def _reconocer_desde_imagen(image_np):
 # =====================================================
 # ASISTENCIA BIOMÉTRICA
 # =====================================================
+
+def obtener_fecha_operativa_asistencia(funcionario, ahora=None):
+    ahora = ahora or timezone.localtime()
+    hoy = ahora.date()
+
+    if not funcionario.turno:
+        return hoy
+
+    turno = funcionario.turno
+
+    # Turno normal: no cruza medianoche
+    if turno.hora_salida > turno.hora_entrada:
+        return hoy
+
+    # Turno nocturno: ejemplo 17:00 a 01:00
+    ayer = hoy - timezone.timedelta(days=1)
+
+    asistencia_ayer = Asistencia.objects.filter(
+        funcionario=funcionario,
+        fecha=ayer,
+        hora_entrada__isnull=False,
+        hora_salida__isnull=True,
+    ).first()
+
+    if asistencia_ayer:
+        return ayer
+
+    return hoy
+
 def _marcar_asistencia_biometrica(request, funcionario, modo):
-    hoy = timezone.localdate()
     ahora = timezone.localtime()
+    fecha_operativa = obtener_fecha_operativa_asistencia(funcionario, ahora)
 
     if modo not in ["entrada", "salida"]:
         return {
@@ -384,7 +413,7 @@ def _marcar_asistencia_biometrica(request, funcionario, modo):
 
     asistencia, creada = Asistencia.objects.get_or_create(
         funcionario=funcionario,
-        fecha=hoy
+        fecha=fecha_operativa
     )
 
     siguiente = asistencia.siguiente_marcacion
