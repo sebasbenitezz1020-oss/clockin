@@ -429,6 +429,13 @@
             <a href="{% url 'vacaciones_lista' %}">🏖️ Vacaciones</a>
             {% endif %}
 
+            {% if es_admin_master or perm_comunicaciones %}
+            <a href="{% url 'comunicaciones_lista' %}" class="sidebar-link">
+                <span class="sidebar-icon">📢</span>
+                <span>Comunicaciones</span>
+            </a>
+            {% endif %}
+
             {% if puede_ver_icl %}
             <a href="{% url 'icl_lista' %}">📈 ICL</a>
             {% endif %}

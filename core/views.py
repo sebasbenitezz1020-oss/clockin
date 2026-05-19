@@ -43,6 +43,7 @@ from .forms import (
     SucursalForm,
     TurnoForm,
     VacacionForm,
+    ComunicacionLaboralForm,
 )
 from .liquidacion_utils import calcular_liquidacion_funcionario
 from .models import (
@@ -60,6 +61,8 @@ from .models import (
     Sucursal,
     Turno,
     Vacacion,
+    PlanillaSemanalFuncionario,
+    ComunicacionLaboral,
 )
 
 def _bloquear_si_no_admin_master(request):
@@ -3192,6 +3195,256 @@ def configuracion_general(request):
         "config": config,
     })
 
+def calcular_liquidacion_funcionario(
+    funcionario,
+    tipo_salida,
+    fecha_salida,
+    dias_trabajados_pendientes=None,
+    vacaciones_causadas_pendientes_dias=None,
+    preaviso_dias_otorgados=0,
+    preaviso_cumplido=False,
+    descontar_preaviso=False,
+    otros_descuentos=Decimal("0"),
+):
+    from decimal import Decimal
+    from datetime import date
+    from calendar import monthrange
+    from django.apps import apps
+
+    def D(valor):
+        try:
+            return Decimal(str(valor or 0))
+        except Exception:
+            return Decimal("0")
+
+    salario_base = D(getattr(funcionario, "salario_base", 0))
+    bono_base = D(getattr(funcionario, "bono", 0))
+    salario_total = salario_base + bono_base
+
+    salario_diario = salario_total / Decimal("30") if salario_total > 0 else Decimal("0")
+
+    fecha_ingreso = getattr(funcionario, "fecha_ingreso", None)
+
+    antiguedad_anios = 0
+    antiguedad_meses = 0
+    antiguedad_dias = 0
+
+    if fecha_ingreso and fecha_salida:
+        antiguedad_anios = fecha_salida.year - fecha_ingreso.year
+        antiguedad_meses = fecha_salida.month - fecha_ingreso.month
+        antiguedad_dias = fecha_salida.day - fecha_ingreso.day
+
+        if antiguedad_dias < 0:
+            antiguedad_meses -= 1
+            mes_anterior = fecha_salida.month - 1 or 12
+            anio_mes_anterior = fecha_salida.year if fecha_salida.month > 1 else fecha_salida.year - 1
+            antiguedad_dias += monthrange(anio_mes_anterior, mes_anterior)[1]
+
+        if antiguedad_meses < 0:
+            antiguedad_anios -= 1
+            antiguedad_meses += 12
+
+        if antiguedad_anios < 0:
+            antiguedad_anios = 0
+            antiguedad_meses = 0
+            antiguedad_dias = 0
+
+    if dias_trabajados_pendientes is None:
+        dias_trabajados_pendientes = fecha_salida.day if fecha_salida else 0
+
+    try:
+        dias_trabajados_pendientes = int(dias_trabajados_pendientes or 0)
+    except Exception:
+        dias_trabajados_pendientes = 0
+
+    salario_pendiente_monto = salario_diario * Decimal(dias_trabajados_pendientes)
+
+    ausencias_descuento = 0
+
+    try:
+        Asistencia = apps.get_model("core", "Asistencia")
+
+        fecha_inicio_mes = date(fecha_salida.year, fecha_salida.month, 1)
+
+        asistencias_qs = Asistencia.objects.filter(
+            funcionario=funcionario,
+            fecha__gte=fecha_inicio_mes,
+            fecha__lte=fecha_salida,
+        )
+
+        fechas_asistidas = set(asistencias_qs.values_list("fecha", flat=True))
+
+        dia_actual = fecha_inicio_mes
+        while dia_actual <= fecha_salida:
+            if dia_actual.weekday() != 6:
+                if dia_actual not in fechas_asistidas:
+                    ausencias_descuento += 1
+
+            dia_actual = dia_actual.replace(day=dia_actual.day + 1) if dia_actual.day < monthrange(dia_actual.year, dia_actual.month)[1] else None
+
+            if dia_actual is None:
+                break
+
+    except Exception:
+        ausencias_descuento = 0
+
+    descuento_ausencias = salario_diario * Decimal(ausencias_descuento)
+
+    if descuento_ausencias > 0:
+        salario_pendiente_monto -= descuento_ausencias
+
+    if salario_pendiente_monto < 0:
+        salario_pendiente_monto = Decimal("0")
+
+    if vacaciones_causadas_pendientes_dias is None:
+        vacaciones_causadas_pendientes_dias = 0
+
+    try:
+        vacaciones_causadas_pendientes_dias = int(vacaciones_causadas_pendientes_dias or 0)
+    except Exception:
+        vacaciones_causadas_pendientes_dias = 0
+
+    vacaciones_causadas_monto = salario_diario * Decimal(vacaciones_causadas_pendientes_dias)
+
+    tipo_normalizado = str(tipo_salida or "").lower()
+
+    if tipo_normalizado == "renuncia":
+        vacaciones_proporcionales_dias = 0
+        vacaciones_proporcionales_monto = Decimal("0")
+    else:
+        meses_trabajados_anio = fecha_salida.month if fecha_salida else 0
+
+        if antiguedad_anios < 5:
+            dias_vacaciones_anual = 12
+        elif antiguedad_anios < 10:
+            dias_vacaciones_anual = 18
+        else:
+            dias_vacaciones_anual = 30
+
+        vacaciones_proporcionales_dias = round((dias_vacaciones_anual / 12) * meses_trabajados_anio)
+        vacaciones_proporcionales_monto = salario_diario * Decimal(vacaciones_proporcionales_dias)
+
+    aguinaldo_proporcional_monto = Decimal("0")
+
+    if fecha_salida:
+        meses_aguinaldo = fecha_salida.month
+        aguinaldo_proporcional_monto = (salario_total * Decimal(meses_aguinaldo)) / Decimal("12")
+
+    preaviso_dias_corresponde = 0
+    preaviso_monto = Decimal("0")
+
+    if tipo_normalizado in ["despido_sin_causa", "despido_sin_justa_causa"]:
+        if antiguedad_anios < 1:
+            preaviso_dias_corresponde = 30
+        elif antiguedad_anios < 5:
+            preaviso_dias_corresponde = 45
+        elif antiguedad_anios < 10:
+            preaviso_dias_corresponde = 60
+        else:
+            preaviso_dias_corresponde = 90
+
+        if not preaviso_cumplido:
+            dias_preaviso_pagar = max(preaviso_dias_corresponde - int(preaviso_dias_otorgados or 0), 0)
+            preaviso_monto = salario_diario * Decimal(dias_preaviso_pagar)
+
+    if descontar_preaviso and tipo_normalizado == "renuncia":
+        preaviso_monto = Decimal("0")
+
+    indemnizacion_dias = 0
+    indemnizacion_monto = Decimal("0")
+
+    if tipo_normalizado in ["despido_sin_causa", "despido_sin_justa_causa"]:
+        indemnizacion_dias = antiguedad_anios * 15
+        indemnizacion_monto = salario_diario * Decimal(indemnizacion_dias)
+
+    ips_monto = Decimal("0")
+
+    if getattr(funcionario, "ips", False):
+        ips_monto = salario_pendiente_monto * Decimal("0.09")
+
+    deudas_monto = Decimal("0")
+
+    try:
+        Deuda = apps.get_model("core", "Deuda")
+
+        deudas_qs = Deuda.objects.filter(funcionario=funcionario)
+
+        if hasattr(Deuda, "activa"):
+            deudas_qs = deudas_qs.filter(activa=True)
+
+        for deuda in deudas_qs:
+            deudas_monto += D(getattr(deuda, "saldo_pendiente", None) or getattr(deuda, "monto", 0))
+
+    except Exception:
+        deudas_monto = Decimal("0")
+
+    otros_descuentos = D(otros_descuentos)
+
+    total_haberes = (
+        salario_pendiente_monto
+        + vacaciones_causadas_monto
+        + vacaciones_proporcionales_monto
+        + aguinaldo_proporcional_monto
+        + preaviso_monto
+        + indemnizacion_monto
+    )
+
+    total_descuentos = ips_monto + deudas_monto + otros_descuentos
+
+    total_liquidacion = total_haberes - total_descuentos
+
+    if total_liquidacion < 0:
+        total_liquidacion = Decimal("0")
+
+    requiere_revision_juridica = False
+    alerta_revision = ""
+
+    if tipo_normalizado in ["despido_justa_causa", "despido_por_justa_causa", "abandono"]:
+        requiere_revision_juridica = True
+        alerta_revision = "Este tipo de salida requiere revisión jurídica antes de confirmar la liquidación."
+
+    return {
+        "antiguedad_anios": antiguedad_anios,
+        "antiguedad_meses": antiguedad_meses,
+        "antiguedad_dias": antiguedad_dias,
+
+        "salario_base_snapshot": salario_base,
+        "bono_base_snapshot": bono_base,
+
+        "dias_trabajados_pendientes": dias_trabajados_pendientes,
+        "salario_pendiente_monto": salario_pendiente_monto,
+
+        "ausencias_descuento": ausencias_descuento,
+        "descuento_ausencias": descuento_ausencias,
+
+        "vacaciones_causadas_pendientes_dias": vacaciones_causadas_pendientes_dias,
+        "vacaciones_causadas_monto": vacaciones_causadas_monto,
+
+        "vacaciones_proporcionales_dias": vacaciones_proporcionales_dias,
+        "vacaciones_proporcionales_monto": vacaciones_proporcionales_monto,
+
+        "aguinaldo_proporcional_monto": aguinaldo_proporcional_monto,
+
+        "preaviso_dias_corresponde": preaviso_dias_corresponde,
+        "preaviso_dias_otorgados": preaviso_dias_otorgados,
+        "preaviso_cumplido": preaviso_cumplido,
+        "preaviso_monto": preaviso_monto,
+
+        "indemnizacion_dias": indemnizacion_dias,
+        "indemnizacion_monto": indemnizacion_monto,
+
+        "ips_monto": ips_monto,
+        "deudas_monto": deudas_monto,
+        "otros_descuentos": otros_descuentos,
+
+        "total_haberes": total_haberes,
+        "total_descuentos": total_descuentos,
+        "total_liquidacion": total_liquidacion,
+
+        "requiere_revision_juridica": requiere_revision_juridica,
+        "alerta_revision": alerta_revision,
+    }
+
 @login_required
 def liquidaciones_lista(request):
     permiso = validar_permiso_o_redirigir(request, "liquidacion", "puede_ver")
@@ -3386,6 +3639,10 @@ def liquidacion_preview(request):
         "bono_base_snapshot": str(resumen["bono_base_snapshot"]),
         "dias_trabajados_pendientes": resumen["dias_trabajados_pendientes"],
         "salario_pendiente_monto": str(resumen["salario_pendiente_monto"]),
+
+        "ausencias_descuento": resumen.get("ausencias_descuento", 0),
+        "descuento_ausencias": str(resumen.get("descuento_ausencias", 0)),
+
         "vacaciones_causadas_pendientes_dias": resumen["vacaciones_causadas_pendientes_dias"],
         "vacaciones_causadas_monto": str(resumen["vacaciones_causadas_monto"]),
         "vacaciones_proporcionales_dias": resumen["vacaciones_proporcionales_dias"],
@@ -3664,7 +3921,9 @@ def liquidacion_pdf(request, pk):
 
     tabla_haberes = Table([
         ["Concepto", "Detalle", "Monto"],
-        ["Salario pendiente", f"{liquidacion.dias_trabajados_pendientes} día(s)", f"Gs. {liquidacion.salario_pendiente_monto:,.0f}".replace(",", ".")],
+        ["Salario pendiente bruto", f"{liquidacion.dias_trabajados_pendientes} día(s)", f"Gs. {(liquidacion.salario_pendiente_monto + liquidacion.descuento_ausencias):,.0f}".replace(",", ".")],
+        ["Ausencias descontadas", f"{liquidacion.ausencias_descuento} día(s)", f"- Gs. {liquidacion.descuento_ausencias:,.0f}".replace(",", ".")],
+        ["Salario pendiente neto", "-", f"Gs. {liquidacion.salario_pendiente_monto:,.0f}".replace(",", ".")],
         ["Vacaciones causadas pendientes", f"{liquidacion.vacaciones_causadas_pendientes_dias} día(s)", f"Gs. {liquidacion.vacaciones_causadas_monto:,.0f}".replace(",", ".")],
         ["Vacaciones proporcionales", f"{liquidacion.vacaciones_proporcionales_dias} día(s)", f"Gs. {liquidacion.vacaciones_proporcionales_monto:,.0f}".replace(",", ".")],
         ["Aguinaldo proporcional", "-", f"Gs. {liquidacion.aguinaldo_proporcional_monto:,.0f}".replace(",", ".")],
@@ -3782,6 +4041,490 @@ def liquidacion_pdf(request, pk):
     response.write(pdf)
     return response
 
+def generar_texto_comunicacion_laboral(comunicacion):
+    funcionario = comunicacion.funcionario
+    empresa_nombre = funcionario.empresa_mostrar
+    fecha_emision = comunicacion.fecha_emision.strftime("%d/%m/%Y") if comunicacion.fecha_emision else "-"
+    fecha_ref = comunicacion.fecha_referencia.strftime("%d/%m/%Y") if comunicacion.fecha_referencia else "la fecha indicada"
+    detalle = comunicacion.detalle_hecho or "los hechos detallados por la empresa"
+
+    tipo = comunicacion.tipo
+
+    textos = {
+        ComunicacionLaboral.Tipos.AMONESTACION: f"""
+Por medio de la presente, la empresa <b>{empresa_nombre}</b> comunica formalmente al trabajador
+<b>{funcionario.nombre_completo}</b>, con C.I. N° <b>{funcionario.cedula}</b>, que se deja constancia
+de una <b>amonestación disciplinaria</b> vinculada a los siguientes hechos:
+<br/><br/>
+<b>{detalle}</b>
+<br/><br/>
+La presente comunicación se realiza a los efectos de documentar la situación ocurrida, advertir al trabajador
+sobre la necesidad de cumplir estrictamente con sus obligaciones laborales, reglamentos internos, horarios,
+instrucciones de trabajo y normas de conducta aplicables.
+<br/><br/>
+Se deja constancia de que la reiteración de hechos similares podrá dar lugar a nuevas medidas disciplinarias,
+conforme a la gravedad del caso, los antecedentes existentes y la normativa laboral vigente.
+""",
+
+        ComunicacionLaboral.Tipos.PREAVISO: f"""
+Por medio de la presente, la empresa <b>{empresa_nombre}</b> comunica formalmente al trabajador
+<b>{funcionario.nombre_completo}</b>, con C.I. N° <b>{funcionario.cedula}</b>, el otorgamiento de
+<b>preaviso</b> conforme a la normativa laboral vigente.
+<br/><br/>
+La presente comunicación se emite en fecha <b>{fecha_emision}</b>, tomando como referencia
+<b>{fecha_ref}</b>.
+<br/><br/>
+El plazo de preaviso deberá ser determinado conforme a la antigüedad del trabajador y a las disposiciones
+aplicables del Código del Trabajo. Se deja constancia de que este documento tiene por finalidad comunicar
+formalmente la decisión empresarial y preservar respaldo documental suficiente.
+<br/><br/>
+Detalle adicional:
+<br/>
+<b>{detalle}</b>
+""",
+
+        ComunicacionLaboral.Tipos.ABANDONO: f"""
+Por medio de la presente, la empresa <b>{empresa_nombre}</b> comunica formalmente al trabajador
+<b>{funcionario.nombre_completo}</b>, con C.I. N° <b>{funcionario.cedula}</b>, que se ha registrado una
+situación compatible con <b>abandono de trabajo</b> o inasistencia injustificada, según los antecedentes
+obrantes en la empresa.
+<br/><br/>
+Hechos registrados:
+<br/>
+<b>{detalle}</b>
+<br/><br/>
+Se intima al trabajador a justificar de manera inmediata y documentada su ausencia o interrupción de tareas.
+La falta de justificación suficiente podrá ser considerada para la adopción de las medidas laborales que
+correspondan conforme al Código del Trabajo y demás normas aplicables.
+<br/><br/>
+La presente comunicación se emite a efectos de dejar constancia formal y permitir el ejercicio del derecho
+a formular aclaraciones o descargos.
+""",
+
+        ComunicacionLaboral.Tipos.PERMISO: f"""
+Por medio de la presente, la empresa <b>{empresa_nombre}</b> comunica al trabajador
+<b>{funcionario.nombre_completo}</b>, con C.I. N° <b>{funcionario.cedula}</b>, la recepción, autorización,
+rechazo o registro administrativo de un <b>permiso laboral</b>, conforme a los datos consignados por RRHH.
+<br/><br/>
+Detalle del permiso:
+<br/>
+<b>{detalle}</b>
+<br/><br/>
+El trabajador deberá cumplir con las condiciones, fechas, horarios y documentación respaldatoria indicadas
+por la empresa. En caso de no presentar los justificativos correspondientes, la situación podrá ser tratada
+como ausencia injustificada.
+""",
+
+        ComunicacionLaboral.Tipos.AUSENCIA: f"""
+Por medio de la presente, la empresa <b>{empresa_nombre}</b> comunica formalmente al trabajador
+<b>{funcionario.nombre_completo}</b>, con C.I. N° <b>{funcionario.cedula}</b>, que se ha registrado una
+<b>ausencia injustificada</b> o una falta de comunicación previa respecto a su inasistencia.
+<br/><br/>
+Detalle registrado:
+<br/>
+<b>{detalle}</b>
+<br/><br/>
+Se solicita al trabajador presentar la justificación correspondiente en el plazo más breve posible. La falta
+de justificación documentada podrá generar constancia disciplinaria y ser considerada como antecedente
+laboral, conforme a la normativa vigente y a los reglamentos internos aplicables.
+""",
+
+        ComunicacionLaboral.Tipos.SUSPENSION: f"""
+Por medio de la presente, la empresa <b>{empresa_nombre}</b> comunica al trabajador
+<b>{funcionario.nombre_completo}</b>, con C.I. N° <b>{funcionario.cedula}</b>, la aplicación o inicio del
+procedimiento relacionado con una <b>suspensión disciplinaria</b>, según los hechos detallados.
+<br/><br/>
+Hechos:
+<br/>
+<b>{detalle}</b>
+<br/><br/>
+La medida deberá ser proporcional a la falta imputada, respetar el derecho de defensa del trabajador y
+documentarse debidamente. En caso de corresponder, el trabajador podrá presentar su descargo o explicación
+ante RRHH dentro del plazo otorgado por la empresa.
+""",
+
+        ComunicacionLaboral.Tipos.CITACION_DESCARGO: f"""
+Por medio de la presente, la empresa <b>{empresa_nombre}</b> cita formalmente al trabajador
+<b>{funcionario.nombre_completo}</b>, con C.I. N° <b>{funcionario.cedula}</b>, a presentar su
+<b>descargo</b> respecto a los hechos comunicados.
+<br/><br/>
+Hechos objeto de descargo:
+<br/>
+<b>{detalle}</b>
+<br/><br/>
+La finalidad de esta comunicación es garantizar que el trabajador pueda exponer su versión, presentar
+documentos o aclaraciones, y ejercer su derecho de defensa antes de que la empresa adopte una decisión
+disciplinaria o administrativa definitiva.
+""",
+
+        ComunicacionLaboral.Tipos.CAMBIO_CARGO_SECTOR: f"""
+Por medio de la presente, la empresa <b>{empresa_nombre}</b> comunica al trabajador
+<b>{funcionario.nombre_completo}</b>, con C.I. N° <b>{funcionario.cedula}</b>, una modificación,
+reasignación o cambio administrativo relacionado con su cargo, sector, sucursal, funciones u organización
+interna del trabajo.
+<br/><br/>
+Detalle:
+<br/>
+<b>{detalle}</b>
+<br/><br/>
+La presente comunicación se emite para dejar constancia formal de la medida administrativa, sin perjuicio
+de los derechos laborales que correspondan al trabajador conforme a la normativa vigente.
+""",
+
+        ComunicacionLaboral.Tipos.MEMORANDUM: f"""
+Por medio de la presente, la empresa <b>{empresa_nombre}</b> emite memorándum interno dirigido al trabajador
+<b>{funcionario.nombre_completo}</b>, con C.I. N° <b>{funcionario.cedula}</b>.
+<br/><br/>
+Asunto:
+<br/>
+<b>{comunicacion.asunto or comunicacion.titulo}</b>
+<br/><br/>
+Detalle:
+<br/>
+<b>{detalle}</b>
+<br/><br/>
+Se deja constancia de la presente comunicación para fines administrativos, organizativos y documentales.
+""",
+    }
+
+    return textos.get(tipo, detalle)
+
+
+@login_required
+def comunicaciones_lista(request):
+    permiso = validar_permiso_o_redirigir(request, "comunicaciones", "puede_ver")
+    if permiso:
+        return permiso
+
+    q = request.GET.get("q", "").strip()
+    tipo = request.GET.get("tipo", "").strip()
+    estado = request.GET.get("estado", "").strip()
+
+    empresa_usuario = obtener_empresa_usuario(request.user)
+    admin_master = es_admin_master(request.user)
+
+    comunicaciones = ComunicacionLaboral.objects.select_related(
+        "funcionario",
+        "empresa",
+        "sucursal",
+        "generado_por",
+        "funcionario__sucursal_rel",
+        "funcionario__sucursal_rel__empresa",
+    ).all()
+
+    if not admin_master:
+        if empresa_usuario:
+            comunicaciones = comunicaciones.filter(funcionario__sucursal_rel__empresa=empresa_usuario)
+        else:
+            comunicaciones = comunicaciones.none()
+
+    if q:
+        comunicaciones = comunicaciones.filter(
+            Q(funcionario__nombre__icontains=q) |
+            Q(funcionario__apellido__icontains=q) |
+            Q(funcionario__cedula__icontains=q) |
+            Q(titulo__icontains=q) |
+            Q(asunto__icontains=q) |
+            Q(detalle_hecho__icontains=q)
+        )
+
+    if tipo:
+        comunicaciones = comunicaciones.filter(tipo=tipo)
+
+    if estado:
+        comunicaciones = comunicaciones.filter(estado=estado)
+
+    return render(request, "core/comunicaciones_lista.html", {
+        "comunicaciones": comunicaciones,
+        "q": q,
+        "tipo": tipo,
+        "estado": estado,
+        "tipos": ComunicacionLaboral.Tipos.choices,
+        "estados": ComunicacionLaboral.Estados.choices,
+        "empresa_usuario": empresa_usuario,
+        "es_admin_master": admin_master,
+    })
+
+
+@login_required
+def comunicacion_nueva(request):
+    permiso = validar_permiso_o_redirigir(request, "comunicaciones", "puede_crear")
+    if permiso:
+        return permiso
+
+    empresa_usuario = obtener_empresa_usuario(request.user)
+    admin_master = es_admin_master(request.user)
+
+    if request.method == "POST":
+        form = ComunicacionLaboralForm(request.POST, request.FILES)
+
+        if not admin_master and empresa_usuario:
+            form.fields["funcionario"].queryset = Funcionario.objects.filter(
+                activo=True,
+                sucursal_rel__empresa=empresa_usuario
+            ).order_by("apellido", "nombre")
+
+        if form.is_valid():
+            comunicacion = form.save(commit=False)
+
+            if not admin_master:
+                if not comunicacion.funcionario.sucursal_rel or comunicacion.funcionario.sucursal_rel.empresa != empresa_usuario:
+                    messages.error(request, "No puedes crear comunicaciones para otra empresa.")
+                    return redirect("comunicaciones_lista")
+
+            comunicacion.empresa = comunicacion.funcionario.empresa
+            comunicacion.sucursal = comunicacion.funcionario.sucursal_rel
+            comunicacion.generado_por = request.user
+
+            if not comunicacion.contenido:
+                comunicacion.contenido = generar_texto_comunicacion_laboral(comunicacion)
+
+            comunicacion.save()
+
+            registrar_historial(
+                request,
+                "Comunicaciones",
+                "Crear",
+                f"Se creó comunicación {comunicacion.get_tipo_display()} para {comunicacion.funcionario.nombre_completo}."
+            )
+
+            messages.success(request, "Comunicación creada correctamente.")
+            return redirect("comunicacion_detalle", pk=comunicacion.pk)
+    else:
+        form = ComunicacionLaboralForm(initial={"fecha_emision": timezone.localdate()})
+
+        if not admin_master and empresa_usuario:
+            form.fields["funcionario"].queryset = Funcionario.objects.filter(
+                activo=True,
+                sucursal_rel__empresa=empresa_usuario
+            ).order_by("apellido", "nombre")
+
+    return render(request, "core/comunicacion_form.html", {
+        "form": form,
+        "titulo_form": "Nueva comunicación",
+        "boton_texto": "Guardar comunicación",
+    })
+
+
+@login_required
+def comunicacion_editar(request, pk):
+    permiso = validar_permiso_o_redirigir(request, "comunicaciones", "puede_editar")
+    if permiso:
+        return permiso
+
+    empresa_usuario = obtener_empresa_usuario(request.user)
+    admin_master = es_admin_master(request.user)
+
+    comunicacion = get_object_or_404(
+        ComunicacionLaboral.objects.select_related("funcionario", "funcionario__sucursal_rel", "funcionario__sucursal_rel__empresa"),
+        pk=pk
+    )
+
+    if not admin_master:
+        if not comunicacion.funcionario.sucursal_rel or comunicacion.funcionario.sucursal_rel.empresa != empresa_usuario:
+            messages.error(request, "No puedes editar comunicaciones de otra empresa.")
+            return redirect("comunicaciones_lista")
+
+    if request.method == "POST":
+        form = ComunicacionLaboralForm(request.POST, request.FILES, instance=comunicacion)
+
+        if not admin_master and empresa_usuario:
+            form.fields["funcionario"].queryset = Funcionario.objects.filter(
+                activo=True,
+                sucursal_rel__empresa=empresa_usuario
+            ).order_by("apellido", "nombre")
+
+        if form.is_valid():
+            comunicacion = form.save(commit=False)
+            comunicacion.empresa = comunicacion.funcionario.empresa
+            comunicacion.sucursal = comunicacion.funcionario.sucursal_rel
+            comunicacion.save()
+
+            registrar_historial(
+                request,
+                "Comunicaciones",
+                "Editar",
+                f"Se editó comunicación de {comunicacion.funcionario.nombre_completo}."
+            )
+
+            messages.success(request, "Comunicación actualizada correctamente.")
+            return redirect("comunicacion_detalle", pk=comunicacion.pk)
+    else:
+        form = ComunicacionLaboralForm(instance=comunicacion)
+
+        if not admin_master and empresa_usuario:
+            form.fields["funcionario"].queryset = Funcionario.objects.filter(
+                activo=True,
+                sucursal_rel__empresa=empresa_usuario
+            ).order_by("apellido", "nombre")
+
+    return render(request, "core/comunicacion_form.html", {
+        "form": form,
+        "titulo_form": "Editar comunicación",
+        "boton_texto": "Guardar cambios",
+        "comunicacion": comunicacion,
+    })
+
+
+@login_required
+def comunicacion_detalle(request, pk):
+    permiso = validar_permiso_o_redirigir(request, "comunicaciones", "puede_ver")
+    if permiso:
+        return permiso
+
+    empresa_usuario = obtener_empresa_usuario(request.user)
+    admin_master = es_admin_master(request.user)
+
+    comunicacion = get_object_or_404(
+        ComunicacionLaboral.objects.select_related("funcionario", "empresa", "sucursal", "generado_por"),
+        pk=pk
+    )
+
+    if not admin_master:
+        if not comunicacion.funcionario.sucursal_rel or comunicacion.funcionario.sucursal_rel.empresa != empresa_usuario:
+            messages.error(request, "No puedes ver comunicaciones de otra empresa.")
+            return redirect("comunicaciones_lista")
+
+    return render(request, "core/comunicacion_detalle.html", {
+        "comunicacion": comunicacion,
+    })
+
+
+@login_required
+def comunicacion_pdf(request, pk):
+    permiso = validar_permiso_o_redirigir(request, "comunicaciones", "puede_ver")
+    if permiso:
+        return permiso
+
+    empresa_usuario = obtener_empresa_usuario(request.user)
+    admin_master = es_admin_master(request.user)
+
+    comunicacion = get_object_or_404(
+        ComunicacionLaboral.objects.select_related(
+            "funcionario",
+            "empresa",
+            "sucursal",
+            "generado_por",
+            "funcionario__sucursal_rel",
+            "funcionario__sucursal_rel__empresa",
+        ),
+        pk=pk
+    )
+
+    if not admin_master:
+        if not comunicacion.funcionario.sucursal_rel or comunicacion.funcionario.sucursal_rel.empresa != empresa_usuario:
+            messages.error(request, "No puedes generar PDF de otra empresa.")
+            return redirect("comunicaciones_lista")
+
+    funcionario = comunicacion.funcionario
+    empresa_pdf = obtener_empresa_documento(funcionario=funcionario)
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        leftMargin=20 * mm,
+        rightMargin=20 * mm,
+        topMargin=18 * mm,
+        bottomMargin=18 * mm,
+    )
+
+    styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle(
+        name="TituloComunicacion",
+        parent=styles["Heading1"],
+        fontName="Helvetica-Bold",
+        fontSize=15,
+        leading=19,
+        alignment=TA_CENTER,
+        textColor=colors.HexColor("#111827"),
+        spaceAfter=10,
+    ))
+
+    styles.add(ParagraphStyle(
+        name="TextoComunicacion",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=10,
+        leading=15,
+        alignment=TA_LEFT,
+        textColor=colors.HexColor("#111827"),
+    ))
+
+    elementos = []
+
+    elementos += construir_encabezado_empresa_pdf(empresa_pdf, "COMUNICACIÓN LABORAL")
+    elementos.append(Paragraph(comunicacion.titulo.upper(), styles["TituloComunicacion"]))
+    elementos.append(Spacer(1, 8))
+
+    datos = [
+        ["Funcionario", funcionario.nombre_completo],
+        ["Cédula", funcionario.cedula],
+        ["Cargo", funcionario.cargo or "-"],
+        ["Sector", funcionario.sector or "-"],
+        ["Sucursal", funcionario.sucursal_mostrar],
+        ["Tipo de comunicación", comunicacion.get_tipo_display()],
+        ["Fecha de emisión", comunicacion.fecha_emision.strftime("%d/%m/%Y")],
+        ["Fecha de referencia", comunicacion.fecha_referencia.strftime("%d/%m/%Y") if comunicacion.fecha_referencia else "-"],
+        ["Estado", comunicacion.get_estado_display()],
+    ]
+
+    tabla = Table(datos, colWidths=[55 * mm, 105 * mm])
+    tabla.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#eff6ff")),
+        ("TEXTCOLOR", (0, 0), (0, -1), colors.HexColor("#1d4ed8")),
+        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+        ("FONTNAME", (1, 0), (1, -1), "Helvetica"),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#cbd5e1")),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+    ]))
+
+    elementos.append(tabla)
+    elementos.append(Spacer(1, 14))
+
+    contenido = comunicacion.contenido or generar_texto_comunicacion_laboral(comunicacion)
+    contenido = contenido.replace("\n", "<br/>")
+
+    elementos.append(Paragraph(contenido, styles["TextoComunicacion"]))
+    elementos.append(Spacer(1, 30))
+
+    firmas = Table([
+        ["_______________________________", "_______________________________"],
+        ["Firma del empleador / RRHH", "Firma del funcionario"],
+        ["", ""],
+        ["Aclaración: ____________________", "Aclaración: ____________________"],
+        ["Fecha: ____/____/______", "Fecha: ____/____/______"],
+    ], colWidths=[80 * mm, 80 * mm])
+
+    firmas.setStyle(TableStyle([
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+
+    elementos.append(firmas)
+
+    agregar_texto_legal_empresa_pdf(elementos, empresa_pdf)
+
+    doc.build(elementos)
+
+    pdf = buffer.getvalue()
+    buffer.close()
+
+    registrar_historial(
+        request,
+        "Comunicaciones",
+        "PDF",
+        f"Se generó PDF de comunicación para {funcionario.nombre_completo}."
+    )
+
+    response = HttpResponse(content_type="application/pdf")
+    response["Content-Disposition"] = f'inline; filename="comunicacion_{funcionario.cedula}_{comunicacion.id}.pdf"'
+    response.write(pdf)
+    return response
 
 @login_required
 def dias_libres_lista(request):
@@ -3797,13 +4540,8 @@ def dias_libres_lista(request):
     empresa_usuario = obtener_empresa_usuario(request.user)
     admin_master = es_admin_master(request.user)
 
-    dias_libres = DiaLibre.objects.select_related(
-        "funcionario",
-        "empresa",
-        "sucursal",
-    ).filter(activo=True)
-
     funcionarios_activos = Funcionario.objects.filter(activo=True).select_related(
+        "turno",
         "sucursal_rel",
         "sucursal_rel__empresa"
     )
@@ -3811,32 +4549,20 @@ def dias_libres_lista(request):
     if not admin_master:
         if empresa_usuario:
             empresa_id = str(empresa_usuario.id)
-            dias_libres = dias_libres.filter(empresa=empresa_usuario)
             funcionarios_activos = funcionarios_activos.filter(sucursal_rel__empresa=empresa_usuario)
         else:
-            dias_libres = dias_libres.none()
             funcionarios_activos = funcionarios_activos.none()
 
     if empresa_id:
-        dias_libres = dias_libres.filter(empresa_id=empresa_id)
         funcionarios_activos = funcionarios_activos.filter(sucursal_rel__empresa_id=empresa_id)
 
     if sucursal_id:
-        dias_libres = dias_libres.filter(sucursal_id=sucursal_id)
         funcionarios_activos = funcionarios_activos.filter(sucursal_rel_id=sucursal_id)
 
     if sector:
-        dias_libres = dias_libres.filter(sector=sector)
         funcionarios_activos = funcionarios_activos.filter(sector=sector)
 
     if q:
-        dias_libres = dias_libres.filter(
-            Q(funcionario__nombre__icontains=q) |
-            Q(funcionario__apellido__icontains=q) |
-            Q(funcionario__cedula__icontains=q) |
-            Q(sector__icontains=q)
-        )
-
         funcionarios_activos = funcionarios_activos.filter(
             Q(nombre__icontains=q) |
             Q(apellido__icontains=q) |
@@ -3849,58 +4575,95 @@ def dias_libres_lista(request):
         if permiso_post:
             return permiso_post
 
+        dias_campos = [
+            "lunes",
+            "martes",
+            "miercoles",
+            "jueves",
+            "viernes",
+            "sabado",
+            "domingo",
+        ]
+
         for funcionario in funcionarios_activos:
-            dia_valor = request.POST.get(f"dia_libre_{funcionario.id}", "").strip()
+            planilla, creada = PlanillaSemanalFuncionario.objects.get_or_create(
+                funcionario=funcionario
+            )
 
-            if dia_valor == "":
-                continue
+            for campo in dias_campos:
+                valor_turno = request.POST.get(f"{campo}_{funcionario.id}", "").strip()
 
-            dia_semana = int(dia_valor)
+                if valor_turno == "":
+                    setattr(planilla, campo, None)
+                else:
+                    try:
+                        turno = Turno.objects.get(pk=valor_turno, activo=True)
 
-            dia_libre_actual = DiaLibre.objects.filter(
-                funcionario=funcionario,
-                activo=True
-            ).first()
+                        if not admin_master and empresa_usuario:
+                            if turno.empresa != empresa_usuario:
+                                continue
 
-            if dia_libre_actual:
-                dia_libre_actual.dia_semana = dia_semana
-                dia_libre_actual.empresa = funcionario.empresa
-                dia_libre_actual.sucursal = funcionario.sucursal_rel
-                dia_libre_actual.sector = funcionario.sector or ""
-                dia_libre_actual.fecha_inicio = timezone.localdate()
-                dia_libre_actual.save()
-            else:
-                DiaLibre.objects.create(
-                    funcionario=funcionario,
-                    empresa=funcionario.empresa,
-                    sucursal=funcionario.sucursal_rel,
-                    sector=funcionario.sector or "",
-                    dia_semana=dia_semana,
-                    fecha_inicio=timezone.localdate(),
-                    activo=True,
-                )
+                        setattr(planilla, campo, turno)
+                    except Turno.DoesNotExist:
+                        setattr(planilla, campo, None)
+
+            planilla.save()
+
+            # Mantener compatibilidad con el sistema viejo de DiaLibre:
+            # Si un día queda vacío, se registra como día libre activo.
+            DiaLibre.objects.filter(funcionario=funcionario, activo=True).delete()
+
+            mapa_dias = {
+                "lunes": 0,
+                "martes": 1,
+                "miercoles": 2,
+                "jueves": 3,
+                "viernes": 4,
+                "sabado": 5,
+                "domingo": 6,
+            }
+
+            for campo, numero_dia in mapa_dias.items():
+                if getattr(planilla, campo) is None:
+                    DiaLibre.objects.create(
+                        funcionario=funcionario,
+                        empresa=funcionario.empresa,
+                        sucursal=funcionario.sucursal_rel,
+                        sector=funcionario.sector or "",
+                        dia_semana=numero_dia,
+                        fecha_inicio=timezone.localdate(),
+                        activo=True,
+                        observacion="Generado automáticamente desde planilla semanal."
+                    )
 
         registrar_historial(
             request,
             "Días Libres",
-            "Asignación rápida",
-            f"Se actualizaron días libres por sector/sucursal. Sector: {sector or 'Todos'}."
+            "Planilla semanal",
+            f"Se actualizó la planilla semanal de turnos. Sector: {sector or 'Todos'}."
         )
 
-        messages.success(request, "Días libres actualizados correctamente.")
+        messages.success(request, "Planilla semanal actualizada correctamente.")
         return redirect(f"/dias-libres/?empresa={empresa_id}&sucursal={sucursal_id}&sector={sector}&q={q}")
 
     if admin_master:
         empresas = Empresa.objects.filter(activo=True).order_by("nombre")
         sucursales = Sucursal.objects.filter(activo=True).order_by("nombre")
+        turnos = Turno.objects.filter(activo=True).select_related("empresa").order_by("nombre")
+
         if empresa_id:
             sucursales = sucursales.filter(empresa_id=empresa_id)
+            turnos = turnos.filter(empresa_id=empresa_id)
     else:
         empresas = Empresa.objects.filter(id=empresa_usuario.id) if empresa_usuario else Empresa.objects.none()
         sucursales = Sucursal.objects.filter(
             activo=True,
             empresa=empresa_usuario
         ).order_by("nombre") if empresa_usuario else Sucursal.objects.none()
+        turnos = Turno.objects.filter(
+            activo=True,
+            empresa=empresa_usuario
+        ).order_by("nombre") if empresa_usuario else Turno.objects.none()
 
     sectores_qs = Funcionario.objects.filter(activo=True).exclude(sector="")
 
@@ -3916,29 +4679,40 @@ def dias_libres_lista(request):
     sectores = sectores_qs.values_list("sector", flat=True).distinct().order_by("sector")
 
     total_funcionarios = funcionarios_activos.count()
-    total_asignados = DiaLibre.objects.filter(
-        activo=True,
-        funcionario__in=funcionarios_activos
-    ).values("funcionario").distinct().count()
-    total_pendientes = max(total_funcionarios - total_asignados, 0)
 
     funcionarios_rapidos = []
 
+    total_con_planilla = 0
+    total_pendientes = 0
+
     for funcionario in funcionarios_activos.order_by("apellido", "nombre"):
-        dia_actual = DiaLibre.objects.filter(
-            funcionario=funcionario,
-            activo=True
-        ).first()
+        planilla, creada = PlanillaSemanalFuncionario.objects.get_or_create(
+            funcionario=funcionario
+        )
+
+        tiene_algo = any([
+            planilla.lunes,
+            planilla.martes,
+            planilla.miercoles,
+            planilla.jueves,
+            planilla.viernes,
+            planilla.sabado,
+            planilla.domingo,
+        ])
+
+        if tiene_algo:
+            total_con_planilla += 1
+        else:
+            total_pendientes += 1
 
         funcionarios_rapidos.append({
             "funcionario": funcionario,
-            "dia_actual": dia_actual.dia_semana if dia_actual else "",
+            "planilla": planilla,
         })
 
     return render(request, "core/dias_libres_lista.html", {
-        "dias_libres": dias_libres.order_by("sector", "dia_semana", "funcionario__apellido"),
         "funcionarios_rapidos": funcionarios_rapidos,
-        "dias_semana_choices": DiaLibre.DiasSemana.choices,
+        "turnos": turnos,
         "empresas": empresas,
         "sucursales": sucursales,
         "sectores": sectores,
@@ -3947,7 +4721,7 @@ def dias_libres_lista(request):
         "sector": sector,
         "q": q,
         "total_funcionarios": total_funcionarios,
-        "total_asignados": total_asignados,
+        "total_asignados": total_con_planilla,
         "total_pendientes": total_pendientes,
         "empresa_usuario": empresa_usuario,
         "es_admin_master": admin_master,

@@ -350,6 +350,30 @@
                 </div>
             </div>
 
+            <tr>
+                <td>Salario pendiente bruto</td>
+                <td>{{ liquidacion.dias_trabajados_pendientes }} día(s)</td>
+                <td>
+                    Gs. {{ liquidacion.salario_pendiente_monto|add:liquidacion.descuento_ausencias|floatformat:0 }}
+                </td>
+            </tr>
+
+            <tr>
+                <td>Ausencias descontadas</td>
+                <td>{{ liquidacion.ausencias_descuento }} día(s)</td>
+                <td>
+                    - Gs. {{ liquidacion.descuento_ausencias|floatformat:0 }}
+                </td>
+            </tr>
+
+            <tr>
+                <td><strong>Salario pendiente neto</strong></td>
+                <td>-</td>
+                <td>
+                    <strong>Gs. {{ liquidacion.salario_pendiente_monto|floatformat:0 }}</strong>
+                </td>
+            </tr>
+
             <div class="liqdet-panel">
                 <div class="liqdet-panel-title">Descuentos</div>
                 <div class="liqdet-list">

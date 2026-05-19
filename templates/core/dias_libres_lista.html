@@ -1,6 +1,6 @@
 {% extends "base.html" %}
 
-{% block title %}Días Libres | ClockIn{% endblock %}
+{% block title %}Planilla Semanal | ClockIn{% endblock %}
 
 {% block content %}
 <style>
@@ -34,6 +34,8 @@
         background: linear-gradient(135deg, var(--brand-primary), var(--brand-primary-dark));
         color: #fff;
         box-shadow: 0 10px 24px var(--brand-shadow);
+        border: none;
+        cursor: pointer;
     }
 
     .dl-stats {
@@ -133,7 +135,7 @@
 
     .dl-table {
         width: 100%;
-        min-width: 900px;
+        min-width: 1250px;
         border-collapse: separate;
         border-spacing: 0 8px;
     }
@@ -143,22 +145,25 @@
         font-size: 11px;
         font-weight: 800;
         text-transform: uppercase;
-        padding: 0 10px 4px;
+        padding: 0 8px 4px;
+        white-space: nowrap;
     }
 
     .dl-table tbody td {
-        padding: 12px 10px;
+        padding: 10px 8px;
         background: rgba(255,255,255,.02);
         border-top: 1px solid rgba(255,255,255,.04);
         border-bottom: 1px solid rgba(255,255,255,.04);
         color: #fff;
         font-size: 13px;
+        vertical-align: middle;
     }
 
     .dl-table tbody td:first-child {
         border-left: 1px solid rgba(255,255,255,.04);
         border-top-left-radius: 16px;
         border-bottom-left-radius: 16px;
+        min-width: 190px;
     }
 
     .dl-table tbody td:last-child {
@@ -168,60 +173,36 @@
     }
 
     .dl-select-dia {
-        width: 100%;
+        width: 145px;
         background: #0f1722;
         color: white;
         border: 1px solid rgba(255,255,255,.08);
         border-radius: 12px;
-        padding: 10px;
-    }
-
-    .dl-actions {
-        display: flex;
-        gap: 8px;
-        flex-wrap: wrap;
-    }
-
-    .dl-link {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        padding: 8px 12px;
-        border-radius: 10px;
+        padding: 9px;
         font-size: 12px;
-        font-weight: 800;
-        text-decoration: none;
-        background: rgba(59,130,246,.14);
-        color: #bfdbfe;
-        border: 1px solid rgba(59,130,246,.22);
     }
 
-    .dl-link-soft {
-        background: rgba(255,255,255,.05);
-        color: #e5e7eb;
-        border: 1px solid rgba(255,255,255,.08);
-    }
-
-    .dl-badge-ok {
-        display: inline-flex;
-        padding: 6px 10px;
-        border-radius: 999px;
-        font-size: 12px;
-        font-weight: 800;
-        background: rgba(34,197,94,.14);
-        color: #bbf7d0;
-        border: 1px solid rgba(34,197,94,.22);
-    }
-
-    .dl-badge-off {
-        display: inline-flex;
-        padding: 6px 10px;
-        border-radius: 999px;
-        font-size: 12px;
-        font-weight: 800;
-        background: rgba(239,68,68,.14);
+    .dl-select-dia.libre {
         color: #fecaca;
-        border: 1px solid rgba(239,68,68,.22);
+        border-color: rgba(239,68,68,.35);
+        background: rgba(127,29,29,.25);
+    }
+
+    .dl-mini {
+        color: #94a3b8;
+        font-size: 11px;
+        margin-top: 3px;
+    }
+
+    .dl-func {
+        font-weight: 900;
+        color: #fff;
+    }
+
+    .dl-actions-bottom {
+        display: flex;
+        justify-content: flex-end;
+        margin-top: 14px;
     }
 
     @media (max-width: 900px) {
@@ -243,15 +224,14 @@
 
 <div class="dl-head">
     <div>
-        <h2>🗓️ Días Libres</h2>
-        <p>Planificación semanal de días libres por funcionario, sector y sucursal.</p>
+        <h2>🗓️ Planilla Semanal de Turnos</h2>
+        <p>Organiza en una sola pantalla qué turno trabaja cada funcionario de lunes a domingo.</p>
     </div>
-    <a href="{% url 'dia_libre_nuevo' %}" class="dl-btn">➕ Nuevo día libre</a>
 </div>
 
 {% if es_admin_master %}
     <div class="alert-box warning-box mb-20">
-        Vista global de días libres de todas las empresas.
+        Vista global de planificación semanal de todas las empresas.
     </div>
 {% elif empresa_usuario %}
     <div class="alert-box success-box mb-20">
@@ -262,8 +242,8 @@
 <div class="dl-card">
     <div class="dl-quick-head">
         <div>
-            <h3>⚡ Asignación rápida</h3>
-            <p>Filtra por empresa, sucursal, sector o funcionario y asigna el día libre en una sola vista.</p>
+            <h3>⚡ Planilla rápida semanal</h3>
+            <p>Filtra por sucursal, sector o funcionario. En cada día selecciona un turno o deja “Día Libre”.</p>
         </div>
 
         <form method="get" class="dl-filter-compact" id="filtroDiasLibresRapido">
@@ -313,22 +293,99 @@
                         <th>Cédula</th>
                         <th>Sector</th>
                         <th>Sucursal</th>
-                        <th>Día libre</th>
+                        <th>Lunes</th>
+                        <th>Martes</th>
+                        <th>Miércoles</th>
+                        <th>Jueves</th>
+                        <th>Viernes</th>
+                        <th>Sábado</th>
+                        <th>Domingo</th>
                     </tr>
                 </thead>
+
                 <tbody>
                     {% for item in funcionarios_rapidos %}
                     <tr>
-                        <td>{{ item.funcionario.nombre_completo }}</td>
+                        <td>
+                            <div class="dl-func">{{ item.funcionario.nombre_completo }}</div>
+                            <div class="dl-mini">Turno base: {{ item.funcionario.turno.nombre|default:"Sin turno" }}</div>
+                        </td>
                         <td>{{ item.funcionario.cedula }}</td>
                         <td>{{ item.funcionario.sector|default:"-" }}</td>
                         <td>{{ item.funcionario.sucursal_mostrar }}</td>
+
                         <td>
-                            <select name="dia_libre_{{ item.funcionario.id }}" class="dl-select-dia">
-                                <option value="">Sin cambios</option>
-                                {% for value, label in dias_semana_choices %}
-                                    <option value="{{ value }}" {% if item.dia_actual == value %}selected{% endif %}>
-                                        {{ label }}
+                            <select name="lunes_{{ item.funcionario.id }}" class="dl-select-dia">
+                                <option value="">Día Libre</option>
+                                {% for turno in turnos %}
+                                    <option value="{{ turno.id }}" {% if item.planilla.lunes and item.planilla.lunes.id == turno.id %}selected{% endif %}>
+                                        {{ turno.nombre }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </td>
+
+                        <td>
+                            <select name="martes_{{ item.funcionario.id }}" class="dl-select-dia">
+                                <option value="">Día Libre</option>
+                                {% for turno in turnos %}
+                                    <option value="{{ turno.id }}" {% if item.planilla.martes and item.planilla.martes.id == turno.id %}selected{% endif %}>
+                                        {{ turno.nombre }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </td>
+
+                        <td>
+                            <select name="miercoles_{{ item.funcionario.id }}" class="dl-select-dia">
+                                <option value="">Día Libre</option>
+                                {% for turno in turnos %}
+                                    <option value="{{ turno.id }}" {% if item.planilla.miercoles and item.planilla.miercoles.id == turno.id %}selected{% endif %}>
+                                        {{ turno.nombre }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </td>
+
+                        <td>
+                            <select name="jueves_{{ item.funcionario.id }}" class="dl-select-dia">
+                                <option value="">Día Libre</option>
+                                {% for turno in turnos %}
+                                    <option value="{{ turno.id }}" {% if item.planilla.jueves and item.planilla.jueves.id == turno.id %}selected{% endif %}>
+                                        {{ turno.nombre }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </td>
+
+                        <td>
+                            <select name="viernes_{{ item.funcionario.id }}" class="dl-select-dia">
+                                <option value="">Día Libre</option>
+                                {% for turno in turnos %}
+                                    <option value="{{ turno.id }}" {% if item.planilla.viernes and item.planilla.viernes.id == turno.id %}selected{% endif %}>
+                                        {{ turno.nombre }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </td>
+
+                        <td>
+                            <select name="sabado_{{ item.funcionario.id }}" class="dl-select-dia">
+                                <option value="">Día Libre</option>
+                                {% for turno in turnos %}
+                                    <option value="{{ turno.id }}" {% if item.planilla.sabado and item.planilla.sabado.id == turno.id %}selected{% endif %}>
+                                        {{ turno.nombre }}
+                                    </option>
+                                {% endfor %}
+                            </select>
+                        </td>
+
+                        <td>
+                            <select name="domingo_{{ item.funcionario.id }}" class="dl-select-dia">
+                                <option value="">Día Libre</option>
+                                {% for turno in turnos %}
+                                    <option value="{{ turno.id }}" {% if item.planilla.domingo and item.planilla.domingo.id == turno.id %}selected{% endif %}>
+                                        {{ turno.nombre }}
                                     </option>
                                 {% endfor %}
                             </select>
@@ -336,8 +393,8 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="5" style="text-align:center; color:#94a3b8; padding:22px;">
-                            Selecciona una sucursal, sector o busca un funcionario para asignar días libres.
+                        <td colspan="11" style="text-align:center; color:#94a3b8; padding:22px;">
+                            No hay funcionarios para los filtros seleccionados.
                         </td>
                     </tr>
                     {% endfor %}
@@ -345,9 +402,9 @@
             </table>
         </div>
 
-        <div style="margin-top:12px;">
-            <button type="submit" class="dl-btn" style="border:none; cursor:pointer;">
-                💾 Guardar días libres
+        <div class="dl-actions-bottom">
+            <button type="submit" class="dl-btn">
+                💾 Guardar planilla semanal
             </button>
         </div>
     </form>
@@ -355,86 +412,43 @@
 
 <div class="dl-stats">
     <div class="dl-stat">
-        <div class="lab">Funcionarios activos</div>
+        <div class="lab">Funcionarios filtrados</div>
         <div class="val">{{ total_funcionarios }}</div>
     </div>
     <div class="dl-stat">
-        <div class="lab">Con día libre asignado</div>
+        <div class="lab">Con turnos asignados</div>
         <div class="val">{{ total_asignados }}</div>
     </div>
     <div class="dl-stat">
-        <div class="lab">Pendientes de asignar</div>
+        <div class="lab">Sin turnos cargados</div>
         <div class="val">{{ total_pendientes }}</div>
-    </div>
-</div>
-
-<div class="dl-card">
-    <div class="dl-quick-head">
-        <div>
-            <h3>📋 Días libres registrados</h3>
-            <p>Listado general de días libres activos e inactivos.</p>
-        </div>
-    </div>
-
-    <div class="dl-table-wrap">
-        <table class="dl-table">
-            <thead>
-                <tr>
-                    <th>Funcionario</th>
-                    <th>Empresa</th>
-                    <th>Sucursal</th>
-                    <th>Sector</th>
-                    <th>Día libre</th>
-                    <th>Estado</th>
-                    <th>Acciones</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for item in dias_libres %}
-                <tr>
-                    <td>{{ item.funcionario.nombre_completo }}</td>
-                    <td>{{ item.empresa.nombre|default:"-" }}</td>
-                    <td>{{ item.sucursal.nombre|default:"-" }}</td>
-                    <td>{{ item.sector|default:"-" }}</td>
-                    <td>{{ item.get_dia_semana_display }}</td>
-                    <td>
-                        {% if item.activo %}
-                            <span class="dl-badge-ok">Activo</span>
-                        {% else %}
-                            <span class="dl-badge-off">Inactivo</span>
-                        {% endif %}
-                    </td>
-                    <td>
-                        <div class="dl-actions">
-                            <a href="{% url 'dia_libre_editar' item.id %}" class="dl-link">Editar</a>
-                            <a href="{% url 'dia_libre_toggle_activo' item.id %}" class="dl-link dl-link-soft">
-                                {% if item.activo %}Inactivar{% else %}Activar{% endif %}
-                            </a>
-                        </div>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="7" style="text-align:center; color:#94a3b8; padding:22px;">
-                        No hay días libres cargados.
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
     </div>
 </div>
 
 <script>
 document.addEventListener("DOMContentLoaded", function () {
     const filtro = document.getElementById("filtroDiasLibresRapido");
-    if (!filtro) return;
+    if (filtro) {
+        const selects = filtro.querySelectorAll("select");
+        selects.forEach(function (select) {
+            select.addEventListener("change", function () {
+                filtro.submit();
+            });
+        });
+    }
 
-    const selects = filtro.querySelectorAll("select");
+    function pintarSelect(select) {
+        if (select.value === "") {
+            select.classList.add("libre");
+        } else {
+            select.classList.remove("libre");
+        }
+    }
 
-    selects.forEach(function (select) {
+    document.querySelectorAll(".dl-select-dia").forEach(function (select) {
+        pintarSelect(select);
         select.addEventListener("change", function () {
-            filtro.submit();
+            pintarSelect(select);
         });
     });
 });

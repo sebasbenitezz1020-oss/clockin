@@ -957,6 +957,9 @@ class Liquidacion(models.Model):
     dias_trabajados_pendientes = models.PositiveIntegerField(default=0)
     salario_pendiente_monto = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
+    ausencias_descuento = models.PositiveIntegerField(default=0)
+    descuento_ausencias = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+
     vacaciones_causadas_pendientes_dias = models.PositiveIntegerField(default=0)
     vacaciones_causadas_monto = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
@@ -1057,3 +1060,120 @@ class DiaLibre(models.Model):
         if self.fecha_fin and self.fecha_fin < hoy:
             return False
         return True    
+    
+class PlanillaSemanalFuncionario(models.Model):
+    funcionario = models.OneToOneField(
+        Funcionario,
+        on_delete=models.CASCADE,
+        related_name="planilla_semanal"
+    )
+
+    lunes = models.ForeignKey(Turno, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    martes = models.ForeignKey(Turno, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    miercoles = models.ForeignKey(Turno, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    jueves = models.ForeignKey(Turno, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    viernes = models.ForeignKey(Turno, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    sabado = models.ForeignKey(Turno, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+    domingo = models.ForeignKey(Turno, on_delete=models.SET_NULL, null=True, blank=True, related_name="+")
+
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["funcionario__apellido", "funcionario__nombre"]
+
+    def __str__(self):
+        return f"Planilla semanal - {self.funcionario.nombre_completo}"
+
+    def turno_para_fecha(self, fecha):
+        dia = fecha.weekday()
+
+        mapa = {
+            0: self.lunes,
+            1: self.martes,
+            2: self.miercoles,
+            3: self.jueves,
+            4: self.viernes,
+            5: self.sabado,
+            6: self.domingo,
+        }
+
+        return mapa.get(dia)
+class ComunicacionLaboral(models.Model):
+    class Tipos(models.TextChoices):
+        AMONESTACION = "amonestacion", "Sanción Disciplinaria / Amonestación"
+        PREAVISO = "preaviso", "Preaviso"
+        ABANDONO = "abandono", "Abandono de Trabajo"
+        PERMISO = "permiso", "Comunicación de Permiso"
+        AUSENCIA = "ausencia", "Ausencia Injustificada"
+        SUSPENSION = "suspension", "Suspensión Disciplinaria"
+        CITACION_DESCARGO = "citacion_descargo", "Citación a Descargo"
+        CAMBIO_CARGO_SECTOR = "cambio_cargo_sector", "Cambio de Cargo / Sector / Sucursal"
+        MEMORANDUM = "memorandum", "Memorándum Interno"
+
+    class Estados(models.TextChoices):
+        BORRADOR = "borrador", "Borrador"
+        EMITIDA = "emitida", "Emitida"
+        ENTREGADA = "entregada", "Entregada"
+        FIRMADA = "firmada", "Firmada"
+        ANULADA = "anulada", "Anulada"
+
+    funcionario = models.ForeignKey(
+        Funcionario,
+        on_delete=models.CASCADE,
+        related_name="comunicaciones"
+    )
+
+    empresa = models.ForeignKey(
+        Empresa,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="comunicaciones"
+    )
+
+    sucursal = models.ForeignKey(
+        Sucursal,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="comunicaciones"
+    )
+
+    tipo = models.CharField(max_length=40, choices=Tipos.choices)
+    titulo = models.CharField(max_length=180)
+    fecha_emision = models.DateField(default=timezone.localdate)
+    fecha_referencia = models.DateField(null=True, blank=True)
+
+    asunto = models.CharField(max_length=255, blank=True, default="")
+    detalle_hecho = models.TextField(blank=True, default="")
+    contenido = models.TextField(blank=True, default="")
+    observacion_interna = models.TextField(blank=True, default="")
+
+    requiere_firma = models.BooleanField(default=True)
+    firmado = models.BooleanField(default=False)
+    fecha_firma = models.DateField(null=True, blank=True)
+
+    estado = models.CharField(max_length=20, choices=Estados.choices, default=Estados.BORRADOR)
+
+    generado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="comunicaciones_generadas"
+    )
+
+    adjunto_firmado = models.FileField(
+        upload_to="comunicaciones/firmadas/",
+        null=True,
+        blank=True
+    )
+
+    creado_en = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-fecha_emision", "-creado_en"]
+
+    def __str__(self):
+        return f"{self.funcionario.nombre_completo} - {self.get_tipo_display()} - {self.fecha_emision:%d/%m/%Y}"

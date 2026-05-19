@@ -66,6 +66,11 @@ from .views import (
     nomina_cerrar_periodo,
     nomina_reabrir_periodo,
     vacacion_notificacion_pdf,
+    comunicaciones_lista,
+    comunicacion_nueva,
+    comunicacion_editar,
+    comunicacion_detalle,
+    comunicacion_pdf,
 )
 
 urlpatterns = [
@@ -137,4 +142,9 @@ urlpatterns = [
     path("dias-libres/<int:pk>/editar/", dia_libre_editar, name="dia_libre_editar"),
     path("dias-libres/<int:pk>/toggle-activo/", dia_libre_toggle_activo, name="dia_libre_toggle_activo"),
     path("usuarios/", include("usuarios.urls")),
+    path("comunicaciones/", comunicaciones_lista, name="comunicaciones_lista"),
+    path("comunicaciones/nueva/", comunicacion_nueva, name="comunicacion_nueva"),
+    path("comunicaciones/<int:pk>/", comunicacion_detalle, name="comunicacion_detalle"),
+    path("comunicaciones/<int:pk>/editar/", comunicacion_editar, name="comunicacion_editar"),
+    path("comunicaciones/<int:pk>/pdf/", comunicacion_pdf, name="comunicacion_pdf"),
 ]

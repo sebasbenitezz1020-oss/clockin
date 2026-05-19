@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}Comunicaciones | ClockIn{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>📢 Comunicaciones</h2>
+    <p>Documentos laborales, avisos, sanciones, preavisos, permisos y constancias.</p>
+</div>
+
+<div class="card-dark" style="padding:18px; margin-bottom:16px;">
+    <form method="get" style="display:flex; gap:10px; flex-wrap:wrap;">
+        <input type="text" name="q" value="{{ q }}" placeholder="Buscar funcionario, cédula o asunto" class="form-control">
+
+        <select name="tipo" class="form-control">
+            <option value="">Tipo</option>
+            {% for value, label in tipos %}
+                <option value="{{ value }}" {% if tipo == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+
+        <select name="estado" class="form-control">
+            <option value="">Estado</option>
+            {% for value, label in estados %}
+                <option value="{{ value }}" {% if estado == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+
+        <button type="submit" class="btn-primary">Filtrar</button>
+        <a href="{% url 'comunicacion_nueva' %}" class="btn-primary">➕ Nueva comunicación</a>
+    </form>
+</div>
+
+<div class="card-dark" style="padding:18px;">
+    <table class="table-dark">
+        <thead>
+            <tr>
+                <th>Fecha</th>
+                <th>Funcionario</th>
+                <th>Tipo</th>
+                <th>Título</th>
+                <th>Estado</th>
+                <th>Firma</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for item in comunicaciones %}
+            <tr>
+                <td>{{ item.fecha_emision|date:"d/m/Y" }}</td>
+                <td>{{ item.funcionario.nombre_completo }}</td>
+                <td>{{ item.get_tipo_display }}</td>
+                <td>{{ item.titulo }}</td>
+                <td>{{ item.get_estado_display }}</td>
+                <td>
+                    {% if item.firmado %}
+                        ✅ Firmado
+                    {% elif item.requiere_firma %}
+                        ⏳ Pendiente
+                    {% else %}
+                        No requiere
+                    {% endif %}
+                </td>
+                <td>
+                    <a href="{% url 'comunicacion_detalle' item.id %}">Ver</a> |
+                    <a href="{% url 'comunicacion_editar' item.id %}">Editar</a> |
+                    <a href="{% url 'comunicacion_pdf' item.id %}" target="_blank">PDF</a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="7" style="text-align:center;">No hay comunicaciones registradas.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

@@ -10,6 +10,7 @@ from .models import (
     ConfiguracionGeneral,
     Liquidacion,
     DiaLibre,
+    ComunicacionLaboral,
 )
 
 from django import forms
@@ -749,7 +750,7 @@ class LiquidacionForm(forms.ModelForm):
             "vacaciones_causadas_pendientes_dias": forms.NumberInput(attrs={
                 "class": "form-control",
                 "min": "0",
-                "placeholder": "0"
+                "placeholder": "Solo vacaciones no gozadas"
             }),
             "preaviso_dias_otorgados": forms.NumberInput(attrs={
                 "class": "form-control",
@@ -855,3 +856,70 @@ class DiaLibreForm(forms.ModelForm):
             cleaned["sector"] = funcionario.sector or ""
 
         return cleaned    
+class ComunicacionLaboralForm(forms.ModelForm):
+    fecha_emision = forms.DateField(
+        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"})
+    )
+
+    fecha_referencia = forms.DateField(
+        required=False,
+        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"})
+    )
+
+    class Meta:
+        model = ComunicacionLaboral
+        fields = [
+            "funcionario",
+            "tipo",
+            "titulo",
+            "fecha_emision",
+            "fecha_referencia",
+            "asunto",
+            "detalle_hecho",
+            "contenido",
+            "observacion_interna",
+            "requiere_firma",
+            "estado",
+            "adjunto_firmado",
+        ]
+
+        widgets = {
+            "funcionario": forms.Select(attrs={"class": "form-control"}),
+            "tipo": forms.Select(attrs={"class": "form-control"}),
+            "titulo": forms.TextInput(attrs={
+                "class": "form-control",
+                "placeholder": "Ej: Comunicación de ausencia injustificada"
+            }),
+            "asunto": forms.TextInput(attrs={
+                "class": "form-control",
+                "placeholder": "Asunto principal de la comunicación"
+            }),
+            "detalle_hecho": forms.Textarea(attrs={
+                "class": "form-control",
+                "rows": 4,
+                "placeholder": "Describe el hecho, fecha, horario, conducta o situación comunicada"
+            }),
+            "contenido": forms.Textarea(attrs={
+                "class": "form-control",
+                "rows": 10,
+                "placeholder": "Texto legal generado automáticamente. Puedes editarlo antes de guardar."
+            }),
+            "observacion_interna": forms.Textarea(attrs={
+                "class": "form-control",
+                "rows": 3,
+                "placeholder": "Observación interna de RRHH"
+            }),
+            "requiere_firma": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "estado": forms.Select(attrs={"class": "form-control"}),
+            "adjunto_firmado": forms.ClearableFileInput(attrs={"class": "form-control"}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+        self.fields["funcionario"].queryset = Funcionario.objects.filter(
+            activo=True
+        ).order_by("apellido", "nombre")
+
+        self.fields["funcionario"].empty_label = "Seleccionar funcionario"
+        self.fields["tipo"].choices = [("", "Seleccionar tipo de comunicación")] + list(ComunicacionLaboral.Tipos.choices)

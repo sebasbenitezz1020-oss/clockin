@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}Detalle Comunicación | ClockIn{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>📢 Comunicación Laboral</h2>
+    <p>{{ comunicacion.titulo }}</p>
+</div>
+
+<div class="card-dark" style="padding:22px;">
+    <h3>{{ comunicacion.get_tipo_display }}</h3>
+
+    <p><strong>Funcionario:</strong> {{ comunicacion.funcionario.nombre_completo }}</p>
+    <p><strong>Cédula:</strong> {{ comunicacion.funcionario.cedula }}</p>
+    <p><strong>Fecha emisión:</strong> {{ comunicacion.fecha_emision|date:"d/m/Y" }}</p>
+    <p><strong>Fecha referencia:</strong> {{ comunicacion.fecha_referencia|date:"d/m/Y"|default:"-" }}</p>
+    <p><strong>Estado:</strong> {{ comunicacion.get_estado_display }}</p>
+
+    <hr>
+
+    <h4>Asunto</h4>
+    <p>{{ comunicacion.asunto|default:"-" }}</p>
+
+    <h4>Detalle del hecho</h4>
+    <p>{{ comunicacion.detalle_hecho|linebreaks }}</p>
+
+    <h4>Contenido</h4>
+    <div style="background:rgba(255,255,255,.04); padding:16px; border-radius:12px;">
+        {{ comunicacion.contenido|safe|linebreaks }}
+    </div>
+
+    <hr>
+
+    <p>
+        <strong>Requiere firma:</strong>
+        {% if comunicacion.requiere_firma %}Sí{% else %}No{% endif %}
+    </p>
+
+    <p>
+        <strong>Firmado:</strong>
+        {% if comunicacion.firmado %}Sí{% else %}No{% endif %}
+    </p>
+
+    {% if comunicacion.adjunto_firmado %}
+        <p>
+            <strong>Adjunto firmado:</strong>
+            <a href="{{ comunicacion.adjunto_firmado.url }}" target="_blank">Ver archivo</a>
+        </p>
+    {% endif %}
+
+    <div style="margin-top:20px; display:flex; gap:10px; flex-wrap:wrap;">
+        <a href="{% url 'comunicaciones_lista' %}" class="btn-secondary">Volver</a>
+        <a href="{% url 'comunicacion_editar' comunicacion.id %}" class="btn-secondary">Editar</a>
+        <a href="{% url 'comunicacion_pdf' comunicacion.id %}" target="_blank" class="btn-primary">Generar PDF</a>
+    </div>
+</div>
+{% endblock %}

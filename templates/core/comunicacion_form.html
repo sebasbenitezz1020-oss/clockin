@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block title %}{{ titulo_form }} | ClockIn{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>📢 {{ titulo_form }}</h2>
+    <p>Genera una comunicación laboral con texto legal editable y PDF con membrete.</p>
+</div>
+
+<div class="card-dark" style="padding:22px;">
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+
+        {{ form.non_field_errors }}
+
+        <div class="form-grid">
+            <div>
+                <label>Funcionario</label>
+                {{ form.funcionario }}
+                {{ form.funcionario.errors }}
+            </div>
+
+            <div>
+                <label>Tipo</label>
+                {{ form.tipo }}
+                {{ form.tipo.errors }}
+            </div>
+
+            <div>
+                <label>Título</label>
+                {{ form.titulo }}
+                {{ form.titulo.errors }}
+            </div>
+
+            <div>
+                <label>Fecha emisión</label>
+                {{ form.fecha_emision }}
+                {{ form.fecha_emision.errors }}
+            </div>
+
+            <div>
+                <label>Fecha referencia</label>
+                {{ form.fecha_referencia }}
+                {{ form.fecha_referencia.errors }}
+            </div>
+
+            <div>
+                <label>Estado</label>
+                {{ form.estado }}
+                {{ form.estado.errors }}
+            </div>
+        </div>
+
+        <div style="margin-top:14px;">
+            <label>Asunto</label>
+            {{ form.asunto }}
+            {{ form.asunto.errors }}
+        </div>
+
+        <div style="margin-top:14px;">
+            <label>Detalle del hecho</label>
+            {{ form.detalle_hecho }}
+            {{ form.detalle_hecho.errors }}
+        </div>
+
+        <div style="margin-top:14px;">
+            <label>Contenido legal editable</label>
+            {{ form.contenido }}
+            {{ form.contenido.errors }}
+            <small>Si dejas vacío este campo, ClockIn generará el texto automáticamente.</small>
+        </div>
+
+        <div style="margin-top:14px;">
+            <label>Observación interna</label>
+            {{ form.observacion_interna }}
+            {{ form.observacion_interna.errors }}
+        </div>
+
+        <div style="margin-top:14px;">
+            <label>
+                {{ form.requiere_firma }}
+                Requiere firma del funcionario
+            </label>
+        </div>
+
+        <div style="margin-top:14px;">
+            <label>Adjuntar documento firmado</label>
+            {{ form.adjunto_firmado }}
+            {{ form.adjunto_firmado.errors }}
+        </div>
+
+        <div style="margin-top:20px; display:flex; gap:10px; justify-content:flex-end;">
+            <a href="{% url 'comunicaciones_lista' %}" class="btn-secondary">Volver</a>
+            <button type="submit" class="btn-primary">{{ boton_texto }}</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
