@@ -1,0 +1,57 @@
+{% extends "base.html" %}
+
+{% block title %}Planilla Bancaria | ClockIn{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>🏦 Planilla Bancaria</h2>
+    <p>Genera archivos CSV/TXT para pago masivo de salarios.</p>
+</div>
+
+<div class="card-dark" style="padding:18px; margin-bottom:16px;">
+    <a href="{% url 'planilla_bancaria_nueva' %}" class="btn-primary">
+        ➕ Nueva planilla
+    </a>
+</div>
+
+<div class="card-dark" style="padding:18px;">
+    <table class="table-dark">
+        <thead>
+            <tr>
+                <th>Banco</th>
+                <th>Periodo</th>
+                <th>Funcionarios</th>
+                <th>Total</th>
+                <th>Estado</th>
+                <th>Generado</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            {% for item in planillas %}
+            <tr>
+                <td>{{ item.banco }}</td>
+                <td>{{ item.mes|stringformat:"02d" }}/{{ item.anio }}</td>
+                <td>{{ item.total_funcionarios }}</td>
+                <td>Gs. {{ item.total_importe|floatformat:0 }}</td>
+                <td>{{ item.get_estado_display }}</td>
+                <td>{{ item.generado_en|date:"d/m/Y H:i" }}</td>
+
+                <td>
+                    <a href="{% url 'planilla_bancaria_exportar' item.id %}" class="btn-primary">
+                        ⬇ Exportar CSV
+                    </a>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="7" style="text-align:center;">
+                    No hay planillas generadas.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

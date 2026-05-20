@@ -140,6 +140,7 @@
 
     <div class="alert-box warning-box" style="margin-top:12px;">
         ⚖️ Recordatorio legal: la notificación debe realizarse por escrito con al menos 15 días de anticipación.
+        ClockIn calculará automáticamente la fecha de notificación 15 días antes del inicio de vacaciones.
         Las vacaciones deben iniciar un día lunes o el siguiente día hábil si el lunes fuera feriado.
     </div>
 </div>
@@ -201,6 +202,14 @@
                     </div>
                 </div>
             </div>
+                <div class="vf-field">
+                    <label>Fecha de notificación</label>
+                    {{ form.fecha_notificacion }}
+                    {{ form.fecha_notificacion.errors }}
+                    <small>
+                        ClockIn calculará automáticamente esta fecha con 15 días de antelación según la fecha de inicio.
+                    </small>
+                </div>
 
             <div class="form-field">
                 <label for="{{ form.fecha_hasta.id_for_label }}">Fecha hasta</label>
@@ -242,6 +251,7 @@
 document.addEventListener("DOMContentLoaded", function () {
     const funcionarioSelect = document.getElementById("id_funcionario");
     const fechaDesde = document.getElementById("id_fecha_desde");
+    const fechaNotificacion = document.getElementById("id_fecha_notificacion");
     const fechaHasta = document.getElementById("id_fecha_hasta");
     const diasInput = document.getElementById("id_dias_solicitados");
 
@@ -256,6 +266,10 @@ document.addEventListener("DOMContentLoaded", function () {
 
     fechaHasta.readOnly = true;
     diasInput.readOnly = true;
+
+    if (fechaNotificacion) {
+        fechaNotificacion.readOnly = true;
+    }
 
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
@@ -308,12 +322,18 @@ document.addEventListener("DOMContentLoaded", function () {
 
         if (dias <= 0) return false;
 
-        const diferenciaDias = Math.floor((fecha - hoy) / (1000 * 60 * 60 * 24));
-
+        // PRO: Permitimos fechas pasadas y fechas próximas.
+        // La fecha de notificación se calcula automáticamente 15 días antes.
+        // Solo mantenemos la regla de inicio en lunes.
         const esLunes = fecha.getDay() === 1;
-        const cumpleAnticipacion = diferenciaDias >= 15;
 
-        return esLunes && cumpleAnticipacion;
+        return esLunes;
+    }
+
+    function calcularFechaNotificacion(fechaInicio) {
+        const fecha = new Date(fechaInicio);
+        fecha.setDate(fecha.getDate() - 15);
+        return fecha;
     }
 
     function recalcularVacacion() {
@@ -323,6 +343,9 @@ document.addEventListener("DOMContentLoaded", function () {
             info.style.display = "none";
             fechaHasta.value = "";
             diasInput.value = "";
+            if (fechaNotificacion) {
+                fechaNotificacion.value = "";
+            }
             return;
         }
 
@@ -337,6 +360,9 @@ document.addEventListener("DOMContentLoaded", function () {
         if (dias <= 0) {
             fechaHasta.value = "";
             diasInput.value = "0";
+            if (fechaNotificacion) {
+                fechaNotificacion.value = "";
+            }
             info.style.display = "block";
             info.className = "alert-box error-box-strong vac-auto-box";
             info.innerHTML = "⚠️ Este funcionario no tiene saldo de vacaciones disponible.";
@@ -346,23 +372,32 @@ document.addEventListener("DOMContentLoaded", function () {
         if (!fechaHabilitada(inicio)) {
             fechaHasta.value = "";
             diasInput.value = "";
+            if (fechaNotificacion) {
+                fechaNotificacion.value = "";
+            }
             info.style.display = "block";
             info.className = "alert-box error-box-strong vac-auto-box";
-            info.innerHTML = "⚠️ Fecha no habilitada. Debe ser lunes y cumplir mínimo 15 días de anticipación.";
+            info.innerHTML = "⚠️ Fecha no habilitada. Las vacaciones deben iniciar un lunes.";
             return;
         }
 
         const fin = sumarDias(inicio, dias - 1);
         const regreso = sumarDias(fin, 1);
+        const notificacion = calcularFechaNotificacion(inicio);
 
         diasInput.value = dias;
         fechaHasta.value = formatoInput(fin);
+
+        if (fechaNotificacion) {
+            fechaNotificacion.value = formatoInput(notificacion);
+        }
 
         info.style.display = "block";
         info.className = "alert-box success-box vac-auto-box";
         info.innerHTML = `
             ✅ Vacación calculada automáticamente.<br>
             Días disponibles: <strong>${dias}</strong><br>
+            Fecha automática de notificación: <strong>${formatoVisual(notificacion)}</strong><br>
             Inicio: <strong>${formatoVisual(inicio)}</strong><br>
             Último día de vacaciones: <strong>${formatoVisual(fin)}</strong><br>
             Fecha estimada de regreso: <strong>${formatoVisual(regreso)}</strong>
@@ -410,7 +445,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 });
             } else {
                 btn.classList.add("disabled");
-                btn.title = "No permitido: debe ser lunes y cumplir 15 días de anticipación";
+                btn.title = "No permitido: las vacaciones deben iniciar un lunes";
             }
 
             if (seleccionada && esMismaFecha(fecha, seleccionada)) {
@@ -443,6 +478,9 @@ document.addEventListener("DOMContentLoaded", function () {
         fechaDesde.value = "";
         fechaHasta.value = "";
         diasInput.value = "";
+        if (fechaNotificacion) {
+            fechaNotificacion.value = "";
+        }
         info.style.display = "none";
         renderCalendario();
     });
@@ -462,6 +500,7 @@ document.addEventListener("DOMContentLoaded", function () {
         anioActual = inicial.getFullYear();
         recalcularVacacion();
     }
+    
 
     renderCalendario();
 });

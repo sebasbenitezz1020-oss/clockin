@@ -2,6 +2,8 @@ from calendar import monthrange
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from io import BytesIO
+import csv
+from django.http import HttpResponse
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -44,6 +46,8 @@ from .forms import (
     TurnoForm,
     VacacionForm,
     ComunicacionLaboralForm,
+    PlanillaBancariaForm,
+    BancoHorasOtorgarForm,
 )
 from .liquidacion_utils import calcular_liquidacion_funcionario
 from .models import (
@@ -56,6 +60,7 @@ from .models import (
     HistorialAccion,
     Liquidacion,
     NominaMensual,
+    AguinaldoAnual,
     CierreNomina,
     PermisoLicencia,
     Sucursal,
@@ -63,6 +68,8 @@ from .models import (
     Vacacion,
     PlanillaSemanalFuncionario,
     ComunicacionLaboral,
+    PlanillaBancaria,
+    BancoHorasMovimiento,
 )
 
 def _bloquear_si_no_admin_master(request):
@@ -448,6 +455,9 @@ def dashboard(request):
     perm_reportes = tiene_permiso(request.user, "reportes", "puede_ver")
     perm_dias_libres = tiene_permiso(request.user, "dias_libres", "puede_ver")
     perm_liquidacion = tiene_permiso(request.user, "liquidacion", "puede_ver")
+    perm_aguinaldo = tiene_permiso(request.user, "aguinaldo", "puede_ver")
+    perm_planilla_bancaria = tiene_permiso(request.user, "planilla_bancaria", "puede_ver")
+    perm_banco_horas = tiene_permiso(request.user, "banco_horas", "puede_ver")
 
     empresa_usuario = obtener_empresa_usuario(request.user)
 
@@ -550,6 +560,9 @@ def dashboard(request):
         "perm_reportes": perm_reportes,
         "perm_dias_libres": perm_dias_libres,
         "perm_liquidacion": perm_liquidacion,
+        "perm_aguinaldo": perm_aguinaldo,
+        "perm_planilla_bancaria": perm_planilla_bancaria,
+        "perm_banco_horas": perm_banco_horas,
         "es_admin_master": es_admin_master(request.user),
     }
     return render(request, "core/dashboard.html", context)
@@ -2026,7 +2039,7 @@ def vacacion_notificacion_pdf(request, pk):
 
     empresa_nombre = funcionario.empresa_mostrar
     sucursal_nombre = funcionario.sucursal_mostrar
-    fecha_emision = timezone.localdate()
+    fecha_emision = vacacion.fecha_notificacion or (vacacion.fecha_desde - timezone.timedelta(days=15))
 
     empresa_pdf = obtener_empresa_documento(funcionario=funcionario)
     elementos += construir_encabezado_empresa_pdf(empresa_pdf, "NOTIFICACIÓN DE VACACIONES")
@@ -2573,6 +2586,730 @@ def historial_lista(request):
     return render(request, "core/historial_lista.html", {
         "historial": historial[:300],
         "q": q,
+    })
+
+def calcular_aguinaldo_funcionario(funcionario, anio):
+    nominas = NominaMensual.objects.filter(
+        funcionario=funcionario,
+        anio=anio
+    )
+
+    total_remuneraciones = nominas.aggregate(
+        total=Sum("salario_bruto")
+    )["total"] or Decimal("0.00")
+
+    meses_computados = nominas.count()
+    monto_aguinaldo = (total_remuneraciones / Decimal("12")).quantize(Decimal("0.01"))
+
+    aguinaldo, creado = AguinaldoAnual.objects.update_or_create(
+        funcionario=funcionario,
+        anio=anio,
+        defaults={
+            "empresa": funcionario.empresa,
+            "sucursal": funcionario.sucursal_rel,
+            "total_remuneraciones": total_remuneraciones,
+            "monto_aguinaldo": monto_aguinaldo,
+            "meses_computados": meses_computados,
+        }
+    )
+
+    return aguinaldo
+
+
+@login_required
+def aguinaldo_lista(request):
+    permiso = validar_permiso_o_redirigir(request, "aguinaldo", "puede_ver")
+    if permiso:
+        return permiso
+
+    hoy = timezone.localdate()
+    anio = int(request.GET.get("anio", hoy.year))
+    estado = request.GET.get("estado", "").strip()
+    sucursal_id = request.GET.get("sucursal", "").strip()
+    q = request.GET.get("q", "").strip()
+
+    empresa_usuario = obtener_empresa_usuario(request.user)
+    admin_master = es_admin_master(request.user)
+
+    aguinaldos = AguinaldoAnual.objects.select_related(
+        "funcionario",
+        "empresa",
+        "sucursal",
+        "funcionario__sucursal_rel",
+        "funcionario__sucursal_rel__empresa",
+    ).filter(anio=anio)
+
+    if not admin_master:
+        if empresa_usuario:
+            aguinaldos = aguinaldos.filter(funcionario__sucursal_rel__empresa=empresa_usuario)
+        else:
+            aguinaldos = aguinaldos.none()
+
+    if estado:
+        aguinaldos = aguinaldos.filter(estado=estado)
+
+    if sucursal_id:
+        aguinaldos = aguinaldos.filter(funcionario__sucursal_rel_id=sucursal_id)
+
+    if q:
+        aguinaldos = aguinaldos.filter(
+            Q(funcionario__nombre__icontains=q) |
+            Q(funcionario__apellido__icontains=q) |
+            Q(funcionario__cedula__icontains=q)
+        )
+
+    total_general = aguinaldos.aggregate(
+        total=Sum("monto_aguinaldo")
+    )["total"] or Decimal("0.00")
+
+    total_pagados = aguinaldos.filter(estado=AguinaldoAnual.Estados.PAGADO).count()
+    total_pendientes = aguinaldos.filter(estado=AguinaldoAnual.Estados.PENDIENTE).count()
+
+    anios = list(range(hoy.year - 3, hoy.year + 2))
+
+    if admin_master:
+        sucursales = Sucursal.objects.filter(activo=True).order_by("empresa__nombre", "nombre")
+    else:
+        sucursales = Sucursal.objects.filter(
+            activo=True,
+            empresa=empresa_usuario
+        ).order_by("nombre") if empresa_usuario else Sucursal.objects.none()
+
+    return render(request, "core/aguinaldo_lista.html", {
+        "aguinaldos": aguinaldos.order_by("funcionario__apellido", "funcionario__nombre"),
+        "anio": anio,
+        "anios": anios,
+        "estado": estado,
+        "sucursal_id": sucursal_id,
+        "sucursales": sucursales,
+        "q": q,
+        "estados": AguinaldoAnual.Estados.choices,
+        "total_general": total_general,
+        "total_pagados": total_pagados,
+        "total_pendientes": total_pendientes,
+        "empresa_usuario": empresa_usuario,
+        "es_admin_master": admin_master,
+    })
+
+
+@login_required
+def aguinaldo_generar(request):
+    permiso = validar_permiso_o_redirigir(request, "aguinaldo", "puede_crear")
+    if permiso:
+        return permiso
+
+    hoy = timezone.localdate()
+    anio = int(request.GET.get("anio", hoy.year))
+
+    empresa_usuario = obtener_empresa_usuario(request.user)
+    admin_master = es_admin_master(request.user)
+
+    funcionarios = Funcionario.objects.filter(activo=True).select_related(
+        "sucursal_rel",
+        "sucursal_rel__empresa"
+    )
+
+    if not admin_master:
+        if empresa_usuario:
+            funcionarios = funcionarios.filter(sucursal_rel__empresa=empresa_usuario)
+        else:
+            funcionarios = funcionarios.none()
+
+    cantidad = 0
+
+    for funcionario in funcionarios:
+        calcular_aguinaldo_funcionario(funcionario, anio)
+        cantidad += 1
+
+    registrar_historial(
+        request,
+        "Aguinaldo",
+        "Generar/Recalcular",
+        f"Se generó o recalculó el aguinaldo del año {anio} para {cantidad} funcionario(s)."
+    )
+
+    messages.success(request, f"Aguinaldo {anio} generado correctamente para {cantidad} funcionario(s).")
+    return redirect(f"/aguinaldo/?anio={anio}")
+
+
+@login_required
+def aguinaldo_toggle_pagado(request, pk):
+    permiso = validar_permiso_o_redirigir(request, "aguinaldo", "puede_pagar")
+    if permiso:
+        return permiso
+
+    empresa_usuario = obtener_empresa_usuario(request.user)
+    admin_master = es_admin_master(request.user)
+
+    aguinaldo = get_object_or_404(
+        AguinaldoAnual.objects.select_related("funcionario", "funcionario__sucursal_rel", "funcionario__sucursal_rel__empresa"),
+        pk=pk
+    )
+
+    if not admin_master:
+        if not aguinaldo.funcionario.sucursal_rel or aguinaldo.funcionario.sucursal_rel.empresa != empresa_usuario:
+            messages.error(request, "No puedes operar aguinaldos de otra empresa.")
+            return redirect("aguinaldo_lista")
+
+    if aguinaldo.estado == AguinaldoAnual.Estados.PAGADO:
+        aguinaldo.estado = AguinaldoAnual.Estados.PENDIENTE
+        aguinaldo.fecha_pago = None
+        accion = "revirtió a pendiente"
+    else:
+        aguinaldo.estado = AguinaldoAnual.Estados.PAGADO
+        aguinaldo.fecha_pago = timezone.localdate()
+        accion = "marcó como pagado"
+
+    aguinaldo.save()
+
+    registrar_historial(
+        request,
+        "Aguinaldo",
+        "Cambio de estado",
+        f"Se {accion} el aguinaldo de {aguinaldo.funcionario.nombre_completo} del año {aguinaldo.anio}."
+    )
+
+    messages.success(request, "Estado de aguinaldo actualizado correctamente.")
+    return redirect(f"/aguinaldo/?anio={aguinaldo.anio}")
+
+
+@login_required
+def aguinaldo_pdf(request, pk):
+    permiso = validar_permiso_o_redirigir(request, "aguinaldo", "puede_ver")
+    if permiso:
+        return permiso
+
+    empresa_usuario = obtener_empresa_usuario(request.user)
+    admin_master = es_admin_master(request.user)
+
+    aguinaldo = get_object_or_404(
+        AguinaldoAnual.objects.select_related(
+            "funcionario",
+            "empresa",
+            "sucursal",
+            "funcionario__sucursal_rel",
+            "funcionario__sucursal_rel__empresa",
+        ),
+        pk=pk
+    )
+
+    if not admin_master:
+        if not aguinaldo.funcionario.sucursal_rel or aguinaldo.funcionario.sucursal_rel.empresa != empresa_usuario:
+            messages.error(request, "No puedes exportar aguinaldos de otra empresa.")
+            return redirect("aguinaldo_lista")
+
+    funcionario = aguinaldo.funcionario
+    empresa_pdf = obtener_empresa_documento(funcionario=funcionario)
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        leftMargin=18 * mm,
+        rightMargin=18 * mm,
+        topMargin=18 * mm,
+        bottomMargin=18 * mm,
+    )
+
+    styles = getSampleStyleSheet()
+    styles.add(ParagraphStyle(
+        name="TituloAguinaldo",
+        parent=styles["Heading1"],
+        fontName="Helvetica-Bold",
+        fontSize=18,
+        leading=22,
+        alignment=TA_CENTER,
+        textColor=colors.HexColor("#111827"),
+        spaceAfter=10,
+    ))
+
+    styles.add(ParagraphStyle(
+        name="TextoAguinaldo",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=9,
+        leading=13,
+        textColor=colors.HexColor("#111827"),
+    ))
+
+    elementos = []
+
+    elementos += construir_encabezado_empresa_pdf(empresa_pdf, "RECIBO DE AGUINALDO")
+    elementos.append(Paragraph("AGUINALDO ANUAL", styles["TituloAguinaldo"]))
+    elementos.append(Spacer(1, 8))
+
+    datos = [
+        ["Funcionario", funcionario.nombre_completo],
+        ["Cédula", funcionario.cedula],
+        ["Empresa", funcionario.empresa_mostrar],
+        ["Sucursal", funcionario.sucursal_mostrar],
+        ["Cargo", funcionario.cargo or "-"],
+        ["Año", str(aguinaldo.anio)],
+        ["Meses computados", str(aguinaldo.meses_computados)],
+        ["Estado", aguinaldo.get_estado_display()],
+        ["Fecha de pago", aguinaldo.fecha_pago.strftime("%d/%m/%Y") if aguinaldo.fecha_pago else "-"],
+    ]
+
+    tabla_datos = Table(datos, colWidths=[55 * mm, 105 * mm])
+    tabla_datos.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#eff6ff")),
+        ("TEXTCOLOR", (0, 0), (0, -1), colors.HexColor("#1d4ed8")),
+        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+        ("FONTNAME", (1, 0), (1, -1), "Helvetica"),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#cbd5e1")),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+    ]))
+    elementos.append(tabla_datos)
+    elementos.append(Spacer(1, 12))
+
+    tabla_calc = Table([
+        ["Concepto", "Monto"],
+        ["Total remuneraciones computables del año", _gs(aguinaldo.total_remuneraciones)],
+        ["AGUINALDO A COBRAR", _gs(aguinaldo.monto_aguinaldo)],
+    ], colWidths=[115 * mm, 45 * mm])
+
+    tabla_calc.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#dbeafe")),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#dcfce7")),
+        ("TEXTCOLOR", (0, -1), (-1, -1), colors.HexColor("#166534")),
+        ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+        ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#cbd5e1")),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    elementos.append(tabla_calc)
+    elementos.append(Spacer(1, 14))
+
+    texto = """
+    Se deja constancia de que el presente cálculo corresponde al aguinaldo anual, calculado sobre la base
+    de las remuneraciones computables registradas en el sistema para el año indicado. El aguinaldo no constituye
+    salario mensual ordinario y se documenta de forma separada para fines administrativos y laborales.
+    """
+    elementos.append(Paragraph(texto, styles["TextoAguinaldo"]))
+    elementos.append(Spacer(1, 28))
+
+    firmas = Table([
+        ["_______________________________", "_______________________________"],
+        ["Firma responsable / RRHH", "Firma funcionario"],
+        ["", ""],
+        ["Aclaración: ____________________", "Aclaración: ____________________"],
+    ], colWidths=[80 * mm, 80 * mm])
+
+    firmas.setStyle(TableStyle([
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    elementos.append(firmas)
+
+    agregar_texto_legal_empresa_pdf(elementos, empresa_pdf)
+
+    doc.build(elementos)
+
+    pdf = buffer.getvalue()
+    buffer.close()
+
+    response = HttpResponse(content_type="application/pdf")
+    response["Content-Disposition"] = f'inline; filename="aguinaldo_{funcionario.cedula}_{aguinaldo.anio}.pdf"'
+    response.write(pdf)
+    return response
+
+@login_required
+def planilla_bancaria_lista(request):
+    permiso = validar_permiso_o_redirigir(request, "planilla_bancaria", "puede_ver")
+    if permiso:
+        return permiso
+
+    empresa_usuario = obtener_empresa_usuario(request.user)
+    admin_master = es_admin_master(request.user)
+
+    planillas = PlanillaBancaria.objects.select_related(
+        "empresa",
+        "sucursal",
+        "generado_por"
+    )
+
+    if not admin_master:
+        if empresa_usuario:
+            planillas = planillas.filter(empresa=empresa_usuario)
+        else:
+            planillas = planillas.none()
+
+    return render(request, "core/planilla_bancaria_lista.html", {
+        "planillas": planillas,
+        "empresa_usuario": empresa_usuario,
+        "es_admin_master": admin_master,
+    })
+
+
+@login_required
+def planilla_bancaria_nueva(request):
+    permiso = validar_permiso_o_redirigir(request, "planilla_bancaria", "puede_crear")
+    if permiso:
+        return permiso
+
+    empresa_usuario = obtener_empresa_usuario(request.user)
+    admin_master = es_admin_master(request.user)
+
+    if request.method == "POST":
+        form = PlanillaBancariaForm(request.POST)
+
+        if form.is_valid():
+            planilla = form.save(commit=False)
+
+            if not admin_master and empresa_usuario:
+                planilla.empresa = empresa_usuario
+
+            planilla.generado_por = request.user
+
+            nominas = NominaMensual.objects.select_related(
+                "funcionario"
+            ).filter(
+                anio=planilla.anio,
+                mes=planilla.mes,
+            )
+
+            if planilla.empresa:
+                nominas = nominas.filter(
+                    funcionario__sucursal_rel__empresa=planilla.empresa
+                )
+
+            if planilla.sucursal:
+                nominas = nominas.filter(
+                    funcionario__sucursal_rel=planilla.sucursal
+                )
+
+            total_importe = Decimal("0")
+            total_funcionarios = 0
+
+            for nomina in nominas:
+                total_importe += nomina.salario_neto
+                total_funcionarios += 1
+
+            planilla.total_importe = total_importe
+            planilla.total_funcionarios = total_funcionarios
+            planilla.estado = PlanillaBancaria.Estados.GENERADA
+
+            planilla.save()
+
+            registrar_historial(
+                request,
+                "Planilla Bancaria",
+                "Generar",
+                f"Se generó planilla bancaria {planilla.banco} {planilla.mes:02d}/{planilla.anio}."
+            )
+
+            messages.success(request, "Planilla bancaria generada correctamente.")
+            return redirect("planilla_bancaria_lista")
+
+    else:
+        hoy = timezone.localdate()
+
+        form = PlanillaBancariaForm(initial={
+            "anio": hoy.year,
+            "mes": hoy.month,
+        })
+
+        if not admin_master and empresa_usuario:
+            form.fields["empresa"].queryset = Empresa.objects.filter(id=empresa_usuario.id)
+            form.fields["empresa"].initial = empresa_usuario
+
+    return render(request, "core/planilla_bancaria_form.html", {
+        "form": form,
+        "titulo_form": "Nueva planilla bancaria",
+        "boton_texto": "Generar planilla",
+    })
+
+
+@login_required
+def planilla_bancaria_exportar(request, pk):
+    permiso = validar_permiso_o_redirigir(request, "planilla_bancaria", "puede_exportar")
+    if permiso:
+        return permiso
+
+    empresa_usuario = obtener_empresa_usuario(request.user)
+    admin_master = es_admin_master(request.user)
+
+    planilla = get_object_or_404(
+        PlanillaBancaria.objects.select_related("empresa", "sucursal"),
+        pk=pk
+    )
+
+    if not admin_master:
+        if planilla.empresa != empresa_usuario:
+            messages.error(request, "No puedes exportar planillas de otra empresa.")
+            return redirect("planilla_bancaria_lista")
+
+    nominas = NominaMensual.objects.select_related(
+        "funcionario"
+    ).filter(
+        anio=planilla.anio,
+        mes=planilla.mes,
+    )
+
+    if planilla.empresa:
+        nominas = nominas.filter(
+            funcionario__sucursal_rel__empresa=planilla.empresa
+        )
+
+    if planilla.sucursal:
+        nominas = nominas.filter(
+            funcionario__sucursal_rel=planilla.sucursal
+        )
+
+    response = HttpResponse(content_type="text/csv")
+    response["Content-Disposition"] = (
+        f'attachment; filename="planilla_{planilla.banco}_{planilla.mes:02d}_{planilla.anio}.csv"'
+    )
+
+    writer = csv.writer(response)
+
+    writer.writerow([
+        "CEDULA",
+        "NOMBRE",
+        "BANCO",
+        "TIPO_CUENTA",
+        "NUMERO_CUENTA",
+        "MONEDA",
+        "MONTO",
+        "CONCEPTO",
+    ])
+
+    for nomina in nominas:
+        funcionario = nomina.funcionario
+
+        writer.writerow([
+            funcionario.cedula,
+            funcionario.nombre_completo,
+            funcionario.banco or planilla.banco,
+            funcionario.tipo_cuenta or "",
+            funcionario.numero_cuenta or "",
+            "PYG",
+            int(nomina.salario_neto),
+            f"SALARIO {planilla.mes:02d}/{planilla.anio}",
+        ])
+
+    planilla.estado = PlanillaBancaria.Estados.EXPORTADA
+    planilla.save(update_fields=["estado"])
+
+    registrar_historial(
+        request,
+        "Planilla Bancaria",
+        "Exportar CSV",
+        f"Se exportó CSV de planilla bancaria {planilla.banco}."
+    )
+
+    return response
+
+def obtener_saldo_banco_horas(funcionario):
+    ultimo = BancoHorasMovimiento.objects.filter(
+        funcionario=funcionario
+    ).order_by("-fecha", "-id").first()
+
+    return ultimo.saldo_nuevo if ultimo else 0
+
+
+def registrar_movimiento_banco(
+    funcionario,
+    tipo,
+    minutos,
+    observacion="",
+    origen="sistema",
+    user=None,
+    fecha=None,
+):
+    saldo_anterior = obtener_saldo_banco_horas(funcionario)
+    saldo_nuevo = saldo_anterior + minutos
+
+    return BancoHorasMovimiento.objects.create(
+        funcionario=funcionario,
+        empresa=funcionario.empresa,
+        sucursal=funcionario.sucursal_rel,
+        fecha=fecha or timezone.localdate(),
+        tipo=tipo,
+        minutos=minutos,
+        saldo_anterior=saldo_anterior,
+        saldo_nuevo=saldo_nuevo,
+        observacion=observacion,
+        origen=origen,
+        creado_por=user,
+    )
+
+
+def recalcular_banco_horas_funcionario(funcionario, user=None):
+    BancoHorasMovimiento.objects.filter(
+        funcionario=funcionario,
+        origen="asistencia"
+    ).delete()
+
+    asistencias = Asistencia.objects.filter(
+        funcionario=funcionario
+    ).order_by("fecha")
+
+    for asistencia in asistencias:
+        segundos = asistencia.horas_trabajadas_segundos or 0
+
+        horas_reales = segundos / 3600
+
+        diferencia_horas = horas_reales - 8
+
+        diferencia_minutos = int(diferencia_horas * 60)
+
+        bloques_30 = abs(diferencia_minutos) // 30
+
+        minutos_finales = bloques_30 * 30
+
+        if minutos_finales == 0:
+            continue
+
+        if diferencia_minutos > 0:
+            registrar_movimiento_banco(
+                funcionario=funcionario,
+                tipo=BancoHorasMovimiento.Tipos.GENERADO,
+                minutos=minutos_finales,
+                observacion=f"Horas extras generadas automáticamente ({asistencia.fecha:%d/%m/%Y})",
+                origen="asistencia",
+                user=user,
+                fecha=asistencia.fecha,
+            )
+
+        else:
+            registrar_movimiento_banco(
+                funcionario=funcionario,
+                tipo=BancoHorasMovimiento.Tipos.DESCUENTO,
+                minutos=-minutos_finales,
+                observacion=f"Descuento automático por faltante ({asistencia.fecha:%d/%m/%Y})",
+                origen="asistencia",
+                user=user,
+                fecha=asistencia.fecha,
+            )
+
+
+@login_required
+def banco_horas_lista(request):
+    permiso = validar_permiso_o_redirigir(request, "banco_horas", "puede_ver")
+    if permiso:
+        return permiso
+
+    empresa_usuario = obtener_empresa_usuario(request.user)
+    admin_master = es_admin_master(request.user)
+
+    funcionarios = Funcionario.objects.filter(activo=True).select_related(
+        "sucursal_rel",
+        "sucursal_rel__empresa"
+    )
+
+    if not admin_master:
+        if empresa_usuario:
+            funcionarios = funcionarios.filter(
+                sucursal_rel__empresa=empresa_usuario
+            )
+        else:
+            funcionarios = funcionarios.none()
+
+    datos = []
+
+    for funcionario in funcionarios:
+        saldo = obtener_saldo_banco_horas(funcionario)
+
+        datos.append({
+            "funcionario": funcionario,
+            "saldo": saldo,
+        })
+
+    return render(request, "core/banco_horas_lista.html", {
+        "datos": datos,
+        "empresa_usuario": empresa_usuario,
+        "es_admin_master": admin_master,
+    })
+
+
+@login_required
+def banco_horas_recalcular(request, funcionario_id):
+    permiso = validar_permiso_o_redirigir(request, "banco_horas", "puede_editar")
+    if permiso:
+        return permiso
+
+    funcionario = get_object_or_404(Funcionario, pk=funcionario_id)
+
+    recalcular_banco_horas_funcionario(funcionario, request.user)
+
+    registrar_historial(
+        request,
+        "Banco de Horas",
+        "Recalcular",
+        f"Se recalculó banco de horas de {funcionario.nombre_completo}."
+    )
+
+    messages.success(request, "Banco de horas recalculado correctamente.")
+    return redirect("banco_horas_lista")
+
+
+@login_required
+def banco_horas_otorgar(request):
+    permiso = validar_permiso_o_redirigir(request, "banco_horas", "puede_editar")
+    if permiso:
+        return permiso
+
+    if request.method == "POST":
+        form = BancoHorasOtorgarForm(request.POST)
+
+        if form.is_valid():
+            funcionario = form.cleaned_data["funcionario"]
+            horas = form.cleaned_data["horas"]
+            observacion = form.cleaned_data["observacion"]
+
+            minutos = horas * 60
+
+            registrar_movimiento_banco(
+                funcionario=funcionario,
+                tipo=BancoHorasMovimiento.Tipos.HORAS_TOMADAS,
+                minutos=-minutos,
+                observacion=observacion or f"Otorgamiento de {horas} hora(s) libres.",
+                origen="rrhh",
+                user=request.user,
+            )
+
+            registrar_historial(
+                request,
+                "Banco de Horas",
+                "Otorgar horas",
+                f"Se otorgó {horas} hora(s) libres a {funcionario.nombre_completo}."
+            )
+
+            messages.success(request, "Horas descontadas correctamente del banco.")
+            return redirect("banco_horas_lista")
+
+    else:
+        form = BancoHorasOtorgarForm()
+
+    return render(request, "core/banco_horas_otorgar.html", {
+        "form": form,
+    })
+
+
+@login_required
+def banco_horas_historial(request, funcionario_id):
+    permiso = validar_permiso_o_redirigir(request, "banco_horas", "puede_ver")
+    if permiso:
+        return permiso
+
+    funcionario = get_object_or_404(Funcionario, pk=funcionario_id)
+
+    movimientos = BancoHorasMovimiento.objects.filter(
+        funcionario=funcionario
+    ).select_related("creado_por")
+
+    return render(request, "core/banco_horas_historial.html", {
+        "funcionario": funcionario,
+        "movimientos": movimientos,
+        "saldo_actual": obtener_saldo_banco_horas(funcionario),
     })
 
 @login_required

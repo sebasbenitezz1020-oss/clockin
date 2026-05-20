@@ -810,6 +810,166 @@ class NominaMensual(models.Model):
     def __str__(self):
         return f"{self.funcionario.nombre_completo} - Nómina {self.mes:02d}/{self.anio}"
     
+class AguinaldoAnual(models.Model):
+    class Estados(models.TextChoices):
+        PENDIENTE = "pendiente", "Pendiente"
+        PAGADO = "pagado", "Pagado"
+        ANULADO = "anulado", "Anulado"
+
+    funcionario = models.ForeignKey(Funcionario, on_delete=models.CASCADE, related_name="aguinaldos")
+    empresa = models.ForeignKey(Empresa, on_delete=models.SET_NULL, null=True, blank=True, related_name="aguinaldos")
+    sucursal = models.ForeignKey(Sucursal, on_delete=models.SET_NULL, null=True, blank=True, related_name="aguinaldos")
+
+    anio = models.PositiveIntegerField()
+    total_remuneraciones = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    monto_aguinaldo = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+    meses_computados = models.PositiveSmallIntegerField(default=0)
+
+    estado = models.CharField(max_length=20, choices=Estados.choices, default=Estados.PENDIENTE)
+    fecha_pago = models.DateField(null=True, blank=True)
+    observacion = models.TextField(blank=True, default="")
+
+    generado_en = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-anio", "funcionario__apellido", "funcionario__nombre"]
+        unique_together = ("funcionario", "anio")
+
+    def __str__(self):
+        return f"Aguinaldo {self.anio} - {self.funcionario.nombre_completo}"
+    
+class PlanillaBancaria(models.Model):
+    class Estados(models.TextChoices):
+        BORRADOR = "borrador", "Borrador"
+        GENERADA = "generada", "Generada"
+        EXPORTADA = "exportada", "Exportada"
+
+    class Formatos(models.TextChoices):
+        CSV = "csv", "CSV"
+        TXT = "txt", "TXT"
+
+    empresa = models.ForeignKey(
+        Empresa,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="planillas_bancarias"
+    )
+
+    sucursal = models.ForeignKey(
+        Sucursal,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="planillas_bancarias"
+    )
+
+    anio = models.PositiveIntegerField()
+    mes = models.PositiveSmallIntegerField()
+
+    banco = models.CharField(max_length=120)
+    formato = models.CharField(
+        max_length=10,
+        choices=Formatos.choices,
+        default=Formatos.CSV
+    )
+
+    total_funcionarios = models.PositiveIntegerField(default=0)
+    total_importe = models.DecimalField(max_digits=14, decimal_places=2, default=0)
+
+    observacion = models.TextField(blank=True, default="")
+
+    estado = models.CharField(
+        max_length=20,
+        choices=Estados.choices,
+        default=Estados.BORRADOR
+    )
+
+    generado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="planillas_bancarias_generadas"
+    )
+
+    generado_en = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-anio", "-mes", "-generado_en"]
+
+    def __str__(self):
+        return f"{self.banco} - {self.mes:02d}/{self.anio}"
+    
+class BancoHorasMovimiento(models.Model):
+    class Tipos(models.TextChoices):
+        GENERADO = "generado", "Horas generadas"
+        DESCUENTO = "descuento", "Descuento por faltante"
+        HORAS_TOMADAS = "horas_tomadas", "Horas tomadas"
+        AJUSTE_MANUAL = "ajuste_manual", "Ajuste manual"
+
+    funcionario = models.ForeignKey(
+        Funcionario,
+        on_delete=models.CASCADE,
+        related_name="movimientos_banco_horas"
+    )
+
+    empresa = models.ForeignKey(
+        Empresa,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="movimientos_banco_horas"
+    )
+
+    sucursal = models.ForeignKey(
+        Sucursal,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="movimientos_banco_horas"
+    )
+
+    fecha = models.DateField(default=timezone.localdate)
+
+    tipo = models.CharField(
+        max_length=30,
+        choices=Tipos.choices
+    )
+
+    minutos = models.IntegerField(default=0)
+
+    saldo_anterior = models.IntegerField(default=0)
+    saldo_nuevo = models.IntegerField(default=0)
+
+    origen = models.CharField(max_length=50, blank=True, default="sistema")
+    observacion = models.TextField(blank=True, default="")
+
+    creado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="movimientos_banco_horas_creados"
+    )
+
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-fecha", "-creado_en"]
+
+    def __str__(self):
+        return f"{self.funcionario.nombre_completo} - {self.get_tipo_display()}"
+
+    @property
+    def horas_texto(self):
+        horas = abs(self.minutos) // 60
+        minutos = abs(self.minutos) % 60
+        signo = "-" if self.minutos < 0 else "+"
+        return f"{signo}{horas:02d}:{minutos:02d}"
+    
 class CierreNomina(models.Model):
     mes = models.PositiveSmallIntegerField()
     anio = models.PositiveIntegerField()
@@ -889,12 +1049,18 @@ class Vacacion(models.Model):
     )
     fecha_desde = models.DateField()
     fecha_hasta = models.DateField()
+    fecha_notificacion = models.DateField(null=True, blank=True)
     dias_solicitados = models.PositiveIntegerField(default=1)
     estado = models.CharField(max_length=20, choices=Estados.choices, default=Estados.PENDIENTE)
     observacion = models.TextField(blank=True, default="")
 
     creado_en = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)
+
+    def save(self, *args, **kwargs):
+        if self.fecha_desde:
+            self.fecha_notificacion = self.fecha_desde - timedelta(days=15)
+        super().save(*args, **kwargs)
 
     class Meta:
         ordering = ["-fecha_desde", "-creado_en"]

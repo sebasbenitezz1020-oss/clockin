@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+
+{% block title %}Historial Banco de Horas | ClockIn{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>📋 Historial Banco de Horas</h2>
+    <p>{{ funcionario.nombre_completo }}</p>
+</div>
+
+<div class="card-dark" style="padding:18px; margin-bottom:16px;">
+    <h3>Saldo actual:
+        {% widthratio saldo_actual 60 1 %}h
+        ({{ saldo_actual }} min)
+    </h3>
+</div>
+
+<div class="card-dark" style="padding:18px;">
+    <table class="table-dark">
+        <thead>
+            <tr>
+                <th>Fecha</th>
+                <th>Tipo</th>
+                <th>Movimiento</th>
+                <th>Saldo anterior</th>
+                <th>Saldo nuevo</th>
+                <th>Origen</th>
+                <th>Observación</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            {% for item in movimientos %}
+            <tr>
+                <td>{{ item.fecha|date:"d/m/Y" }}</td>
+                <td>{{ item.get_tipo_display }}</td>
+                <td>{{ item.horas_texto }}</td>
+                <td>{{ item.saldo_anterior }} min</td>
+                <td>{{ item.saldo_nuevo }} min</td>
+                <td>{{ item.origen }}</td>
+                <td>{{ item.observacion }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="7" style="text-align:center;">
+                    No hay movimientos registrados.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

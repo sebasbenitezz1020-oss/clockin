@@ -1067,7 +1067,8 @@
     const CONFIG_FULLSCREEN_AUTO = "{% if config_general and config_general.biometrico_fullscreen_auto %}true{% else %}false{% endif %}" === "true";
 
     const DETECCION_INTERVALO = 650;
-    const ESTABILIDAD_MS = 600;
+    const FRAMES_ESTABLES_REQUERIDOS = 2;
+    const ESTABILIDAD_MS = DETECCION_INTERVALO * FRAMES_ESTABLES_REQUERIDOS;
 
     const ZONA_LECTURA_CONFIG = {
         x: 0.22,

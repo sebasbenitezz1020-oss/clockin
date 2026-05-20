@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+
+{% block title %}Otorgar Horas | ClockIn{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>➖ Otorgar horas libres</h2>
+</div>
+
+<div class="card-dark" style="padding:22px;">
+    <form method="post">
+        {% csrf_token %}
+
+        <div class="form-grid">
+            <div>
+                <label>Funcionario</label>
+                {{ form.funcionario }}
+            </div>
+
+            <div>
+                <label>Horas</label>
+                {{ form.horas }}
+            </div>
+        </div>
+
+        <div style="margin-top:14px;">
+            <label>Observación</label>
+            {{ form.observacion }}
+        </div>
+
+        <div style="margin-top:20px;">
+            <button type="submit" class="btn-primary">
+                Guardar ajuste
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}

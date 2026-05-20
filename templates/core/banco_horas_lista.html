@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}Banco de Horas | ClockIn{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>⏱️ Banco de Horas</h2>
+    <p>Control de horas extras acumuladas y compensaciones internas.</p>
+</div>
+
+<div class="card-dark" style="padding:18px; margin-bottom:16px;">
+    <a href="{% url 'banco_horas_otorgar' %}" class="btn-primary">
+        ➖ Otorgar horas libres
+    </a>
+</div>
+
+<div class="card-dark" style="padding:18px;">
+    <table class="table-dark">
+        <thead>
+            <tr>
+                <th>Funcionario</th>
+                <th>Cédula</th>
+                <th>Sucursal</th>
+                <th>Saldo banco</th>
+                <th>Acciones</th>
+            </tr>
+        </thead>
+
+        <tbody>
+            {% for item in datos %}
+            <tr>
+                <td>{{ item.funcionario.nombre_completo }}</td>
+                <td>{{ item.funcionario.cedula }}</td>
+                <td>{{ item.funcionario.sucursal_mostrar }}</td>
+
+                <td>
+                    {% widthratio item.saldo 60 1 %}h
+                    ({{ item.saldo }} min)
+                </td>
+
+                <td>
+                    <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                        <a href="{% url 'banco_horas_recalcular' item.funcionario.id %}" class="btn-primary">
+                            🔄 Recalcular
+                        </a>
+
+                        <a href="{% url 'banco_horas_historial' item.funcionario.id %}" class="btn-primary">
+                            📋 Historial
+                        </a>
+                    </div>
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="5" style="text-align:center;">
+                    No hay registros.
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

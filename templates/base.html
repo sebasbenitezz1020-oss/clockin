@@ -425,6 +425,11 @@
             <a href="{% url 'permisos_lista' %}">📄 Permisos / Licencias</a>
             {% endif %}
 
+            <a href="{% url 'banco_horas_lista' %}" class="sidebar-link">
+                <span class="sidebar-icon">⏱️</span>
+                <span>Banco de Horas</span>
+            </a>
+
             {% if puede_ver_vacaciones %}
             <a href="{% url 'vacaciones_lista' %}">🏖️ Vacaciones</a>
             {% endif %}
@@ -433,6 +438,13 @@
             <a href="{% url 'comunicaciones_lista' %}" class="sidebar-link">
                 <span class="sidebar-icon">📢</span>
                 <span>Comunicaciones</span>
+            </a>
+            {% endif %}
+
+            {% if es_admin_master or perm_aguinaldo %}
+            <a href="{% url 'aguinaldo_lista' %}" class="sidebar-link">
+                <span class="sidebar-icon">🎁</span>
+                <span>Aguinaldo</span>
             </a>
             {% endif %}
 
@@ -451,6 +463,11 @@
             {% if puede_ver_liquidacion %}
             <a href="{% url 'liquidaciones_lista' %}">📑 Liquidación</a>
             {% endif %}
+
+            <a href="{% url 'planilla_bancaria_lista' %}" class="sidebar-link">
+                <span class="sidebar-icon">🏦</span>
+                <span>Planilla Bancaria</span>
+            </a>
 
             {% if puede_ver_configuracion %}
             <a href="{% url 'configuracion_general' %}">⚙️ Configuración</a>

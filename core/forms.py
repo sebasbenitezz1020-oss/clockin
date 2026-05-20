@@ -11,6 +11,7 @@ from .models import (
     Liquidacion,
     DiaLibre,
     ComunicacionLaboral,
+    PlanillaBancaria,
 )
 
 from django import forms
@@ -650,12 +651,21 @@ class VacacionForm(forms.ModelForm):
     fecha_hasta = forms.DateField(
         widget=forms.DateInput(attrs={"type": "date", "class": "form-control"})
     )
+    fecha_notificacion = forms.DateField(
+        required=False,
+        input_formats=["%Y-%m-%d", "%d/%m/%Y"],
+        widget=forms.DateInput(
+            format="%Y-%m-%d",
+            attrs={"type": "date", "class": "form-control"}
+        )
+    )
 
     class Meta:
         model = Vacacion
         fields = [
             "funcionario",
             "fecha_desde",
+            "fecha_notificacion",
             "fecha_hasta",
             "dias_solicitados",
             "estado",
@@ -679,7 +689,6 @@ class VacacionForm(forms.ModelForm):
         fecha_hasta = cleaned_data.get("fecha_hasta")
         dias_solicitados = cleaned_data.get("dias_solicitados")
         estado = cleaned_data.get("estado")
-        hoy = timezone.localdate()
 
         if fecha_desde and fecha_hasta and fecha_hasta < fecha_desde:
             raise forms.ValidationError("La fecha hasta no puede ser menor que la fecha desde.")
@@ -690,11 +699,7 @@ class VacacionForm(forms.ModelForm):
                     "Según la normativa laboral, las vacaciones deben iniciar un día lunes o el siguiente día hábil si el lunes fuera feriado."
                 )
 
-            diferencia = (fecha_desde - hoy).days
-            if diferencia < 15:
-                raise forms.ValidationError(
-                    "La notificación de vacaciones debe realizarse con al menos 15 días de anticipación."
-                )
+            cleaned_data["fecha_notificacion"] = fecha_desde - timezone.timedelta(days=15)
 
         if fecha_desde and fecha_hasta and dias_solicitados:
             dias_reales = (fecha_hasta - fecha_desde).days + 1
@@ -923,3 +928,77 @@ class ComunicacionLaboralForm(forms.ModelForm):
 
         self.fields["funcionario"].empty_label = "Seleccionar funcionario"
         self.fields["tipo"].choices = [("", "Seleccionar tipo de comunicación")] + list(ComunicacionLaboral.Tipos.choices)
+
+class PlanillaBancariaForm(forms.ModelForm):
+    class Meta:
+        model = PlanillaBancaria
+        fields = [
+            "anio",
+            "mes",
+            "banco",
+            "formato",
+            "empresa",
+            "sucursal",
+            "observacion",
+        ]
+
+        widgets = {
+            "anio": forms.NumberInput(attrs={
+                "class": "form-control",
+                "min": "2020",
+            }),
+
+            "mes": forms.Select(
+                choices=[(i, f"{i:02d}") for i in range(1, 13)],
+                attrs={"class": "form-control"}
+            ),
+
+            "banco": forms.Select(
+                choices=[
+                    ("ITAU", "Itaú"),
+                    ("BASA", "Banco BASA"),
+                    ("CONTINENTAL", "Continental"),
+                    ("UENO", "Ueno"),
+                    ("SUDAMERIS", "Sudameris"),
+                    ("GNB", "Banco GNB"),
+                    ("FAMILIAR", "Familiar"),
+                    ("VISION", "Visión"),
+                    ("GENERICA", "Genérica CSV"),
+                ],
+                attrs={"class": "form-control"}
+            ),
+
+            "formato": forms.Select(attrs={"class": "form-control"}),
+
+            "empresa": forms.Select(attrs={"class": "form-control"}),
+
+            "sucursal": forms.Select(attrs={"class": "form-control"}),
+
+            "observacion": forms.Textarea(attrs={
+                "class": "form-control",
+                "rows": 3,
+            }),
+        }
+class BancoHorasOtorgarForm(forms.Form):
+    funcionario = forms.ModelChoiceField(
+        queryset=Funcionario.objects.filter(activo=True).order_by("apellido", "nombre"),
+        widget=forms.Select(attrs={"class": "form-control"})
+    )
+
+    horas = forms.IntegerField(
+        min_value=1,
+        max_value=8,
+        widget=forms.NumberInput(attrs={
+            "class": "form-control",
+            "min": "1",
+            "max": "8",
+        })
+    )
+
+    observacion = forms.CharField(
+        required=False,
+        widget=forms.Textarea(attrs={
+            "class": "form-control",
+            "rows": 3,
+        })
+    )

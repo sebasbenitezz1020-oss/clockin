@@ -1,0 +1,320 @@
+{% extends "base.html" %}
+
+{% block title %}Aguinaldo | ClockIn{% endblock %}
+
+{% block content %}
+<style>
+    .ag-head {
+        display:flex;
+        justify-content:space-between;
+        align-items:flex-end;
+        gap:16px;
+        flex-wrap:wrap;
+        margin-bottom:16px;
+    }
+
+    .ag-head h2 {
+        margin:0;
+        color:#fff;
+        font-size:34px;
+        font-weight:900;
+    }
+
+    .ag-head p {
+        margin:8px 0 0;
+        color:#94a3b8;
+    }
+
+    .ag-btn {
+        padding:13px 18px;
+        border-radius:14px;
+        text-decoration:none;
+        font-size:14px;
+        font-weight:900;
+        background:linear-gradient(135deg, var(--brand-primary), var(--brand-primary-dark));
+        color:#fff;
+        box-shadow:0 10px 24px var(--brand-shadow);
+        border:none;
+        cursor:pointer;
+        display:inline-flex;
+        align-items:center;
+        gap:8px;
+    }
+
+    .ag-btn-soft {
+        padding:10px 13px;
+        border-radius:12px;
+        text-decoration:none;
+        font-size:12px;
+        font-weight:800;
+        background:rgba(255,255,255,.06);
+        color:#e5e7eb;
+        border:1px solid rgba(255,255,255,.08);
+    }
+
+    .ag-card {
+        background:linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
+        border:1px solid rgba(255,255,255,.06);
+        border-radius:24px;
+        padding:18px;
+        box-shadow:0 12px 36px rgba(0,0,0,.22);
+        margin-bottom:16px;
+    }
+
+    .ag-stats {
+        display:grid;
+        grid-template-columns:repeat(3, 1fr);
+        gap:14px;
+        margin-bottom:16px;
+    }
+
+    .ag-stat {
+        background:linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
+        border:1px solid rgba(255,255,255,.06);
+        border-radius:18px;
+        padding:16px;
+    }
+
+    .ag-stat .lab {
+        color:#94a3b8;
+        font-size:12px;
+        margin-bottom:8px;
+    }
+
+    .ag-stat .val {
+        color:#fff;
+        font-size:26px;
+        font-weight:900;
+    }
+
+    .ag-filter {
+        display:flex;
+        gap:10px;
+        flex-wrap:wrap;
+        align-items:center;
+    }
+
+    .ag-filter input,
+    .ag-filter select {
+        min-width:150px;
+        border:1px solid rgba(255,255,255,.08);
+        background:#0f1722;
+        color:#fff;
+        border-radius:12px;
+        padding:11px 12px;
+        outline:none;
+        font-size:13px;
+    }
+
+    .ag-table-wrap {
+        overflow-x:auto;
+    }
+
+    .ag-table {
+        width:100%;
+        min-width:1000px;
+        border-collapse:separate;
+        border-spacing:0 8px;
+    }
+
+    .ag-table th {
+        color:#dbe6f3;
+        font-size:11px;
+        font-weight:900;
+        text-transform:uppercase;
+        padding:0 10px 4px;
+    }
+
+    .ag-table td {
+        padding:12px 10px;
+        background:rgba(255,255,255,.02);
+        border-top:1px solid rgba(255,255,255,.04);
+        border-bottom:1px solid rgba(255,255,255,.04);
+        color:#fff;
+        font-size:13px;
+    }
+
+    .ag-table td:first-child {
+        border-left:1px solid rgba(255,255,255,.04);
+        border-top-left-radius:16px;
+        border-bottom-left-radius:16px;
+    }
+
+    .ag-table td:last-child {
+        border-right:1px solid rgba(255,255,255,.04);
+        border-top-right-radius:16px;
+        border-bottom-right-radius:16px;
+    }
+
+    .ag-badge-ok {
+        padding:6px 10px;
+        border-radius:999px;
+        background:rgba(34,197,94,.14);
+        color:#bbf7d0;
+        border:1px solid rgba(34,197,94,.22);
+        font-weight:800;
+        font-size:12px;
+    }
+
+    .ag-badge-pend {
+        padding:6px 10px;
+        border-radius:999px;
+        background:rgba(245,158,11,.14);
+        color:#fde68a;
+        border:1px solid rgba(245,158,11,.22);
+        font-weight:800;
+        font-size:12px;
+    }
+
+    @media(max-width:900px){
+        .ag-stats{grid-template-columns:1fr;}
+        .ag-filter input,
+        .ag-filter select,
+        .ag-filter button,
+        .ag-filter a{width:100%;}
+    }
+</style>
+
+<div class="ag-head">
+    <div>
+        <h2>🎁 Aguinaldo</h2>
+        <p>Cálculo anual del aguinaldo basado en las nóminas mensuales registradas.</p>
+    </div>
+
+    <a href="{% url 'aguinaldo_generar' %}?anio={{ anio }}" class="ag-btn">
+        🔄 Generar / Recalcular
+    </a>
+</div>
+
+{% if es_admin_master %}
+    <div class="alert-box warning-box mb-20">
+        Vista global de aguinaldos de todas las empresas.
+    </div>
+{% elif empresa_usuario %}
+    <div class="alert-box success-box mb-20">
+        Empresa actual: <strong>{{ empresa_usuario.nombre }}</strong>
+    </div>
+{% endif %}
+
+<div class="ag-stats">
+    <div class="ag-stat">
+        <div class="lab">Total aguinaldo calculado</div>
+        <div class="val">Gs. {{ total_general|floatformat:0 }}</div>
+    </div>
+    <div class="ag-stat">
+        <div class="lab">Pagados</div>
+        <div class="val">{{ total_pagados }}</div>
+    </div>
+    <div class="ag-stat">
+        <div class="lab">Pendientes</div>
+        <div class="val">{{ total_pendientes }}</div>
+    </div>
+</div>
+
+<div class="ag-card">
+    <form method="get" class="ag-filter">
+        <select name="anio">
+            {% for a in anios %}
+                <option value="{{ a }}" {% if anio == a %}selected{% endif %}>{{ a }}</option>
+            {% endfor %}
+        </select>
+
+        <select name="estado">
+            <option value="">Estado</option>
+            {% for value, label in estados %}
+                <option value="{{ value }}" {% if estado == value %}selected{% endif %}>{{ label }}</option>
+            {% endfor %}
+        </select>
+
+        <select name="sucursal">
+            <option value="">Sucursal</option>
+            {% for sucursal in sucursales %}
+                <option value="{{ sucursal.id }}" {% if sucursal_id == sucursal.id|stringformat:"s" %}selected{% endif %}>
+                    {{ sucursal.nombre }}
+                </option>
+            {% endfor %}
+        </select>
+
+        <input type="text" name="q" value="{{ q }}" placeholder="Buscar funcionario o cédula">
+
+        <button type="submit" class="ag-btn">Filtrar</button>
+    </form>
+</div>
+
+<div class="ag-card">
+    <div class="ag-table-wrap">
+        <table class="ag-table">
+            <thead>
+                <tr>
+                    <th>Funcionario</th>
+                    <th>Cédula</th>
+                    <th>Sucursal</th>
+                    <th>Año</th>
+                    <th>Meses</th>
+                    <th>Total remuneraciones</th>
+                    <th>Aguinaldo</th>
+                    <th>Estado</th>
+                    <th>Fecha pago</th>
+                    <th>Acciones</th>
+                </tr>
+            </thead>
+
+            <tbody>
+                {% for item in aguinaldos %}
+                <tr>
+                    <td>{{ item.funcionario.nombre_completo }}</td>
+                    <td>{{ item.funcionario.cedula }}</td>
+                    <td>{{ item.funcionario.sucursal_mostrar }}</td>
+                    <td>{{ item.anio }}</td>
+                    <td>{{ item.meses_computados }}</td>
+                    <td>Gs. {{ item.total_remuneraciones|floatformat:0 }}</td>
+                    <td><strong>Gs. {{ item.monto_aguinaldo|floatformat:0 }}</strong></td>
+                    <td>
+                        {% if item.estado == "pagado" %}
+                            <span class="ag-badge-ok">Pagado</span>
+                        {% else %}
+                            <span class="ag-badge-pend">{{ item.get_estado_display }}</span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        {% if item.fecha_pago %}
+                            {{ item.fecha_pago|date:"d/m/Y" }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                            <a href="{% url 'aguinaldo_pdf' item.id %}" target="_blank" class="ag-btn-soft">PDF</a>
+                            <a href="{% url 'aguinaldo_toggle_pagado' item.id %}" class="ag-btn-soft">
+                                {% if item.estado == "pagado" %}
+                                    Revertir
+                                {% else %}
+                                    Marcar pagado
+                                {% endif %}
+                            </a>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="10" style="text-align:center; color:#94a3b8; padding:22px;">
+                        No hay aguinaldos generados para este año. Usa “Generar / Recalcular”.
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll(".ag-filter select").forEach(function (select) {
+        select.addEventListener("change", function () {
+            this.form.submit();
+        });
+    });
+});
+</script>
+{% endblock %}

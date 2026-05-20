@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+
+{% block title %}{{ titulo_form }} | ClockIn{% endblock %}
+
+{% block content %}
+<div class="page-header">
+    <h2>🏦 {{ titulo_form }}</h2>
+    <p>Genera planillas salariales para bancos.</p>
+</div>
+
+<div class="card-dark" style="padding:22px;">
+    <form method="post">
+        {% csrf_token %}
+
+        <div class="form-grid">
+            <div>
+                <label>Año</label>
+                {{ form.anio }}
+            </div>
+
+            <div>
+                <label>Mes</label>
+                {{ form.mes }}
+            </div>
+
+            <div>
+                <label>Banco</label>
+                {{ form.banco }}
+            </div>
+
+            <div>
+                <label>Formato</label>
+                {{ form.formato }}
+            </div>
+
+            <div>
+                <label>Empresa</label>
+                {{ form.empresa }}
+            </div>
+
+            <div>
+                <label>Sucursal</label>
+                {{ form.sucursal }}
+            </div>
+        </div>
+
+        <div style="margin-top:14px;">
+            <label>Observación</label>
+            {{ form.observacion }}
+        </div>
+
+        <div style="margin-top:20px; display:flex; justify-content:flex-end;">
+            <button type="submit" class="btn-primary">
+                {{ boton_texto }}
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
