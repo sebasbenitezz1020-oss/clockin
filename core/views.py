@@ -3153,6 +3153,10 @@ def recalcular_banco_horas_funcionario(funcionario, user=None):
     ).order_by("fecha")
 
     for asistencia in asistencias:
+        # Solo procesamos jornadas cerradas.
+        # Si no tiene salida, no se calcula banco.
+        if not asistencia.hora_entrada or not asistencia.hora_salida:
+            continue
         segundos = asistencia.horas_trabajadas_segundos or 0
 
         horas_reales = segundos / 3600
@@ -3218,9 +3222,18 @@ def banco_horas_lista(request):
     for funcionario in funcionarios:
         saldo = obtener_saldo_banco_horas(funcionario)
 
+        horas = abs(saldo) // 60
+        minutos = abs(saldo) % 60
+
+        if saldo < 0:
+            saldo_texto = f"-{horas}:{minutos:02d} hs"
+        else:
+            saldo_texto = f"{horas}:{minutos:02d} hs"
+
         datos.append({
             "funcionario": funcionario,
             "saldo": saldo,
+            "saldo_texto": saldo_texto,
         })
 
     return render(request, "core/banco_horas_lista.html", {

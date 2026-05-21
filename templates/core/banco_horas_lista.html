@@ -34,8 +34,7 @@
                 <td>{{ item.funcionario.sucursal_mostrar }}</td>
 
                 <td>
-                    {% widthratio item.saldo 60 1 %}h
-                    ({{ item.saldo }} min)
+                    {{ item.saldo_texto }}
                 </td>
 
                 <td>
