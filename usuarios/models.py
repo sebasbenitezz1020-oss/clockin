@@ -36,23 +36,32 @@ class Usuario(AbstractUser):
 class PermisoUsuario(models.Model):
     class Modulos(models.TextChoices):
         DASHBOARD = "dashboard", "Dashboard"
+
         EMPRESAS = "empresas", "Empresas"
         SUCURSALES = "sucursales", "Sucursales"
         FUNCIONARIOS = "funcionarios", "Funcionarios"
+        USUARIOS = "usuarios", "Usuarios y Permisos"
+
         TURNOS = "turnos", "Turnos"
-        ASISTENCIA = "asistencia", "Asistencia"
         DIAS_LIBRES = "dias_libres", "Días Libres"
-        DEUDAS = "deudas", "Deudas"
-        NOMINA = "nomina", "Nómina"
+        ASISTENCIA = "asistencia", "Asistencia"
         BIOMETRICO = "biometrico", "Biométrico"
+        BANCO_HORAS = "banco_horas", "Banco de Horas"
+
         PERMISOS = "permisos", "Permisos / Licencias"
         VACACIONES = "vacaciones", "Vacaciones"
+        COMUNICACIONES = "comunicaciones", "Comunicaciones"
+
+        DEUDAS = "deudas", "Deudas"
+        NOMINA = "nomina", "Nómina"
+        AGUINALDO = "aguinaldo", "Aguinaldo"
+        PLANILLA_BANCARIA = "planilla_bancaria", "Planilla Bancaria"
+        LIQUIDACION = "liquidacion", "Liquidación"
+
         ICL = "icl", "ICL"
         REPORTES = "reportes", "Reportes"
         HISTORIAL = "historial", "Historial"
-        LIQUIDACION = "liquidacion", "Liquidación"
         CONFIGURACION = "configuracion", "Configuración"
-
     usuario = models.ForeignKey(
         Usuario,
         on_delete=models.CASCADE,

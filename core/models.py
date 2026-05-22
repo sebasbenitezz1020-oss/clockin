@@ -262,7 +262,7 @@ class Turno(models.Model):
     null=True,
     blank=True
 )
-    nombre = models.CharField(max_length=100, unique=True)
+    nombre = models.CharField(max_length=100)
 
     hora_entrada = models.TimeField()
     hora_salida = models.TimeField()
@@ -278,7 +278,8 @@ class Turno(models.Model):
     actualizado_en = models.DateTimeField(auto_now=True)
 
     class Meta:
-        ordering = ["nombre"]
+        unique_together = ("empresa", "nombre")
+        ordering = ["empresa__nombre", "nombre"]
 
     def __str__(self):
         return self.nombre
@@ -571,6 +572,14 @@ class Asistencia(models.Model):
         related_name="marcaciones_manuales"
     )
 
+    empresa = models.ForeignKey(
+        "core.Empresa",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="asistencias"
+    )
+
     motivo_marcacion_manual = models.TextField(blank=True, null=True)
     fecha_hora_real_sistema = models.DateTimeField(blank=True, null=True)
 
@@ -701,6 +710,11 @@ class Asistencia(models.Model):
 
         return "Finalizado"
     
+    def save(self, *args, **kwargs):
+        if self.funcionario and self.funcionario.sucursal_rel:
+            self.empresa = self.funcionario.sucursal_rel.empresa
+        super().save(*args, **kwargs)
+        
 
 
 class Deuda(models.Model):
@@ -728,6 +742,14 @@ class Deuda(models.Model):
 
     creado_en = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)
+
+    empresa = models.ForeignKey(
+        "core.Empresa",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="deudas"
+    )
 
     class Meta:
         ordering = ["-fecha", "-creado_en"]
@@ -761,6 +783,12 @@ class Deuda(models.Model):
         if salario <= 0:
             return Decimal("0.00")
         return ((Decimal(self.saldo_pendiente or 0) / salario) * Decimal("100")).quantize(Decimal("0.01"))
+    
+    def save(self, *args, **kwargs):
+        if self.funcionario and self.funcionario.sucursal_rel:
+            self.empresa = self.funcionario.sucursal_rel.empresa
+
+        super().save(*args, **kwargs)
 
 
 class NominaMensual(models.Model):
@@ -803,12 +831,25 @@ class NominaMensual(models.Model):
     creado_en = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)
 
+    empresa = models.ForeignKey(
+        "core.Empresa",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="nominas"
+    )
+
     class Meta:
         ordering = ["-anio", "-mes", "funcionario__apellido", "funcionario__nombre"]
         unique_together = ("funcionario", "mes", "anio")
 
     def __str__(self):
         return f"{self.funcionario.nombre_completo} - Nómina {self.mes:02d}/{self.anio}"
+    
+    def save(self, *args, **kwargs):
+        if self.funcionario and self.funcionario.sucursal_rel:
+            self.empresa = self.funcionario.sucursal_rel.empresa
+        super().save(*args, **kwargs)
     
 class AguinaldoAnual(models.Model):
     class Estados(models.TextChoices):
@@ -1024,6 +1065,14 @@ class PermisoLicencia(models.Model):
     creado_en = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)
 
+    empresa = models.ForeignKey(
+        "core.Empresa",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="%(class)s_items"
+    )
+
     class Meta:
         ordering = ["-fecha_desde", "-creado_en"]
 
@@ -1033,6 +1082,11 @@ class PermisoLicencia(models.Model):
     @property
     def dias(self):
         return (self.fecha_hasta - self.fecha_desde).days + 1
+    
+    def save(self, *args, **kwargs):
+        if self.funcionario and self.funcionario.sucursal_rel:
+            self.empresa = self.funcionario.sucursal_rel.empresa
+        super().save(*args, **kwargs)
 
 
 class Vacacion(models.Model):
@@ -1057,6 +1111,14 @@ class Vacacion(models.Model):
     creado_en = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)
 
+    empresa = models.ForeignKey(
+        "core.Empresa",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="vacaciones"
+    )
+
     def save(self, *args, **kwargs):
         if self.fecha_desde:
             self.fecha_notificacion = self.fecha_desde - timedelta(days=15)
@@ -1067,6 +1129,12 @@ class Vacacion(models.Model):
 
     def __str__(self):
         return f"{self.funcionario.nombre_completo} - Vacaciones ({self.fecha_desde} a {self.fecha_hasta})"
+    
+    def save(self, *args, **kwargs):
+        if self.funcionario and self.funcionario.sucursal_rel:
+            self.empresa = self.funcionario.sucursal_rel.empresa
+
+        super().save(*args, **kwargs)
 
 
 class HistorialAccion(models.Model):
@@ -1159,11 +1227,24 @@ class Liquidacion(models.Model):
     creado_en = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)
 
+    empresa = models.ForeignKey(
+        "core.Empresa",
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name="liquidaciones"
+    )
+
     class Meta:
         ordering = ["-fecha_calculo", "-creado_en"]
 
     def __str__(self):
         return f"{self.funcionario.nombre_completo} - {self.get_tipo_salida_display()} - {self.fecha_salida:%d/%m/%Y}"
+    
+    def save(self, *args, **kwargs):
+        if self.funcionario and self.funcionario.sucursal_rel:
+            self.empresa = self.funcionario.sucursal_rel.empresa
+        super().save(*args, **kwargs)
     
 class DiaLibre(models.Model):
     class DiasSemana(models.IntegerChoices):

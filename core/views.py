@@ -21,8 +21,14 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, Tabl
 from reportlab.platypus import Image
 
 from usuarios.utils import validar_permiso_o_redirigir, tiene_permiso
-from usuarios.multiempresa import es_admin_master, obtener_empresa_usuario, filtrar_por_empresa_relacion
-from usuarios.multiempresa import es_admin_master, obtener_empresa_usuario
+from usuarios.multiempresa import (
+    es_admin_master,
+    obtener_empresa_usuario,
+    filtrar_empresa_directa,
+    filtrar_empresa_funcionario,
+    validar_objeto_empresa_funcionario,
+    validar_objeto_empresa_directa,
+)
 
 from datetime import datetime
 from django.contrib import messages
@@ -717,10 +723,29 @@ def sucursal_nueva(request):
     if permiso:
         return permiso
 
+    empresa_usuario = obtener_empresa_usuario(request.user)
+    admin_master = es_admin_master(request.user)
+
     if request.method == "POST":
         form = SucursalForm(request.POST)
+
+        if not admin_master and empresa_usuario:
+            form.fields["empresa"].queryset = Empresa.objects.filter(id=empresa_usuario.id)
+            form.fields["empresa"].initial = empresa_usuario
+
         if form.is_valid():
-            sucursal = form.save()
+            sucursal = form.save(commit=False)
+
+            if not admin_master:
+                if not empresa_usuario:
+                    messages.error(request, "Tu usuario no tiene empresa asignada.")
+                    return redirect("sucursales_lista")
+
+                sucursal.empresa = empresa_usuario
+
+            sucursal.save()
+            form.save_m2m()
+
             registrar_historial(
                 request,
                 "Sucursales",
@@ -731,6 +756,10 @@ def sucursal_nueva(request):
             return redirect("sucursales_lista")
     else:
         form = SucursalForm()
+
+        if not admin_master and empresa_usuario:
+            form.fields["empresa"].queryset = Empresa.objects.filter(id=empresa_usuario.id)
+            form.fields["empresa"].initial = empresa_usuario
 
     return render(request, "core/sucursal_form.html", {
         "form": form,
@@ -745,22 +774,49 @@ def sucursal_editar(request, pk):
     if permiso:
         return permiso
 
-    sucursal = get_object_or_404(Sucursal, pk=pk)
+    empresa_usuario = obtener_empresa_usuario(request.user)
+    admin_master = es_admin_master(request.user)
+
+    sucursal = get_object_or_404(
+        Sucursal.objects.select_related("empresa"),
+        pk=pk
+    )
+
+    if not admin_master:
+        if sucursal.empresa != empresa_usuario:
+            messages.error(request, "No puedes editar sucursales de otra empresa.")
+            return redirect("sucursales_lista")
 
     if request.method == "POST":
         form = SucursalForm(request.POST, instance=sucursal)
+
+        if not admin_master and empresa_usuario:
+            form.fields["empresa"].queryset = Empresa.objects.filter(id=empresa_usuario.id)
+            form.fields["empresa"].initial = empresa_usuario
+
         if form.is_valid():
-            form.save()
+            sucursal_editada = form.save(commit=False)
+
+            if not admin_master:
+                sucursal_editada.empresa = empresa_usuario
+
+            sucursal_editada.save()
+            form.save_m2m()
+
             registrar_historial(
                 request,
                 "Sucursales",
                 "Editar",
-                f"Se editó la sucursal {sucursal.nombre} de {sucursal.empresa.nombre}."
+                f"Se editó la sucursal {sucursal_editada.nombre} de {sucursal_editada.empresa.nombre}."
             )
             messages.success(request, "Sucursal actualizada correctamente.")
             return redirect("sucursales_lista")
     else:
         form = SucursalForm(instance=sucursal)
+
+        if not admin_master and empresa_usuario:
+            form.fields["empresa"].queryset = Empresa.objects.filter(id=empresa_usuario.id)
+            form.fields["empresa"].initial = empresa_usuario
 
     return render(request, "core/sucursal_form.html", {
         "form": form,
@@ -1077,9 +1133,13 @@ def funcionario_nuevo(request):
     if request.method == "POST":
         form = FuncionarioForm(request.POST, request.FILES)
 
-
         if not admin_master and empresa_usuario:
             form.fields["sucursal_rel"].queryset = Sucursal.objects.filter(
+                activo=True,
+                empresa=empresa_usuario
+            ).order_by("nombre")
+
+            form.fields["turno"].queryset = Turno.objects.filter(
                 activo=True,
                 empresa=empresa_usuario
             ).order_by("nombre")
@@ -1090,6 +1150,10 @@ def funcionario_nuevo(request):
             if not admin_master:
                 if not funcionario.sucursal_rel or funcionario.sucursal_rel.empresa != empresa_usuario:
                     messages.error(request, "No puedes crear funcionarios fuera de tu empresa.")
+                    return redirect("funcionarios_lista")
+
+                if funcionario.turno and funcionario.turno.empresa != empresa_usuario:
+                    messages.error(request, "No puedes asignar turnos de otra empresa.")
                     return redirect("funcionarios_lista")
 
             funcionario.save()
@@ -1105,17 +1169,18 @@ def funcionario_nuevo(request):
             return redirect("funcionarios_lista")
     else:
         form = FuncionarioForm()
+
         if not admin_master and empresa_usuario:
             form.fields["sucursal_rel"].queryset = Sucursal.objects.filter(
                 activo=True,
                 empresa=empresa_usuario
             ).order_by("nombre")
 
-        if not admin_master and empresa_usuario:
             form.fields["turno"].queryset = Turno.objects.filter(
                 activo=True,
                 empresa=empresa_usuario
             ).order_by("nombre")
+
         elif admin_master:
             form.fields["turno"].queryset = Turno.objects.filter(
                 activo=True
@@ -1137,7 +1202,10 @@ def funcionario_editar(request, pk):
     empresa_usuario = obtener_empresa_usuario(request.user)
     admin_master = es_admin_master(request.user)
 
-    funcionario = get_object_or_404(Funcionario, pk=pk)
+    funcionario = get_object_or_404(
+        Funcionario.objects.select_related("sucursal_rel", "sucursal_rel__empresa", "turno"),
+        pk=pk
+    )
 
     if not admin_master:
         if not funcionario.sucursal_rel or funcionario.sucursal_rel.empresa != empresa_usuario:
@@ -1153,6 +1221,11 @@ def funcionario_editar(request, pk):
                 empresa=empresa_usuario
             ).order_by("nombre")
 
+            form.fields["turno"].queryset = Turno.objects.filter(
+                activo=True,
+                empresa=empresa_usuario
+            ).order_by("nombre")
+
         if form.is_valid():
             funcionario_editado = form.save(commit=False)
 
@@ -1161,18 +1234,12 @@ def funcionario_editar(request, pk):
                     messages.error(request, "No puedes mover un funcionario a otra empresa.")
                     return redirect("funcionarios_lista")
 
+                if funcionario_editado.turno and funcionario_editado.turno.empresa != empresa_usuario:
+                    messages.error(request, "No puedes asignar turnos de otra empresa.")
+                    return redirect("funcionarios_lista")
+
             funcionario_editado.save()
             form.save_m2m()
-
-            if not admin_master and empresa_usuario:
-                form.fields["turno"].queryset = Turno.objects.filter(
-                    activo=True,
-                    empresa=empresa_usuario
-                ).order_by("nombre")
-            elif admin_master:
-                form.fields["turno"].queryset = Turno.objects.filter(
-                    activo=True
-                ).order_by("nombre")
 
             registrar_historial(
                 request,
@@ -1184,10 +1251,21 @@ def funcionario_editar(request, pk):
             return redirect("funcionarios_lista")
     else:
         form = FuncionarioForm(instance=funcionario)
+
         if not admin_master and empresa_usuario:
             form.fields["sucursal_rel"].queryset = Sucursal.objects.filter(
                 activo=True,
                 empresa=empresa_usuario
+            ).order_by("nombre")
+
+            form.fields["turno"].queryset = Turno.objects.filter(
+                activo=True,
+                empresa=empresa_usuario
+            ).order_by("nombre")
+
+        elif admin_master:
+            form.fields["turno"].queryset = Turno.objects.filter(
+                activo=True
             ).order_by("nombre")
 
     return render(request, "core/funcionario_form.html", {
@@ -1204,7 +1282,17 @@ def funcionario_toggle_activo(request, pk):
     if permiso:
         return permiso
 
-    funcionario = get_object_or_404(Funcionario, pk=pk)
+    funcionario = get_object_or_404(
+        Funcionario.objects.select_related("sucursal_rel", "sucursal_rel__empresa"),
+        pk=pk
+    )
+
+    if not es_admin_master(request.user):
+        empresa_usuario = obtener_empresa_usuario(request.user)
+        if not funcionario.sucursal_rel or funcionario.sucursal_rel.empresa != empresa_usuario:
+            messages.error(request, "No puedes operar banco de horas de otra empresa.")
+            return redirect("banco_horas_lista")
+        
     funcionario.activo = not funcionario.activo
     funcionario.save()
 
@@ -2960,16 +3048,34 @@ def planilla_bancaria_nueva(request):
     if request.method == "POST":
         form = PlanillaBancariaForm(request.POST)
 
+        if not admin_master and empresa_usuario:
+            form.fields["empresa"].queryset = Empresa.objects.filter(id=empresa_usuario.id)
+            form.fields["empresa"].initial = empresa_usuario
+            form.fields["sucursal"].queryset = Sucursal.objects.filter(
+                activo=True,
+                empresa=empresa_usuario
+            ).order_by("nombre")
+
         if form.is_valid():
             planilla = form.save(commit=False)
 
-            if not admin_master and empresa_usuario:
+            if not admin_master:
+                if not empresa_usuario:
+                    messages.error(request, "Tu usuario no tiene empresa asignada.")
+                    return redirect("planilla_bancaria_lista")
+
                 planilla.empresa = empresa_usuario
+
+                if planilla.sucursal and planilla.sucursal.empresa != empresa_usuario:
+                    messages.error(request, "No puedes generar planillas para sucursales de otra empresa.")
+                    return redirect("planilla_bancaria_lista")
 
             planilla.generado_por = request.user
 
             nominas = NominaMensual.objects.select_related(
-                "funcionario"
+                "funcionario",
+                "funcionario__sucursal_rel",
+                "funcionario__sucursal_rel__empresa",
             ).filter(
                 anio=planilla.anio,
                 mes=planilla.mes,
@@ -3019,6 +3125,10 @@ def planilla_bancaria_nueva(request):
         if not admin_master and empresa_usuario:
             form.fields["empresa"].queryset = Empresa.objects.filter(id=empresa_usuario.id)
             form.fields["empresa"].initial = empresa_usuario
+            form.fields["sucursal"].queryset = Sucursal.objects.filter(
+                activo=True,
+                empresa=empresa_usuario
+            ).order_by("nombre")
 
     return render(request, "core/planilla_bancaria_form.html", {
         "form": form,
@@ -3249,7 +3359,16 @@ def banco_horas_recalcular(request, funcionario_id):
     if permiso:
         return permiso
 
-    funcionario = get_object_or_404(Funcionario, pk=funcionario_id)
+    funcionario = get_object_or_404(
+        Funcionario.objects.select_related("sucursal_rel", "sucursal_rel__empresa"),
+        pk=funcionario_id
+    )
+
+    if not es_admin_master(request.user):
+        empresa_usuario = obtener_empresa_usuario(request.user)
+        if not funcionario.sucursal_rel or funcionario.sucursal_rel.empresa != empresa_usuario:
+            messages.error(request, "No puedes operar banco de horas de otra empresa.")
+            return redirect("banco_horas_lista")
 
     recalcular_banco_horas_funcionario(funcionario, request.user)
 
@@ -3270,13 +3389,27 @@ def banco_horas_otorgar(request):
     if permiso:
         return permiso
 
+    empresa_usuario = obtener_empresa_usuario(request.user)
+    admin_master = es_admin_master(request.user)
+
     if request.method == "POST":
         form = BancoHorasOtorgarForm(request.POST)
+
+        if not admin_master and empresa_usuario:
+            form.fields["funcionario"].queryset = Funcionario.objects.filter(
+                activo=True,
+                sucursal_rel__empresa=empresa_usuario
+            ).order_by("apellido", "nombre")
 
         if form.is_valid():
             funcionario = form.cleaned_data["funcionario"]
             horas = form.cleaned_data["horas"]
             observacion = form.cleaned_data["observacion"]
+
+            if not admin_master:
+                if not funcionario.sucursal_rel or funcionario.sucursal_rel.empresa != empresa_usuario:
+                    messages.error(request, "No puedes otorgar horas a funcionarios de otra empresa.")
+                    return redirect("banco_horas_lista")
 
             minutos = horas * 60
 
@@ -3302,10 +3435,15 @@ def banco_horas_otorgar(request):
     else:
         form = BancoHorasOtorgarForm()
 
+        if not admin_master and empresa_usuario:
+            form.fields["funcionario"].queryset = Funcionario.objects.filter(
+                activo=True,
+                sucursal_rel__empresa=empresa_usuario
+            ).order_by("apellido", "nombre")
+
     return render(request, "core/banco_horas_otorgar.html", {
         "form": form,
     })
-
 
 @login_required
 def banco_horas_historial(request, funcionario_id):
@@ -3313,7 +3451,16 @@ def banco_horas_historial(request, funcionario_id):
     if permiso:
         return permiso
 
-    funcionario = get_object_or_404(Funcionario, pk=funcionario_id)
+    funcionario = get_object_or_404(
+        Funcionario.objects.select_related("sucursal_rel", "sucursal_rel__empresa"),
+        pk=funcionario_id
+    )
+
+    if not es_admin_master(request.user):
+        empresa_usuario = obtener_empresa_usuario(request.user)
+        if not funcionario.sucursal_rel or funcionario.sucursal_rel.empresa != empresa_usuario:
+            messages.error(request, "No puedes operar banco de horas de otra empresa.")
+            return redirect("banco_horas_lista")
 
     movimientos = BancoHorasMovimiento.objects.filter(
         funcionario=funcionario
@@ -5066,7 +5213,11 @@ def comunicacion_editar(request, pk):
     admin_master = es_admin_master(request.user)
 
     comunicacion = get_object_or_404(
-        ComunicacionLaboral.objects.select_related("funcionario", "funcionario__sucursal_rel", "funcionario__sucursal_rel__empresa"),
+        ComunicacionLaboral.objects.select_related(
+            "funcionario",
+            "funcionario__sucursal_rel",
+            "funcionario__sucursal_rel__empresa"
+        ),
         pk=pk
     )
 
@@ -5086,6 +5237,12 @@ def comunicacion_editar(request, pk):
 
         if form.is_valid():
             comunicacion = form.save(commit=False)
+
+            if not admin_master:
+                if not comunicacion.funcionario.sucursal_rel or comunicacion.funcionario.sucursal_rel.empresa != empresa_usuario:
+                    messages.error(request, "No puedes mover comunicaciones a otra empresa.")
+                    return redirect("comunicaciones_lista")
+
             comunicacion.empresa = comunicacion.funcionario.empresa
             comunicacion.sucursal = comunicacion.funcionario.sucursal_rel
             comunicacion.save()
