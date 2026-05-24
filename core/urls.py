@@ -82,6 +82,7 @@ from .views import (
     banco_horas_recalcular,
     banco_horas_otorgar,
     banco_horas_historial,
+    verificar_documento,
 )
 
 urlpatterns = [
@@ -169,4 +170,5 @@ urlpatterns = [
     path("banco-horas/otorgar/", banco_horas_otorgar, name="banco_horas_otorgar"),
     path("banco-horas/<int:funcionario_id>/recalcular/", banco_horas_recalcular, name="banco_horas_recalcular"),
     path("banco-horas/<int:funcionario_id>/historial/", banco_horas_historial, name="banco_horas_historial"),
+    path("verificar/<str:codigo>/", verificar_documento, name="verificar_documento"),
 ]

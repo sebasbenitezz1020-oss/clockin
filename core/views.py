@@ -4,6 +4,11 @@ from decimal import Decimal, InvalidOperation
 from io import BytesIO
 import csv
 from django.http import HttpResponse
+import uuid
+import hashlib
+import qrcode
+
+from django.urls import reverse
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
@@ -76,6 +81,7 @@ from .models import (
     ComunicacionLaboral,
     PlanillaBancaria,
     BancoHorasMovimiento,
+    DocumentoFirmado,
 )
 
 def _bloquear_si_no_admin_master(request):
@@ -304,6 +310,157 @@ def agregar_texto_legal_empresa_pdf(elementos, empresa):
 
     elementos.append(Spacer(1, 8))
     elementos.append(Paragraph(f"<b>Observación legal / empresarial:</b><br/>{texto}", legal_style))
+
+def generar_codigo_documento(tipo_documento):
+    anio = timezone.localdate().year
+    tipo = str(tipo_documento or "DOC").upper()[:8]
+    corto = uuid.uuid4().hex[:10].upper()
+    return f"CLK-{anio}-{tipo}-{corto}"
+
+
+def crear_documento_firmado(
+    request,
+    empresa,
+    tipo_documento,
+    documento_id=None,
+    funcionario=None,
+    titulo="",
+):
+    codigo = generar_codigo_documento(tipo_documento)
+
+    base_hash = f"{empresa.id if empresa else ''}|{tipo_documento}|{documento_id}|{funcionario.id if funcionario else ''}|{timezone.now().isoformat()}|{codigo}"
+    hash_documento = hashlib.sha256(base_hash.encode("utf-8")).hexdigest()
+
+    documento = DocumentoFirmado.objects.create(
+        empresa=empresa,
+        codigo=codigo,
+        tipo_documento=tipo_documento,
+        documento_id=documento_id,
+        funcionario=funcionario,
+        titulo=titulo or tipo_documento,
+        hash_documento=hash_documento,
+        firmado_por_nombre=getattr(empresa, "nombre_gerente", "") or "",
+        firmado_por_cargo=getattr(empresa, "cargo_gerente", "") or "Gerente General",
+        emitido_por=request.user if request.user.is_authenticated else None,
+        valido=True,
+    )
+
+    return documento
+
+
+def agregar_firma_qr_documento_pdf(
+    elementos,
+    request,
+    empresa,
+    tipo_documento,
+    documento_id=None,
+    funcionario=None,
+    titulo="Documento ClockIn",
+):
+    documento = crear_documento_firmado(
+        request=request,
+        empresa=empresa,
+        tipo_documento=tipo_documento,
+        documento_id=documento_id,
+        funcionario=funcionario,
+        titulo=titulo,
+    )
+
+    styles = getSampleStyleSheet()
+
+    firma_style = ParagraphStyle(
+        name="FirmaDigitalInterna",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=8,
+        leading=11,
+        alignment=TA_CENTER,
+        textColor=colors.HexColor("#111827"),
+    )
+
+    codigo_style = ParagraphStyle(
+        name="CodigoVerificacionClockIn",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=7,
+        leading=9,
+        alignment=TA_CENTER,
+        textColor=colors.HexColor("#475569"),
+    )
+
+    url_verificacion = request.build_absolute_uri(
+        reverse("verificar_documento", args=[documento.codigo])
+    )
+
+    qr = qrcode.make(url_verificacion)
+    qr_buffer = BytesIO()
+    qr.save(qr_buffer, format="PNG")
+    qr_buffer.seek(0)
+
+    qr_img = Image(qr_buffer, width=28 * mm, height=28 * mm)
+
+    firma_img = Spacer(1, 18 * mm)
+
+    if empresa and getattr(empresa, "firma_gerente", None):
+        try:
+            if empresa.firma_gerente and empresa.firma_gerente.path:
+                firma_img = Image(
+                    empresa.firma_gerente.path,
+                    width=45 * mm,
+                    height=18 * mm
+                )
+        except Exception:
+            firma_img = Spacer(1, 18 * mm)
+
+    nombre = documento.firmado_por_nombre or "Firma autorizada"
+    cargo = documento.firmado_por_cargo or "Gerencia"
+
+    bloque_firma = [
+        firma_img,
+        Paragraph(f"<b>{nombre}</b><br/>{cargo}", firma_style),
+        Paragraph("Firma interna automatizada", codigo_style),
+    ]
+
+    bloque_qr = [
+        qr_img,
+        Paragraph(f"<b>Código:</b> {documento.codigo}", codigo_style),
+        Paragraph(f"Hash: {documento.hash_documento[:18]}...", codigo_style),
+        Paragraph("Escanee el QR para verificar este documento.", codigo_style),
+    ]
+
+    tabla = Table(
+        [[bloque_firma, bloque_qr]],
+        colWidths=[85 * mm, 85 * mm]
+    )
+
+    tabla.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8fafc")),
+        ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#cbd5e1")),
+        ("INNERGRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#e5e7eb")),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("TOPPADDING", (0, 0), (-1, -1), 8),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 8),
+    ]))
+
+    elementos.append(Spacer(1, 12))
+    elementos.append(tabla)
+
+    return documento
+
+def verificar_documento(request, codigo):
+    documento = get_object_or_404(
+        DocumentoFirmado.objects.select_related(
+            "empresa",
+            "funcionario",
+            "emitido_por",
+        ),
+        codigo=codigo
+    )
+
+    return render(request, "core/verificar_documento.html", {
+        "documento": documento,
+    })
 
 def funcionario_tiene_dia_libre(funcionario, fecha=None):
     fecha = fecha or timezone.localdate()
@@ -2186,7 +2343,18 @@ def vacacion_notificacion_pdf(request, pk):
         ("TOPPADDING", (0, 0), (-1, -1), 7),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 7),
     ]))
+    
     elementos.append(firmas)
+
+    agregar_firma_qr_documento_pdf(
+        elementos=elementos,
+        request=request,
+        empresa=empresa_pdf,
+        tipo_documento="VACACIONES",
+        documento_id=vacacion.id,
+        funcionario=funcionario,
+        titulo="Notificación de Vacaciones",
+    )
 
     agregar_texto_legal_empresa_pdf(elementos, empresa_pdf)
 
@@ -2996,6 +3164,16 @@ def aguinaldo_pdf(request, pk):
     ]))
     elementos.append(firmas)
 
+    agregar_firma_qr_documento_pdf(
+        elementos=elementos,
+        request=request,
+        empresa=empresa_pdf,
+        tipo_documento="AGUINALDO",
+        documento_id=aguinaldo.id,
+        funcionario=funcionario,
+        titulo="Recibo de Aguinaldo",
+    )
+
     agregar_texto_legal_empresa_pdf(elementos, empresa_pdf)
 
     doc.build(elementos)
@@ -3259,24 +3437,24 @@ def recalcular_banco_horas_funcionario(funcionario, user=None):
     ).delete()
 
     asistencias = Asistencia.objects.filter(
-        funcionario=funcionario
+        funcionario=funcionario,
+        hora_entrada__isnull=False,
+        hora_salida__isnull=False,
     ).order_by("fecha")
 
     for asistencia in asistencias:
-        # Solo procesamos jornadas cerradas.
-        # Si no tiene salida, no se calcula banco.
-        if not asistencia.hora_entrada or not asistencia.hora_salida:
-            continue
         segundos = asistencia.horas_trabajadas_segundos or 0
 
+        # Si no hay horas reales trabajadas, no se toca el banco.
+        # Las ausencias impactan en sueldo/nómina, no en banco de horas.
+        if segundos <= 0:
+            continue
+
         horas_reales = segundos / 3600
-
         diferencia_horas = horas_reales - 8
-
         diferencia_minutos = int(diferencia_horas * 60)
 
         bloques_30 = abs(diferencia_minutos) // 30
-
         minutos_finales = bloques_30 * 30
 
         if minutos_finales == 0:
@@ -3292,13 +3470,12 @@ def recalcular_banco_horas_funcionario(funcionario, user=None):
                 user=user,
                 fecha=asistencia.fecha,
             )
-
         else:
             registrar_movimiento_banco(
                 funcionario=funcionario,
                 tipo=BancoHorasMovimiento.Tipos.DESCUENTO,
                 minutos=-minutos_finales,
-                observacion=f"Descuento automático por faltante ({asistencia.fecha:%d/%m/%Y})",
+                observacion=f"Descuento automático por jornada incompleta ({asistencia.fecha:%d/%m/%Y})",
                 origen="asistencia",
                 user=user,
                 fecha=asistencia.fecha,
@@ -3314,6 +3491,9 @@ def banco_horas_lista(request):
     empresa_usuario = obtener_empresa_usuario(request.user)
     admin_master = es_admin_master(request.user)
 
+    sucursal_id = request.GET.get("sucursal", "").strip()
+    q = request.GET.get("q", "").strip()
+
     funcionarios = Funcionario.objects.filter(activo=True).select_related(
         "sucursal_rel",
         "sucursal_rel__empresa"
@@ -3321,24 +3501,39 @@ def banco_horas_lista(request):
 
     if not admin_master:
         if empresa_usuario:
-            funcionarios = funcionarios.filter(
-                sucursal_rel__empresa=empresa_usuario
-            )
+            funcionarios = funcionarios.filter(sucursal_rel__empresa=empresa_usuario)
         else:
             funcionarios = funcionarios.none()
 
+    if sucursal_id:
+        funcionarios = funcionarios.filter(sucursal_rel_id=sucursal_id)
+
+    if q:
+        funcionarios = funcionarios.filter(
+            Q(nombre__icontains=q) |
+            Q(apellido__icontains=q) |
+            Q(cedula__icontains=q)
+        )
+
+    if admin_master:
+        sucursales = Sucursal.objects.filter(activo=True).order_by("empresa__nombre", "nombre")
+    else:
+        sucursales = Sucursal.objects.filter(
+            activo=True,
+            empresa=empresa_usuario
+        ).order_by("nombre") if empresa_usuario else Sucursal.objects.none()
+
     datos = []
 
-    for funcionario in funcionarios:
+    for funcionario in funcionarios.order_by("apellido", "nombre"):
         saldo = obtener_saldo_banco_horas(funcionario)
 
         horas = abs(saldo) // 60
         minutos = abs(saldo) % 60
 
+        saldo_texto = f"{horas}:{minutos:02d} hs"
         if saldo < 0:
-            saldo_texto = f"-{horas}:{minutos:02d} hs"
-        else:
-            saldo_texto = f"{horas}:{minutos:02d} hs"
+            saldo_texto = f"-{saldo_texto}"
 
         datos.append({
             "funcionario": funcionario,
@@ -3348,6 +3543,9 @@ def banco_horas_lista(request):
 
     return render(request, "core/banco_horas_lista.html", {
         "datos": datos,
+        "sucursales": sucursales,
+        "sucursal_id": sucursal_id,
+        "q": q,
         "empresa_usuario": empresa_usuario,
         "es_admin_master": admin_master,
     })
@@ -3802,6 +4000,7 @@ def nomina_extracto_pdf(request, pk):
     elementos = []
 
     empresa_pdf = obtener_empresa_documento(funcionario=nomina.funcionario)
+
     elementos += construir_encabezado_empresa_pdf(empresa_pdf, "EXTRACTO DE NÓMINA")
     elementos.append(Spacer(1, 8))
 
@@ -3869,6 +4068,16 @@ def nomina_extracto_pdf(request, pk):
         ("FONTSIZE", (0, 0), (-1, -1), 9),
     ]))
     elementos.append(firmas)
+
+    agregar_firma_qr_documento_pdf(
+        elementos=elementos,
+        request=request,
+        empresa=empresa_pdf,
+        tipo_documento="NOMINA",
+        documento_id=nomina.id,
+        funcionario=funcionario,
+        titulo="Extracto de Nómina",
+    )
 
     agregar_texto_legal_empresa_pdf(elementos, empresa_pdf)
 
@@ -4707,7 +4916,11 @@ def liquidacion_pdf(request, pk):
     admin_master = es_admin_master(request.user)
 
     liquidacion = get_object_or_404(
-        Liquidacion.objects.select_related("funcionario", "funcionario__sucursal_rel", "funcionario__sucursal_rel__empresa"),
+        Liquidacion.objects.select_related(
+            "funcionario",
+            "funcionario__sucursal_rel",
+            "funcionario__sucursal_rel__empresa"
+        ),
         pk=pk
     )
 
@@ -4720,6 +4933,7 @@ def liquidacion_pdf(request, pk):
     config = ConfiguracionGeneral.obtener()
 
     buffer = BytesIO()
+
     doc = SimpleDocTemplate(
         buffer,
         pagesize=A4,
@@ -4730,6 +4944,7 @@ def liquidacion_pdf(request, pk):
     )
 
     styles = getSampleStyleSheet()
+
     styles.add(ParagraphStyle(
         name="TituloClockIn",
         parent=styles["Heading1"],
@@ -4740,6 +4955,7 @@ def liquidacion_pdf(request, pk):
         textColor=colors.HexColor("#111827"),
         spaceAfter=8,
     ))
+
     styles.add(ParagraphStyle(
         name="SubtituloClockIn",
         parent=styles["Normal"],
@@ -4750,6 +4966,7 @@ def liquidacion_pdf(request, pk):
         textColor=colors.HexColor("#475569"),
         spaceAfter=12,
     ))
+
     styles.add(ParagraphStyle(
         name="SeccionClockIn",
         parent=styles["Heading3"],
@@ -4760,6 +4977,7 @@ def liquidacion_pdf(request, pk):
         textColor=colors.HexColor("#1d4ed8"),
         spaceAfter=6,
     ))
+
     styles.add(ParagraphStyle(
         name="TextoClockIn",
         parent=styles["Normal"],
@@ -4768,6 +4986,7 @@ def liquidacion_pdf(request, pk):
         leading=12,
         textColor=colors.HexColor("#111827"),
     ))
+
     styles.add(ParagraphStyle(
         name="TextoBoldClockIn",
         parent=styles["Normal"],
@@ -4783,8 +5002,19 @@ def liquidacion_pdf(request, pk):
     subtitulo = config.subtitulo_sistema if config and config.subtitulo_sistema else "Sistema Web RRHH"
 
     empresa_pdf = obtener_empresa_documento(funcionario=liquidacion.funcionario)
-    elementos += construir_encabezado_empresa_pdf(empresa_pdf, "LIQUIDACIÓN LABORAL")
-    elementos.append(Paragraph("LIQUIDACIÓN FINAL", styles["TituloClockIn"]))
+
+    elementos += construir_encabezado_empresa_pdf(
+        empresa_pdf,
+        "LIQUIDACIÓN LABORAL"
+    )
+
+    elementos.append(
+        Paragraph(
+            "LIQUIDACIÓN FINAL",
+            styles["TituloClockIn"]
+        )
+    )
+
     elementos.append(Spacer(1, 4))
 
     datos_superiores = [
@@ -4797,7 +5027,11 @@ def liquidacion_pdf(request, pk):
         ["Antigüedad", f"{liquidacion.antiguedad_anios} año(s), {liquidacion.antiguedad_meses} mes(es), {liquidacion.antiguedad_dias} día(s)"],
     ]
 
-    tabla_datos = Table(datos_superiores, colWidths=[55 * mm, 105 * mm])
+    tabla_datos = Table(
+        datos_superiores,
+        colWidths=[55 * mm, 105 * mm]
+    )
+
     tabla_datos.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#eff6ff")),
         ("TEXTCOLOR", (0, 0), (0, -1), colors.HexColor("#1d4ed8")),
@@ -4811,10 +5045,16 @@ def liquidacion_pdf(request, pk):
         ("TOPPADDING", (0, 0), (-1, -1), 5),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
     ]))
+
     elementos.append(tabla_datos)
     elementos.append(Spacer(1, 12))
 
-    elementos.append(Paragraph("1. HABERES", styles["SeccionClockIn"]))
+    elementos.append(
+        Paragraph(
+            "1. HABERES",
+            styles["SeccionClockIn"]
+        )
+    )
 
     tabla_haberes = Table([
         ["Concepto", "Detalle", "Monto"],
@@ -4845,10 +5085,16 @@ def liquidacion_pdf(request, pk):
         ("TOPPADDING", (0, 0), (-1, -1), 4),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
     ]))
+
     elementos.append(tabla_haberes)
     elementos.append(Spacer(1, 12))
 
-    elementos.append(Paragraph("2. DESCUENTOS", styles["SeccionClockIn"]))
+    elementos.append(
+        Paragraph(
+            "2. DESCUENTOS",
+            styles["SeccionClockIn"]
+        )
+    )
 
     tabla_desc = Table([
         ["Concepto", "Monto"],
@@ -4873,10 +5119,16 @@ def liquidacion_pdf(request, pk):
         ("TOPPADDING", (0, 0), (-1, -1), 4),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
     ]))
+
     elementos.append(tabla_desc)
     elementos.append(Spacer(1, 12))
 
-    elementos.append(Paragraph("3. TOTAL FINAL", styles["SeccionClockIn"]))
+    elementos.append(
+        Paragraph(
+            "3. TOTAL FINAL",
+            styles["SeccionClockIn"]
+        )
+    )
 
     tabla_total = Table([
         ["TOTAL LIQUIDACIÓN", f"Gs. {liquidacion.total_liquidacion:,.0f}".replace(",", ".")]
@@ -4894,17 +5146,42 @@ def liquidacion_pdf(request, pk):
         ("TOPPADDING", (0, 0), (-1, -1), 6),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
     ]))
+
     elementos.append(tabla_total)
     elementos.append(Spacer(1, 14))
 
     if liquidacion.motivo_observacion:
-        elementos.append(Paragraph("4. OBSERVACIÓN", styles["SeccionClockIn"]))
-        elementos.append(Paragraph(liquidacion.motivo_observacion.replace("\n", "<br/>"), styles["TextoClockIn"]))
+        elementos.append(
+            Paragraph(
+                "4. OBSERVACIÓN",
+                styles["SeccionClockIn"]
+            )
+        )
+
+        elementos.append(
+            Paragraph(
+                liquidacion.motivo_observacion.replace("\n", "<br/>"),
+                styles["TextoClockIn"]
+            )
+        )
+
         elementos.append(Spacer(1, 12))
 
     if liquidacion.requiere_revision_juridica and liquidacion.alerta_revision:
-        elementos.append(Paragraph("5. ALERTA DE REVISIÓN", styles["SeccionClockIn"]))
-        elementos.append(Paragraph(liquidacion.alerta_revision, styles["TextoBoldClockIn"]))
+        elementos.append(
+            Paragraph(
+                "5. ALERTA DE REVISIÓN",
+                styles["SeccionClockIn"]
+            )
+        )
+
+        elementos.append(
+            Paragraph(
+                liquidacion.alerta_revision,
+                styles["TextoBoldClockIn"]
+            )
+        )
+
         elementos.append(Spacer(1, 12))
 
     elementos.append(Spacer(1, 22))
@@ -4924,9 +5201,23 @@ def liquidacion_pdf(request, pk):
         ("TOPPADDING", (0, 0), (-1, -1), 6),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
     ]))
+
     elementos.append(firmas)
 
-    agregar_texto_legal_empresa_pdf(elementos, empresa_pdf)
+    agregar_firma_qr_documento_pdf(
+        elementos=elementos,
+        request=request,
+        empresa=empresa_pdf,
+        tipo_documento="LIQUIDACION",
+        documento_id=liquidacion.id,
+        funcionario=funcionario,
+        titulo="Liquidación Laboral",
+    )
+
+    agregar_texto_legal_empresa_pdf(
+        elementos,
+        empresa_pdf
+    )
 
     doc.build(elementos)
 
@@ -4934,8 +5225,13 @@ def liquidacion_pdf(request, pk):
     buffer.close()
 
     response = HttpResponse(content_type="application/pdf")
-    response["Content-Disposition"] = f'inline; filename="liquidacion_{funcionario.cedula}_{liquidacion.id}.pdf"'
+
+    response["Content-Disposition"] = (
+        f'inline; filename="liquidacion_{funcionario.cedula}_{liquidacion.id}.pdf"'
+    )
+
     response.write(pdf)
+
     return response
 
 def generar_texto_comunicacion_laboral(comunicacion):
@@ -5327,6 +5623,7 @@ def comunicacion_pdf(request, pk):
     empresa_pdf = obtener_empresa_documento(funcionario=funcionario)
 
     buffer = BytesIO()
+
     doc = SimpleDocTemplate(
         buffer,
         pagesize=A4,
@@ -5337,6 +5634,7 @@ def comunicacion_pdf(request, pk):
     )
 
     styles = getSampleStyleSheet()
+
     styles.add(ParagraphStyle(
         name="TituloComunicacion",
         parent=styles["Heading1"],
@@ -5360,8 +5658,18 @@ def comunicacion_pdf(request, pk):
 
     elementos = []
 
-    elementos += construir_encabezado_empresa_pdf(empresa_pdf, "COMUNICACIÓN LABORAL")
-    elementos.append(Paragraph(comunicacion.titulo.upper(), styles["TituloComunicacion"]))
+    elementos += construir_encabezado_empresa_pdf(
+        empresa_pdf,
+        "COMUNICACIÓN LABORAL"
+    )
+
+    elementos.append(
+        Paragraph(
+            comunicacion.titulo.upper(),
+            styles["TituloComunicacion"]
+        )
+    )
+
     elementos.append(Spacer(1, 8))
 
     datos = [
@@ -5376,7 +5684,11 @@ def comunicacion_pdf(request, pk):
         ["Estado", comunicacion.get_estado_display()],
     ]
 
-    tabla = Table(datos, colWidths=[55 * mm, 105 * mm])
+    tabla = Table(
+        datos,
+        colWidths=[55 * mm, 105 * mm]
+    )
+
     tabla.setStyle(TableStyle([
         ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#eff6ff")),
         ("TEXTCOLOR", (0, 0), (0, -1), colors.HexColor("#1d4ed8")),
@@ -5394,7 +5706,13 @@ def comunicacion_pdf(request, pk):
     contenido = comunicacion.contenido or generar_texto_comunicacion_laboral(comunicacion)
     contenido = contenido.replace("\n", "<br/>")
 
-    elementos.append(Paragraph(contenido, styles["TextoComunicacion"]))
+    elementos.append(
+        Paragraph(
+            contenido,
+            styles["TextoComunicacion"]
+        )
+    )
+
     elementos.append(Spacer(1, 30))
 
     firmas = Table([
@@ -5414,7 +5732,20 @@ def comunicacion_pdf(request, pk):
 
     elementos.append(firmas)
 
-    agregar_texto_legal_empresa_pdf(elementos, empresa_pdf)
+    agregar_firma_qr_documento_pdf(
+        elementos=elementos,
+        request=request,
+        empresa=empresa_pdf,
+        tipo_documento="COMUNICACION",
+        documento_id=comunicacion.id,
+        funcionario=funcionario,
+        titulo=comunicacion.titulo,
+    )
+
+    agregar_texto_legal_empresa_pdf(
+        elementos,
+        empresa_pdf
+    )
 
     doc.build(elementos)
 
@@ -5429,8 +5760,13 @@ def comunicacion_pdf(request, pk):
     )
 
     response = HttpResponse(content_type="application/pdf")
-    response["Content-Disposition"] = f'inline; filename="comunicacion_{funcionario.cedula}_{comunicacion.id}.pdf"'
+
+    response["Content-Disposition"] = (
+        f'inline; filename="comunicacion_{funcionario.cedula}_{comunicacion.id}.pdf"'
+    )
+
     response.write(pdf)
+
     return response
 
 @login_required
@@ -5492,6 +5828,16 @@ def dias_libres_lista(request):
             "domingo",
         ]
 
+        mapa_dias = {
+            "lunes": 0,
+            "martes": 1,
+            "miercoles": 2,
+            "jueves": 3,
+            "viernes": 4,
+            "sabado": 5,
+            "domingo": 6,
+        }
+
         for funcionario in funcionarios_activos:
             planilla, creada = PlanillaSemanalFuncionario.objects.get_or_create(
                 funcionario=funcionario
@@ -5516,32 +5862,50 @@ def dias_libres_lista(request):
 
             planilla.save()
 
-            # Mantener compatibilidad con el sistema viejo de DiaLibre:
-            # Si un día queda vacío, se registra como día libre activo.
-            DiaLibre.objects.filter(funcionario=funcionario, activo=True).delete()
-
-            mapa_dias = {
-                "lunes": 0,
-                "martes": 1,
-                "miercoles": 2,
-                "jueves": 3,
-                "viernes": 4,
-                "sabado": 5,
-                "domingo": 6,
-            }
+            # Compatibilidad con el sistema viejo de DiaLibre:
+            # La tabla DiaLibre solo permite 1 día libre activo por funcionario.
+            # Por eso tomamos el PRIMER día vacío como día libre principal.
+            dias_libres_detectados = []
 
             for campo, numero_dia in mapa_dias.items():
                 if getattr(planilla, campo) is None:
+                    dias_libres_detectados.append(numero_dia)
+
+            # Eliminamos duplicados activos antiguos para evitar IntegrityError.
+            dias_libres_activos = DiaLibre.objects.filter(
+                funcionario=funcionario,
+                activo=True
+            ).order_by("id")
+
+            dia_libre_principal = dias_libres_detectados[0] if dias_libres_detectados else None
+
+            if dia_libre_principal is not None:
+                dia_libre_obj = dias_libres_activos.first()
+
+                if dia_libre_obj:
+                    dia_libre_obj.empresa = funcionario.empresa
+                    dia_libre_obj.sucursal = funcionario.sucursal_rel
+                    dia_libre_obj.sector = funcionario.sector or ""
+                    dia_libre_obj.dia_semana = dia_libre_principal
+                    dia_libre_obj.fecha_inicio = timezone.localdate()
+                    dia_libre_obj.activo = True
+                    dia_libre_obj.observacion = "Generado automáticamente desde planilla semanal."
+                    dia_libre_obj.save()
+
+                    dias_libres_activos.exclude(pk=dia_libre_obj.pk).delete()
+                else:
                     DiaLibre.objects.create(
                         funcionario=funcionario,
                         empresa=funcionario.empresa,
                         sucursal=funcionario.sucursal_rel,
                         sector=funcionario.sector or "",
-                        dia_semana=numero_dia,
+                        dia_semana=dia_libre_principal,
                         fecha_inicio=timezone.localdate(),
                         activo=True,
                         observacion="Generado automáticamente desde planilla semanal."
                     )
+            else:
+                dias_libres_activos.delete()
 
         registrar_historial(
             request,

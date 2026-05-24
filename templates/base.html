@@ -342,11 +342,161 @@
         .color-preview-global {
             background: var(--brand-primary);
         }
+        /* =========================
+        MOBILE PREMIUM
+        ========================= */
+
+        .mobile-topbar{
+            display:none;
+        }
+
+        #sidebar-overlay{
+            position:fixed;
+            inset:0;
+            background:rgba(0,0,0,.55);
+            backdrop-filter:blur(4px);
+            z-index:998;
+            opacity:0;
+            pointer-events:none;
+            transition:.25s ease;
+        }
+
+        #sidebar-overlay.active{
+            opacity:1;
+            pointer-events:auto;
+        }
+
+        @media (max-width: 900px){
+
+            body{
+                overflow-x:hidden;
+            }
+
+            .mobile-topbar{
+                position:fixed;
+                top:0;
+                left:0;
+                right:0;
+                height:68px;
+                display:flex;
+                align-items:center;
+                justify-content:space-between;
+                padding:0 18px;
+                background:rgba(8,12,20,.92);
+                backdrop-filter:blur(18px);
+                border-bottom:1px solid rgba(255,255,255,.06);
+                z-index:999;
+            }
+
+            .mobile-brand{
+                color:#fff;
+                font-size:18px;
+                font-weight:800;
+            }
+
+            .mobile-menu-btn{
+                width:44px;
+                height:44px;
+                border-radius:14px;
+                border:none;
+                background:linear-gradient(
+                    135deg,
+                    var(--brand-primary),
+                    var(--brand-primary-dark)
+                );
+                color:#fff;
+                font-size:20px;
+                box-shadow:0 10px 24px var(--brand-shadow);
+            }
+
+            .sidebar{
+                position:fixed;
+                top:0;
+                left:-320px;
+                width:290px;
+                height:100vh;
+                z-index:9999;
+                transition:.28s ease;
+                overflow-y:auto;
+                background:rgba(10,15,24,.96);
+                backdrop-filter:blur(18px);
+                box-shadow:0 20px 60px rgba(0,0,0,.45);
+            }
+
+            .sidebar.active{
+                left:0;
+            }
+
+            .content{
+                width:100%;
+                margin-left:0 !important;
+            }
+
+            .topbar{
+                display:none;
+            }
+
+            .page{
+                padding-top:88px !important;
+            }
+
+            .menu{
+                padding-bottom:120px;
+            }
+
+            .menu a{
+                border-radius:16px;
+                margin-bottom:8px;
+                font-size:15px;
+                padding:14px 16px;
+            }
+
+            .card,
+            .stat-card,
+            .config-card,
+            .resume-box{
+                border-radius:24px;
+                padding:22px !important;
+            }
+
+            h1{
+                font-size:34px !important;
+                line-height:1.1;
+            }
+
+            table{
+                display:block;
+                overflow-x:auto;
+                white-space:nowrap;
+            }
+
+            input,
+            select,
+            textarea{
+                min-height:50px;
+                font-size:16px !important;
+            }
+
+        }
     </style>
 </head>
 <body class="theme-{% if config_general and config_general.color_primario %}{{ config_general.color_primario }}{% else %}azul{% endif %}">
 
-<button id="menu-toggle">☰</button>
+<div class="mobile-topbar">
+    <button id="menu-toggle" class="mobile-menu-btn">
+        ☰
+    </button>
+
+    <div class="mobile-brand">
+        {% if config_general and config_general.nombre_sistema %}
+            {{ config_general.nombre_sistema }}
+        {% else %}
+            ClockIn
+        {% endif %}
+    </div>
+</div>
+
+<div id="sidebar-overlay"></div>
 
 <div class="layout">
     <aside class="sidebar" id="sidebar">
@@ -543,33 +693,55 @@
 <script>
 const toggle = document.getElementById("menu-toggle");
 const sidebar = document.getElementById("sidebar");
+const overlay = document.getElementById("sidebar-overlay");
 
 if (toggle && sidebar) {
+
     toggle.addEventListener("click", () => {
+
         sidebar.classList.toggle("active");
-        document.body.classList.toggle("menu-open", sidebar.classList.contains("active"));
+
+        if(overlay){
+            overlay.classList.toggle(
+                "active",
+                sidebar.classList.contains("active")
+            );
+        }
+
+        document.body.classList.toggle(
+            "menu-open",
+            sidebar.classList.contains("active")
+        );
+    });
+}
+
+if(overlay){
+    overlay.addEventListener("click", () => {
+        sidebar.classList.remove("active");
+        overlay.classList.remove("active");
+        document.body.classList.remove("menu-open");
     });
 }
 
 document.addEventListener("DOMContentLoaded", function () {
+
     const currentPath = window.location.pathname;
+
     document.querySelectorAll(".menu a").forEach(link => {
+
         try {
+
             const url = new URL(link.href, window.location.origin);
+
             if (url.pathname === currentPath) {
                 link.classList.add("active");
                 link.setAttribute("aria-current", "page");
             }
+
         } catch (e) {}
+
     });
 
-    document.addEventListener("click", function (e) {
-        if (window.innerWidth > 900) return;
-        if (!sidebar.classList.contains("active")) return;
-        if (sidebar.contains(e.target) || toggle.contains(e.target)) return;
-        sidebar.classList.remove("active");
-        document.body.classList.remove("menu-open");
-    });
 });
 </script>
 

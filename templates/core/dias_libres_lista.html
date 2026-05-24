@@ -220,6 +220,44 @@
             width: 100%;
         }
     }
+        select {
+        background: #0f172a !important;
+        color: #ffffff !important;
+        border: 1px solid rgba(255,255,255,0.08) !important;
+    }
+
+    select option {
+        background-color: #111827 !important;
+        color: #ffffff !important;
+    }
+
+    select option:hover,
+    select option:checked {
+        background-color: #2563eb !important;
+        color: #ffffff !important;
+    }
+        .select-turno {
+        width: 100%;
+        background: linear-gradient(180deg, #111827 0%, #0b1220 100%);
+        color: #fff;
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 14px;
+        padding: 12px 14px;
+        font-weight: 600;
+        transition: all .2s ease;
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.04);
+    }
+
+    .select-turno:focus {
+        outline: none;
+        border-color: #3b82f6;
+        box-shadow: 0 0 0 4px rgba(59,130,246,.15);
+    }
+
+    .select-turno option {
+        background: #111827;
+        color: white;
+    }
 </style>
 
 <div class="dl-head">

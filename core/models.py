@@ -15,6 +15,23 @@ class Empresa(models.Model):
     logo = models.ImageField(upload_to="empresas/logos/", null=True, blank=True)
     texto_legal_pdf = models.TextField(blank=True, default="")
     activo = models.BooleanField(default=True)
+    firma_gerente = models.ImageField(
+        upload_to="empresas/firmas/",
+        null=True,
+        blank=True
+    )
+
+    nombre_gerente = models.CharField(
+        max_length=150,
+        blank=True,
+        default=""
+    )
+
+    cargo_gerente = models.CharField(
+        max_length=150,
+        blank=True,
+        default="Gerente General"
+    )
 
     creado_en = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)
@@ -1424,3 +1441,45 @@ class ComunicacionLaboral(models.Model):
 
     def __str__(self):
         return f"{self.funcionario.nombre_completo} - {self.get_tipo_display()} - {self.fecha_emision:%d/%m/%Y}"
+    
+class DocumentoFirmado(models.Model):
+    empresa = models.ForeignKey(
+        Empresa,
+        on_delete=models.CASCADE,
+        related_name="documentos_firmados"
+    )
+
+    codigo = models.CharField(max_length=80, unique=True)
+    tipo_documento = models.CharField(max_length=80)
+    documento_id = models.PositiveIntegerField(null=True, blank=True)
+
+    funcionario = models.ForeignKey(
+        Funcionario,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="documentos_firmados"
+    )
+
+    titulo = models.CharField(max_length=180, blank=True, default="")
+    hash_documento = models.CharField(max_length=128, blank=True, default="")
+
+    firmado_por_nombre = models.CharField(max_length=150, blank=True, default="")
+    firmado_por_cargo = models.CharField(max_length=150, blank=True, default="")
+
+    emitido_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="documentos_emitidos"
+    )
+
+    emitido_en = models.DateTimeField(auto_now_add=True)
+    valido = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ["-emitido_en"]
+
+    def __str__(self):
+        return f"{self.codigo} - {self.tipo_documento}"

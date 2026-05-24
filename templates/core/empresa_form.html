@@ -49,6 +49,24 @@
                 {{ form.logo.errors }}
             </div>
 
+            <div class="form-field">
+                <label>Firma del gerente</label>
+                {{ form.firma_gerente }}
+                {{ form.firma_gerente.errors }}
+            </div>
+
+            <div class="form-field">
+                <label>Nombre del gerente</label>
+                {{ form.nombre_gerente }}
+                {{ form.nombre_gerente.errors }}
+            </div>
+
+            <div class="form-field">
+                <label>Cargo del gerente</label>
+                {{ form.cargo_gerente }}
+                {{ form.cargo_gerente.errors }}
+            </div>
+
             <div class="form-field full-width">
                 <label for="{{ form.texto_legal_pdf.id_for_label }}">Texto legal para PDF</label>
                 {{ form.texto_legal_pdf }}

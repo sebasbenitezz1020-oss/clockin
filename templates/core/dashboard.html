@@ -5,448 +5,550 @@
 
 {% block content %}
 <style>
-    .dash-page {
-        padding: 26px 0;
+    .dash-pro {
+        padding: 24px 0 34px;
     }
 
-    .dash-hero {
-        margin-bottom: 24px;
-    }
-
-    .dash-hero h2 {
-        margin: 0;
-        color: #fff;
-        font-size: 34px;
-        font-weight: 800;
-    }
-
-    .dash-hero p {
-        margin: 8px 0 0;
-        color: #94a3b8;
-    }
-
-    .dash-company-note {
-        margin-top: 10px;
-        font-weight: 700;
-    }
-
-    .dash-company-note.global {
-        color: #fcd34d;
-    }
-
-    .dash-company-note.empresa {
-        color: #93c5fd;
-    }
-
-    .dash-company-note.error {
-        color: #fca5a5;
-    }
-
-    .dash-stats {
-        display: grid;
-        grid-template-columns: repeat(5, 1fr);
-        gap: 16px;
-        margin-bottom: 24px;
-    }
-
-    .dash-stat {
+    .dash-hero-pro {
         position: relative;
-        background: linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
-        border: 1px solid rgba(255,255,255,.06);
-        border-radius: 22px;
-        padding: 22px;
-        box-shadow: 0 12px 36px rgba(0,0,0,.22);
         overflow: hidden;
+        border-radius: 30px;
+        padding: 28px;
+        margin-bottom: 22px;
+        background:
+            radial-gradient(circle at top right, var(--brand-soft), transparent 32%),
+            linear-gradient(135deg, rgba(19,24,34,.98), rgba(10,14,22,.98));
+        border: 1px solid rgba(255,255,255,.08);
+        box-shadow: 0 18px 50px rgba(0,0,0,.28);
     }
 
-    .dash-stat::before {
+    .dash-hero-pro::before {
         content: "";
         position: absolute;
         inset: 0 0 auto 0;
-        height: 3px;
+        height: 4px;
         background: linear-gradient(90deg, var(--brand-primary), var(--brand-primary-dark));
-        opacity: .95;
     }
 
-    .dash-stat .lab {
-        color: #94a3b8;
-        font-size: 14px;
-        margin-bottom: 10px;
-    }
-
-    .dash-stat .val {
-        color: #fff;
-        font-size: 40px;
-        font-weight: 800;
-        line-height: 1;
-    }
-
-    .dash-payroll {
-        display: grid;
-        grid-template-columns: repeat(3, 1fr);
-        gap: 16px;
-        margin-bottom: 24px;
-    }
-
-    .dash-payroll-card {
+    .dash-hero-row {
         position: relative;
-        background: linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
-        border: 1px solid rgba(255,255,255,.06);
-        border-radius: 22px;
-        padding: 20px;
-        box-shadow: 0 12px 36px rgba(0,0,0,.20);
-        overflow: hidden;
-    }
-
-    .dash-payroll-card::before {
-        content: "";
-        position: absolute;
-        inset: 0 0 auto 0;
-        height: 3px;
-        background: linear-gradient(90deg, var(--brand-primary), var(--brand-primary-dark));
-        opacity: .95;
-    }
-
-    .dash-payroll-card .top {
+        z-index: 1;
         display: flex;
-        align-items: center;
         justify-content: space-between;
-        margin-bottom: 12px;
+        align-items: flex-start;
+        gap: 18px;
+        flex-wrap: wrap;
     }
 
-    .dash-payroll-card .title {
-        color: #94a3b8;
-        font-size: 14px;
-        font-weight: 700;
-    }
-
-    .dash-payroll-card .icon {
-        width: 42px;
-        height: 42px;
-        border-radius: 14px;
+    .dash-kicker {
         display: inline-flex;
         align-items: center;
-        justify-content: center;
-        font-size: 22px;
-        background: var(--brand-soft);
-        border: 1px solid var(--brand-border);
-        box-shadow: 0 8px 20px var(--brand-shadow);
-    }
-
-    .dash-payroll-card .number {
-        color: #fff;
-        font-size: 30px;
-        font-weight: 800;
-        line-height: 1.2;
-    }
-
-    .bruto .icon,
-    .neto .icon,
-    .deudas .icon {
-        color: var(--brand-text-soft);
-    }
-
-    .dash-resumen {
-        display: grid;
-        grid-template-columns: repeat(4, 1fr);
-        gap: 16px;
-        margin-bottom: 24px;
-    }
-
-    .dash-resumen-card {
-        position: relative;
-        background: linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
-        border: 1px solid rgba(255,255,255,.06);
-        border-radius: 22px;
-        padding: 20px;
-        box-shadow: 0 12px 36px rgba(0,0,0,.20);
-        overflow: hidden;
-    }
-
-    .dash-resumen-card::before {
-        content: "";
-        position: absolute;
-        inset: 0 0 auto 0;
-        height: 3px;
-        background: linear-gradient(90deg, var(--brand-primary), var(--brand-primary-dark));
-        opacity: .95;
-    }
-
-    .dash-resumen-card .top {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 12px;
-        margin-bottom: 12px;
-    }
-
-    .dash-resumen-card .icon {
-        width: 42px;
-        height: 42px;
-        border-radius: 14px;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 21px;
-        background: var(--brand-soft);
-        border: 1px solid var(--brand-border);
-        color: var(--brand-text-soft);
-        box-shadow: 0 8px 20px var(--brand-shadow);
-    }
-
-    .dash-resumen-card .title {
-        color: #94a3b8;
-        font-size: 14px;
-        font-weight: 700;
-    }
-
-    .dash-resumen-card .number {
-        color: #fff;
-        font-size: 34px;
-        font-weight: 800;
-        line-height: 1;
-    }
-
-    .dash-grid {
-        display: grid;
-        grid-template-columns: 1.1fr .9fr;
-        gap: 20px;
-    }
-
-    .dash-card {
-        background: linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
-        border: 1px solid rgba(255,255,255,.06);
-        border-radius: 24px;
-        box-shadow: 0 12px 36px rgba(0,0,0,.22);
-        overflow: hidden;
-    }
-
-    .dash-card-header {
-        position: relative;
-        padding: 20px 22px 10px;
-    }
-
-    .dash-card-header::after {
-        content: "";
-        display: block;
-        width: 70px;
-        height: 3px;
-        margin-top: 12px;
+        gap: 8px;
+        padding: 8px 12px;
         border-radius: 999px;
-        background: linear-gradient(90deg, var(--brand-primary), var(--brand-primary-dark));
-        opacity: .95;
+        background: var(--brand-soft);
+        border: 1px solid var(--brand-border);
+        color: var(--brand-text-soft);
+        font-size: 12px;
+        font-weight: 900;
+        margin-bottom: 12px;
     }
 
-    .dash-card-header h3 {
+    .dash-hero-pro h2 {
         margin: 0;
         color: #fff;
-        font-size: 22px;
-        font-weight: 800;
+        font-size: 38px;
+        font-weight: 950;
+        letter-spacing: -.8px;
     }
 
-    .dash-card-header p {
-        margin: 8px 0 0;
+    .dash-hero-pro p {
+        margin: 9px 0 0;
         color: #94a3b8;
-        font-size: 14px;
+        font-size: 15px;
+    }
+
+    .dash-company-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 8px;
+        margin-top: 14px;
+        padding: 10px 14px;
+        border-radius: 999px;
+        background: rgba(255,255,255,.055);
+        border: 1px solid rgba(255,255,255,.08);
+        color: #e5e7eb;
+        font-weight: 850;
+        font-size: 13px;
+    }
+
+    .dash-date-box {
+        min-width: 210px;
+        border-radius: 22px;
+        padding: 16px;
+        background: rgba(255,255,255,.055);
+        border: 1px solid rgba(255,255,255,.08);
+        text-align: right;
+    }
+
+    .dash-date-box .label {
+        color: #94a3b8;
+        font-size: 12px;
+        font-weight: 800;
+        margin-bottom: 6px;
+    }
+
+    .dash-date-box .value {
+        color: #fff;
+        font-size: 22px;
+        font-weight: 950;
+    }
+
+    .dash-main-grid {
+        display: grid;
+        grid-template-columns: 1.25fr .75fr;
+        gap: 18px;
+        margin-bottom: 18px;
+    }
+
+    .dash-card-pro {
+        position: relative;
+        overflow: hidden;
+        background: linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
+        border: 1px solid rgba(255,255,255,.07);
+        border-radius: 26px;
+        box-shadow: 0 14px 42px rgba(0,0,0,.24);
+    }
+
+    .dash-card-pro::before {
+        content: "";
+        position: absolute;
+        inset: 0 0 auto 0;
+        height: 3px;
+        background: linear-gradient(90deg, var(--brand-primary), var(--brand-primary-dark));
+    }
+
+    .dash-card-head {
+        padding: 20px 22px 12px;
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 14px;
+    }
+
+    .dash-card-head h3 {
+        margin: 0;
+        color: #fff;
+        font-size: 20px;
+        font-weight: 950;
+    }
+
+    .dash-card-head p {
+        margin: 7px 0 0;
+        color: #94a3b8;
+        font-size: 13px;
     }
 
     .dash-card-body {
         padding: 0 22px 22px;
     }
 
-    .dash-table-wrap {
-        overflow-x: auto;
+    .dash-stats-pro {
+        display: grid;
+        grid-template-columns: repeat(5, 1fr);
+        gap: 14px;
+        margin-bottom: 18px;
     }
 
-    .dash-table {
-        width: 100%;
-        min-width: 980px;
-        border-collapse: separate;
-        border-spacing: 0 10px;
+    .dash-stat-pro {
+        position: relative;
+        overflow: hidden;
+        border-radius: 24px;
+        padding: 18px;
+        background: linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
+        border: 1px solid rgba(255,255,255,.07);
+        box-shadow: 0 12px 32px rgba(0,0,0,.22);
     }
 
-    .dash-table thead th {
-        color: #cdd6e1;
-        font-size: 13px;
-        font-weight: 700;
-        text-transform: uppercase;
-        letter-spacing: .4px;
-        padding: 0 14px 6px;
-        white-space: nowrap;
-    }
-
-    .dash-table tbody tr {
-        background: rgba(255,255,255,.02);
-        transition: .18s ease;
-    }
-
-    .dash-table tbody tr:hover {
-        background: var(--brand-soft);
-    }
-
-    .dash-table tbody td {
-        padding: 14px;
-        color: #f3f4f6;
-        border-top: 1px solid rgba(255,255,255,.04);
-        border-bottom: 1px solid rgba(255,255,255,.04);
-    }
-
-    .dash-table tbody td:first-child {
-        border-left: 1px solid rgba(255,255,255,.04);
-        border-top-left-radius: 16px;
-        border-bottom-left-radius: 16px;
-    }
-
-    .dash-table tbody td:last-child {
-        border-right: 1px solid rgba(255,255,255,.04);
-        border-top-right-radius: 16px;
-        border-bottom-right-radius: 16px;
-    }
-
-    .mini-list {
-        display: flex;
-        flex-direction: column;
-        gap: 12px;
-    }
-
-    .mini-item {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        gap: 12px;
-        padding: 14px 16px;
-        border-radius: 18px;
-        background: rgba(255,255,255,.03);
-        border: 1px solid rgba(255,255,255,.05);
-        transition: .18s ease;
-    }
-
-    .mini-item:hover {
-        background: var(--brand-soft);
-        border-color: var(--brand-border);
-    }
-
-    .mini-item strong {
-        color: #fff;
-        display: block;
-        margin-bottom: 4px;
-    }
-
-    .mini-item span {
-        color: #94a3b8;
-        font-size: 13px;
-    }
-
-    .badge-soft {
+    .dash-stat-pro .icon {
+        width: 42px;
+        height: 42px;
+        border-radius: 15px;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        padding: 7px 12px;
-        border-radius: 999px;
+        font-size: 21px;
+        margin-bottom: 14px;
+        background: var(--brand-soft);
+        border: 1px solid var(--brand-border);
+        color: var(--brand-text-soft);
+    }
+
+    .dash-stat-pro .lab {
+        color: #94a3b8;
         font-size: 12px;
-        font-weight: 700;
-        white-space: nowrap;
-        border: 1px solid transparent;
+        font-weight: 850;
+        margin-bottom: 7px;
+    }
+
+    .dash-stat-pro .val {
+        color: #fff;
+        font-size: 32px;
+        font-weight: 950;
+        line-height: 1;
+    }
+
+    .dash-payroll-pro {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 14px;
+        margin-bottom: 18px;
+    }
+
+    .dash-money-card {
+        border-radius: 24px;
+        padding: 18px;
+        background: linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
+        border: 1px solid rgba(255,255,255,.07);
+        box-shadow: 0 12px 32px rgba(0,0,0,.22);
+    }
+
+    .dash-money-card .top {
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:12px;
+        margin-bottom: 12px;
+    }
+
+    .dash-money-card .title {
+        color:#94a3b8;
+        font-size:13px;
+        font-weight:850;
+    }
+
+    .dash-money-card .icon {
+        width:40px;
+        height:40px;
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        border-radius:14px;
+        background:var(--brand-soft);
+        border:1px solid var(--brand-border);
+    }
+
+    .dash-money-card .number {
+        color:#fff;
+        font-size:25px;
+        font-weight:950;
+    }
+
+    .dash-ring-wrap {
+        display:grid;
+        grid-template-columns: 170px 1fr;
+        gap: 18px;
+        align-items:center;
+    }
+
+    .dash-progress-card {
+        padding: 22px;
+        border-radius: 22px;
+        background: rgba(255,255,255,.035);
+        border: 1px solid rgba(255,255,255,.06);
+    }
+
+    .dash-progress-card strong {
+        display: block;
+        color: #fff;
+        font-size: 34px;
+        font-weight: 950;
+    }
+
+    .dash-progress-card span {
+        display: block;
+        color: #94a3b8;
+        font-size: 13px;
+        margin-top: 4px;
+    }
+
+    .dash-progress {
+        margin-top: 16px;
+        height: 12px;
+        border-radius: 999px;
+        background: rgba(255,255,255,.08);
+        overflow: hidden;
+    }
+
+    .dash-progress-fill {
+        height: 100%;
+        width: 0%;
+        border-radius: 999px;
+        background: linear-gradient(90deg, var(--brand-primary), var(--brand-primary-dark));
+        transition: width .35s ease;
+    }
+
+    .dash-status-list {
+        display:flex;
+        flex-direction:column;
+        gap:10px;
+    }
+
+    .dash-status-row {
+        display:flex;
+        justify-content:space-between;
+        align-items:center;
+        gap:12px;
+        padding:12px 14px;
+        border-radius:16px;
+        background:rgba(255,255,255,.035);
+        border:1px solid rgba(255,255,255,.06);
+    }
+
+    .dash-status-row span {
+        color:#cbd5e1;
+        font-size:13px;
+        font-weight:800;
+    }
+
+    .dash-status-row strong {
+        color:#fff;
+        font-size:16px;
+        font-weight:950;
+    }
+
+    .dash-quick-grid {
+        display:grid;
+        grid-template-columns: repeat(2, 1fr);
+        gap:10px;
+    }
+
+    .dash-quick {
+        text-decoration:none;
+        color:#e5e7eb;
+        padding:14px;
+        border-radius:18px;
+        background:rgba(255,255,255,.035);
+        border:1px solid rgba(255,255,255,.06);
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:12px;
+        font-weight:900;
+        transition:.18s ease;
+    }
+
+    .dash-quick:hover {
+        color:#fff;
+        background:var(--brand-soft);
+        border-color:var(--brand-border);
+        transform:translateY(-1px);
+    }
+
+    .dash-table-wrap {
+        overflow-x:auto;
+    }
+
+    .dash-table-pro {
+        width:100%;
+        min-width:980px;
+        border-collapse:separate;
+        border-spacing:0 10px;
+    }
+
+    .dash-table-pro th {
+        color:#cbd5e1;
+        font-size:12px;
+        text-transform:uppercase;
+        letter-spacing:.4px;
+        padding:0 12px 4px;
+        white-space:nowrap;
+    }
+
+    .dash-table-pro td {
+        padding:13px 12px;
+        color:#f8fafc;
+        background:rgba(255,255,255,.025);
+        border-top:1px solid rgba(255,255,255,.045);
+        border-bottom:1px solid rgba(255,255,255,.045);
+    }
+
+    .dash-table-pro td:first-child {
+        border-left:1px solid rgba(255,255,255,.045);
+        border-radius:16px 0 0 16px;
+    }
+
+    .dash-table-pro td:last-child {
+        border-right:1px solid rgba(255,255,255,.045);
+        border-radius:0 16px 16px 0;
+    }
+
+    .dash-table-pro tr:hover td {
+        background:var(--brand-soft);
+    }
+
+    .dash-mini-list {
+        display:flex;
+        flex-direction:column;
+        gap:11px;
+    }
+
+    .dash-mini-item {
+        display:flex;
+        align-items:center;
+        justify-content:space-between;
+        gap:12px;
+        padding:13px 14px;
+        border-radius:18px;
+        background:rgba(255,255,255,.035);
+        border:1px solid rgba(255,255,255,.06);
+    }
+
+    .dash-mini-item strong {
+        color:#fff;
+        display:block;
+        margin-bottom:3px;
+    }
+
+    .dash-mini-item small {
+        color:#94a3b8;
+    }
+
+    .badge-soft {
+        display:inline-flex;
+        align-items:center;
+        justify-content:center;
+        padding:7px 11px;
+        border-radius:999px;
+        font-size:12px;
+        font-weight:900;
+        white-space:nowrap;
+        border:1px solid transparent;
     }
 
     .badge-ok {
-        background: var(--brand-soft);
-        color: var(--brand-text-soft);
-        border-color: var(--brand-border);
+        background:var(--brand-soft);
+        color:var(--brand-text-soft);
+        border-color:var(--brand-border);
     }
 
     .badge-tarde {
-        background: rgba(239,68,68,.12);
-        color: #fca5a5;
-        border-color: rgba(239,68,68,.24);
+        background:rgba(239,68,68,.13);
+        color:#fca5a5;
+        border-color:rgba(239,68,68,.26);
     }
 
     .badge-almuerzo {
-        background: rgba(245,158,11,.12);
-        color: #fcd34d;
-        border-color: rgba(245,158,11,.22);
+        background:rgba(245,158,11,.13);
+        color:#fde68a;
+        border-color:rgba(245,158,11,.24);
     }
 
     .badge-finalizado {
-        background: rgba(59,130,246,.12);
-        color: #93c5fd;
-        border-color: rgba(59,130,246,.24);
+        background:rgba(59,130,246,.13);
+        color:#93c5fd;
+        border-color:rgba(59,130,246,.24);
     }
 
     .muted {
-        color: #94a3b8;
+        color:#94a3b8;
     }
 
     .dash-empty {
-        background: linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
-        border: 1px solid rgba(255,255,255,.06);
-        border-radius: 24px;
-        padding: 28px;
-        color: #cbd5e1;
-        box-shadow: 0 12px 36px rgba(0,0,0,.22);
+        padding:28px;
+        border-radius:26px;
+        background:linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
+        border:1px solid rgba(255,255,255,.07);
+        color:#cbd5e1;
+        box-shadow:0 12px 36px rgba(0,0,0,.22);
     }
 
-    @media (max-width: 1100px) {
-        .dash-stats,
-        .dash-payroll,
-        .dash-resumen {
-            grid-template-columns: repeat(2, 1fr);
+    @media(max-width:1200px) {
+        .dash-stats-pro {
+            grid-template-columns:repeat(2, 1fr);
         }
-
-        .dash-grid {
-            grid-template-columns: 1fr;
+        .dash-main-grid {
+            grid-template-columns:1fr;
+        }
+        .dash-payroll-pro {
+            grid-template-columns:1fr;
         }
     }
 
-    @media (max-width: 640px) {
-        .dash-stats,
-        .dash-payroll,
-        .dash-resumen {
-            grid-template-columns: 1fr;
+    @media(max-width:700px) {
+        .dash-hero-pro h2 {
+            font-size:30px;
+        }
+        .dash-stats-pro,
+        .dash-quick-grid {
+            grid-template-columns:1fr;
+        }
+        .dash-ring-wrap {
+            grid-template-columns:1fr;
+        }
+        .dash-date-box {
+            text-align:left;
+            width:100%;
         }
     }
 </style>
 
-<div class="container-fluid dash-page">
-    <div class="dash-hero">
-        <h2>📊 Dashboard General</h2>
-        <p>Resumen en tiempo real de ClockIn para el día {{ hoy|date:"d/m/Y" }}.</p>
+<div class="container-fluid dash-pro">
 
-        {% if es_admin_master %}
-            <p class="dash-company-note global">🌐 Vista global de todas las empresas.</p>
-        {% elif empresa_usuario %}
-            <p class="dash-company-note empresa">🏢 Empresa actual: {{ empresa_usuario.nombre }}</p>
-        {% else %}
-            <p class="dash-company-note error">⚠ Tu usuario aún no tiene empresa asignada.</p>
-        {% endif %}
+    <div class="dash-hero-pro">
+        <div class="dash-hero-row">
+            <div>
+                <div class="dash-kicker">⚡ ClockIn PRO · Panel Ejecutivo</div>
+                <h2>Dashboard General</h2>
+                <p>Control operativo en tiempo real para el día {{ hoy|date:"d/m/Y" }}.</p>
+
+                {% if es_admin_master %}
+                    <div class="dash-company-pill">🌐 Vista global de todas las empresas</div>
+                {% elif empresa_usuario %}
+                    <div class="dash-company-pill">🏢 Empresa actual: {{ empresa_usuario.nombre }}</div>
+                {% else %}
+                    <div class="dash-company-pill">⚠ Usuario sin empresa asignada</div>
+                {% endif %}
+            </div>
+
+            <div class="dash-date-box">
+                <div class="label">Fecha operativa</div>
+                <div class="value">{{ hoy|date:"d/m/Y" }}</div>
+            </div>
+        </div>
     </div>
 
     {% if perm_funcionarios or perm_asistencia or perm_nomina or perm_deudas %}
-    <div class="dash-stats">
+    <div class="dash-stats-pro">
         {% if perm_funcionarios %}
-        <div class="dash-stat">
+        <div class="dash-stat-pro">
+            <div class="icon">👥</div>
             <div class="lab">Funcionarios activos</div>
             <div class="val">{{ total_funcionarios }}</div>
         </div>
         {% endif %}
 
         {% if perm_asistencia %}
-        <div class="dash-stat">
+        <div class="dash-stat-pro">
+            <div class="icon">✅</div>
             <div class="lab">Presentes hoy</div>
             <div class="val">{{ presentes_hoy }}</div>
         </div>
 
-        <div class="dash-stat">
+        <div class="dash-stat-pro">
+            <div class="icon">⏰</div>
             <div class="lab">Llegadas tarde</div>
             <div class="val">{{ llegadas_tarde_hoy }}</div>
         </div>
 
-        <div class="dash-stat">
+        <div class="dash-stat-pro">
+            <div class="icon">🚪</div>
             <div class="lab">Salidas registradas</div>
             <div class="val">{{ salidas_hoy }}</div>
         </div>
 
-        <div class="dash-stat">
+        <div class="dash-stat-pro">
+            <div class="icon">⏳</div>
             <div class="lab">Pendientes hoy</div>
             <div class="val">{{ pendientes_hoy }}</div>
         </div>
@@ -455,19 +557,19 @@
     {% endif %}
 
     {% if perm_nomina or perm_deudas %}
-    <div class="dash-payroll">
+    <div class="dash-payroll-pro">
         {% if perm_nomina %}
-        <div class="dash-payroll-card bruto">
+        <div class="dash-money-card">
             <div class="top">
-                <div class="title">Total Salario Bruto</div>
+                <div class="title">Total salario bruto estimado</div>
                 <div class="icon">💼</div>
             </div>
             <div class="number">{{ total_salario_bruto|guaranies }}</div>
         </div>
 
-        <div class="dash-payroll-card neto">
+        <div class="dash-money-card">
             <div class="top">
-                <div class="title">Total Salario Neto</div>
+                <div class="title">Total salario neto estimado</div>
                 <div class="icon">💵</div>
             </div>
             <div class="number">{{ total_salario_neto|guaranies }}</div>
@@ -475,9 +577,9 @@
         {% endif %}
 
         {% if perm_deudas %}
-        <div class="dash-payroll-card deudas">
+        <div class="dash-money-card">
             <div class="top">
-                <div class="title">Total Deudas Funcionarios</div>
+                <div class="title">Deudas activas de funcionarios</div>
                 <div class="icon">💳</div>
             </div>
             <div class="number">{{ total_deudas_funcionarios|guaranies }}</div>
@@ -486,54 +588,113 @@
     </div>
     {% endif %}
 
-    {% if perm_asistencia %}
-    <div class="dash-resumen">
-        <div class="dash-resumen-card trabajando">
-            <div class="top">
-                <div class="title">Trabajando</div>
-                <div class="icon">🟢</div>
-            </div>
-            <div class="number">{{ trabajando_hoy }}</div>
-        </div>
+    {% if perm_asistencia or perm_funcionarios %}
+    <div class="dash-main-grid">
 
-        <div class="dash-resumen-card almuerzo">
-            <div class="top">
-                <div class="title">En almuerzo</div>
-                <div class="icon">🍽️</div>
+        {% if perm_asistencia %}
+        <div class="dash-card-pro">
+            <div class="dash-card-head">
+                <div>
+                    <h3>📈 Estado operativo del día</h3>
+                    <p>Resumen visual de asistencia, jornada y pendientes.</p>
+                </div>
             </div>
-            <div class="number">{{ en_almuerzo_hoy }}</div>
-        </div>
 
-        <div class="dash-resumen-card finalizados">
-            <div class="top">
-                <div class="title">Finalizados</div>
-                <div class="icon">🏁</div>
-            </div>
-            <div class="number">{{ finalizados_hoy }}</div>
-        </div>
+            <div class="dash-card-body">
+                {% widthratio presentes_hoy total_funcionarios 100 as porcentaje_asistencia %}
 
-        <div class="dash-resumen-card pendientes">
-            <div class="top">
-                <div class="title">Pendientes</div>
-                <div class="icon">⏳</div>
+                <div class="dash-ring-wrap">
+                    <div class="dash-progress-card">
+                        <strong>{{ porcentaje_asistencia }}%</strong>
+                        <span>asistencia del día</span>
+
+                        <div class="dash-progress">
+                            <div class="dash-progress-fill" data-progress="{{ porcentaje_asistencia }}"></div>
+                        </div>
+                    </div>
+
+                    <div class="dash-status-list">
+                        <div class="dash-status-row">
+                            <span>🟢 Trabajando</span>
+                            <strong>{{ trabajando_hoy }}</strong>
+                        </div>
+                        <div class="dash-status-row">
+                            <span>🍽️ En almuerzo</span>
+                            <strong>{{ en_almuerzo_hoy }}</strong>
+                        </div>
+                        <div class="dash-status-row">
+                            <span>🏁 Finalizados</span>
+                            <strong>{{ finalizados_hoy }}</strong>
+                        </div>
+                        <div class="dash-status-row">
+                            <span>⚠ Requieren atención</span>
+                            <strong>{{ llegadas_tarde_hoy|add:pendientes_hoy }}</strong>
+                        </div>
+                    </div>
+                </div>
             </div>
-            <div class="number">{{ pendientes_hoy }}</div>
+        </div>
+        {% endif %}
+
+        <div class="dash-card-pro">
+            <div class="dash-card-head">
+                <div>
+                    <h3>🚀 Accesos rápidos</h3>
+                    <p>Atajos operativos principales.</p>
+                </div>
+            </div>
+
+            <div class="dash-card-body">
+                <div class="dash-quick-grid">
+                    {% if perm_asistencia %}
+                    <a href="{% url 'asistencia_marcar' %}" class="dash-quick">🕘 Asistencia <span>→</span></a>
+                    {% endif %}
+
+                    {% if perm_funcionarios %}
+                    <a href="{% url 'funcionarios_lista' %}" class="dash-quick">👥 Funcionarios <span>→</span></a>
+                    {% endif %}
+
+                    {% if perm_nomina %}
+                    <a href="{% url 'nomina_lista' %}" class="dash-quick">💰 Nómina <span>→</span></a>
+                    {% endif %}
+
+                    {% if perm_reportes %}
+                    <a href="{% url 'reportes' %}" class="dash-quick">📊 Reportes <span>→</span></a>
+                    {% endif %}
+
+                    {% if perm_icl %}
+                    <a href="{% url 'icl_lista' %}" class="dash-quick">🏆 ICL <span>→</span></a>
+                    {% endif %}
+
+                    {% if perm_dias_libres %}
+                    <a href="{% url 'dias_libres_lista' %}" class="dash-quick">🗓️ Días libres <span>→</span></a>
+                    {% endif %}
+
+                    {% if perm_liquidacion %}
+                    <a href="{% url 'liquidaciones_lista' %}" class="dash-quick">📄 Liquidación <span>→</span></a>
+                    {% endif %}
+
+                    {% if perm_banco_horas %}
+                    <a href="{% url 'banco_horas_lista' %}" class="dash-quick">⏱️ Banco horas <span>→</span></a>
+                    {% endif %}
+                </div>
+            </div>
         </div>
     </div>
-    {% endif %}
 
-    {% if perm_asistencia or perm_funcionarios %}
-    <div class="dash-grid">
+    <div class="dash-main-grid">
         {% if perm_asistencia %}
-        <div class="dash-card">
-            <div class="dash-card-header">
-                <h3>🕘 Últimas marcaciones</h3>
-                <p>Detalle en tiempo real de las asistencias del día.</p>
+        <div class="dash-card-pro">
+            <div class="dash-card-head">
+                <div>
+                    <h3>🕘 Últimas marcaciones</h3>
+                    <p>Actividad reciente registrada en el día.</p>
+                </div>
             </div>
 
             <div class="dash-card-body">
                 <div class="dash-table-wrap">
-                    <table class="dash-table">
+                    <table class="dash-table-pro">
                         <thead>
                             <tr>
                                 <th>Funcionario</th>
@@ -550,13 +711,7 @@
                             {% for a in ultimas_marcaciones %}
                             <tr>
                                 <td>{{ a.funcionario.nombre_completo }}</td>
-                                <td>
-                                    {% if a.funcionario.turno %}
-                                        {{ a.funcionario.turno.nombre }}
-                                    {% else %}
-                                        -
-                                    {% endif %}
-                                </td>
+                                <td>{% if a.funcionario.turno %}{{ a.funcionario.turno.nombre }}{% else %}-{% endif %}</td>
                                 <td>{% if a.hora_entrada %}{{ a.hora_entrada|time:"H:i:s" }}{% else %}<span class="muted">—</span>{% endif %}</td>
                                 <td>{% if a.hora_salida_almuerzo %}{{ a.hora_salida_almuerzo|time:"H:i:s" }}{% else %}<span class="muted">—</span>{% endif %}</td>
                                 <td>{% if a.hora_regreso_almuerzo %}{{ a.hora_regreso_almuerzo|time:"H:i:s" }}{% else %}<span class="muted">—</span>{% endif %}</td>
@@ -587,31 +742,33 @@
         {% endif %}
 
         {% if perm_funcionarios %}
-        <div class="dash-card">
-            <div class="dash-card-header">
-                <h3>👥 Funcionarios recientes</h3>
-                <p>Últimos funcionarios cargados en el sistema.</p>
+        <div class="dash-card-pro">
+            <div class="dash-card-head">
+                <div>
+                    <h3>👥 Funcionarios recientes</h3>
+                    <p>Últimos registros cargados.</p>
+                </div>
             </div>
 
             <div class="dash-card-body">
-                <div class="mini-list">
+                <div class="dash-mini-list">
                     {% for funcionario in funcionarios_recientes %}
-                        <div class="mini-item">
-                            <div>
-                                <strong>{{ funcionario.nombre_completo }}</strong>
-                                <span>
-                                    {{ funcionario.cargo|default:"Sin cargo" }}
-                                    {% if funcionario.sucursal_mostrar %}
-                                        | {{ funcionario.sucursal_mostrar }}
-                                    {% endif %}
-                                </span>
-                            </div>
-                            {% if funcionario.activo %}
-                                <span class="badge-soft badge-ok">Activo</span>
-                            {% else %}
-                                <span class="badge-soft badge-tarde">Inactivo</span>
-                            {% endif %}
+                    <div class="dash-mini-item">
+                        <div>
+                            <strong>{{ funcionario.nombre_completo }}</strong>
+                            <small>
+                                {{ funcionario.cargo|default:"Sin cargo" }}
+                                {% if funcionario.sucursal_mostrar %}
+                                    · {{ funcionario.sucursal_mostrar }}
+                                {% endif %}
+                            </small>
                         </div>
+                        {% if funcionario.activo %}
+                            <span class="badge-soft badge-ok">Activo</span>
+                        {% else %}
+                            <span class="badge-soft badge-tarde">Inactivo</span>
+                        {% endif %}
+                    </div>
                     {% empty %}
                         <div class="muted">No hay funcionarios recientes.</div>
                     {% endfor %}
@@ -620,11 +777,22 @@
         </div>
         {% endif %}
     </div>
+
     {% else %}
     <div class="dash-empty">
-        Bienvenido al sistema. Tu cuenta ya inició correctamente, pero no tienes paneles visibles en el Dashboard todavía.
+        Bienvenido al sistema. Tu cuenta inició correctamente, pero aún no tienes paneles visibles en el Dashboard.
         Pide al administrador que te habilite permisos para los módulos que vas a utilizar.
     </div>
     {% endif %}
 </div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll(".dash-progress-fill").forEach(function (bar) {
+        const value = parseInt(bar.dataset.progress || "0", 10);
+        const safeValue = Math.max(0, Math.min(100, value));
+        bar.style.width = safeValue + "%";
+    });
+});
+</script>
 {% endblock %}

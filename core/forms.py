@@ -75,6 +75,9 @@ class EmpresaForm(forms.ModelForm):
             "logo",
             "texto_legal_pdf",
             "activo",
+            "firma_gerente",
+            "nombre_gerente",
+            "cargo_gerente",
         ]
         widgets = {
             "nombre": forms.TextInput(attrs={"class": "form-control"}),
@@ -85,6 +88,8 @@ class EmpresaForm(forms.ModelForm):
             "logo": forms.ClearableFileInput(attrs={"class": "form-control"}),
             "texto_legal_pdf": forms.Textarea(attrs={"class": "form-control", "rows": 4}),
             "activo": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "nombre_gerente": forms.TextInput(attrs={"class": "form-control"}),
+            "cargo_gerente": forms.TextInput(attrs={"class": "form-control"}),
         }
 
 

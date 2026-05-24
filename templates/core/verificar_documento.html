@@ -1,0 +1,154 @@
+{% extends "base.html" %}
+
+{% block title %}Verificación de Documento | ClockIn{% endblock %}
+
+{% block content %}
+<style>
+    .verify-wrap {
+        max-width: 760px;
+        margin: 40px auto;
+    }
+
+    .verify-card {
+        background: linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
+        border: 1px solid rgba(255,255,255,.08);
+        border-radius: 28px;
+        padding: 28px;
+        box-shadow: 0 18px 50px rgba(0,0,0,.28);
+    }
+
+    .verify-ok {
+        display: inline-flex;
+        padding: 8px 14px;
+        border-radius: 999px;
+        background: rgba(34,197,94,.14);
+        color: #bbf7d0;
+        border: 1px solid rgba(34,197,94,.24);
+        font-weight: 900;
+        margin-bottom: 18px;
+    }
+
+    .verify-bad {
+        display: inline-flex;
+        padding: 8px 14px;
+        border-radius: 999px;
+        background: rgba(239,68,68,.14);
+        color: #fecaca;
+        border: 1px solid rgba(239,68,68,.24);
+        font-weight: 900;
+        margin-bottom: 18px;
+    }
+
+    .verify-card h2 {
+        margin: 0 0 8px;
+        color: #fff;
+        font-size: 30px;
+        font-weight: 950;
+    }
+
+    .verify-card p {
+        color: #94a3b8;
+        margin-bottom: 20px;
+    }
+
+    .verify-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0 8px;
+    }
+
+    .verify-table td {
+        padding: 12px 14px;
+        background: rgba(255,255,255,.035);
+        color: #e5e7eb;
+        border-top: 1px solid rgba(255,255,255,.05);
+        border-bottom: 1px solid rgba(255,255,255,.05);
+    }
+
+    .verify-table td:first-child {
+        width: 230px;
+        color: #93c5fd;
+        font-weight: 900;
+        border-radius: 14px 0 0 14px;
+        border-left: 1px solid rgba(255,255,255,.05);
+    }
+
+    .verify-table td:last-child {
+        border-radius: 0 14px 14px 0;
+        border-right: 1px solid rgba(255,255,255,.05);
+    }
+</style>
+
+<div class="verify-wrap">
+    <div class="verify-card">
+
+        {% if documento.valido %}
+            <div class="verify-ok">✅ Documento válido</div>
+        {% else %}
+            <div class="verify-bad">❌ Documento anulado / no válido</div>
+        {% endif %}
+
+        <h2>Verificación ClockIn</h2>
+        <p>Este documento fue generado internamente por ClockIn y posee código único de validación.</p>
+
+        <table class="verify-table">
+            <tr>
+                <td>Código</td>
+                <td>{{ documento.codigo }}</td>
+            </tr>
+
+            <tr>
+                <td>Empresa</td>
+                <td>{{ documento.empresa.nombre }}</td>
+            </tr>
+
+            <tr>
+                <td>Tipo de documento</td>
+                <td>{{ documento.tipo_documento }}</td>
+            </tr>
+
+            <tr>
+                <td>Título</td>
+                <td>{{ documento.titulo }}</td>
+            </tr>
+
+            <tr>
+                <td>Funcionario</td>
+                <td>
+                    {% if documento.funcionario %}
+                        {{ documento.funcionario.nombre_completo }} - CI {{ documento.funcionario.cedula }}
+                    {% else %}
+                        -
+                    {% endif %}
+                </td>
+            </tr>
+
+            <tr>
+                <td>Firmado por</td>
+                <td>{{ documento.firmado_por_nombre }} - {{ documento.firmado_por_cargo }}</td>
+            </tr>
+
+            <tr>
+                <td>Emitido por</td>
+                <td>
+                    {% if documento.emitido_por %}
+                        {{ documento.emitido_por.get_full_name|default:documento.emitido_por.username }}
+                    {% else %}
+                        Sistema
+                    {% endif %}
+                </td>
+            </tr>
+
+            <tr>
+                <td>Fecha de emisión</td>
+                <td>{{ documento.emitido_en|date:"d/m/Y H:i" }}</td>
+            </tr>
+
+            <tr>
+                <td>Hash interno</td>
+                <td>{{ documento.hash_documento }}</td>
+            </tr>
+        </table>
+    </div>
+</div>
+{% endblock %}

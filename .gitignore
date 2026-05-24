@@ -1,3 +1,13 @@
 db.sqlite3
 __pycache__/
 *.pyc
+
+venv310/
+.venv/
+
+.env
+
+media/
+staticfiles/
+
+.vscode/
