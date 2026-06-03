@@ -12,6 +12,10 @@ from .models import (
     DiaLibre,
     ComunicacionLaboral,
     PlanillaBancaria,
+    DocumentoFuncionario,
+    HistorialLaboralFuncionario,
+    ConductaFuncionario,
+    HistorialSalarialFuncionario,
 )
 
 from django import forms
@@ -400,6 +404,22 @@ class FuncionarioForm(forms.ModelForm):
             "numero_cuenta",
             "fecha_ingreso",
             "foto",
+            "direccion",
+            "ciudad",
+            "departamento",
+            "telefono",
+            "correo",
+            "fecha_nacimiento",
+            "nacionalidad",
+            "estado_civil",
+            "contacto_emergencia_nombre",
+            "contacto_emergencia_parentesco",
+            "contacto_emergencia_telefono",
+            "tipo_sangre",
+            "alergias",
+            "enfermedad_importante",
+            "medicacion_actual",
+            "seguro_medico",
             "activo",
         ]
         widgets = {
@@ -416,6 +436,24 @@ class FuncionarioForm(forms.ModelForm):
             "tipo_cuenta": forms.Select(attrs={"class": "form-control"}),
             "numero_cuenta": forms.TextInput(attrs={"class": "form-control"}),
             "foto": forms.ClearableFileInput(attrs={"class": "form-control"}),
+            "direccion": forms.TextInput(attrs={"class": "form-control"}),
+            "ciudad": forms.TextInput(attrs={"class": "form-control"}),
+            "departamento": forms.TextInput(attrs={"class": "form-control"}),
+            "telefono": forms.TextInput(attrs={"class": "form-control"}),
+            "correo": forms.EmailInput(attrs={"class": "form-control"}),
+            "fecha_nacimiento": forms.DateInput(attrs={"type": "date", "class": "form-control"}),
+            "nacionalidad": forms.TextInput(attrs={"class": "form-control"}),
+            "estado_civil": forms.TextInput(attrs={"class": "form-control"}),
+
+            "contacto_emergencia_nombre": forms.TextInput(attrs={"class": "form-control"}),
+            "contacto_emergencia_parentesco": forms.TextInput(attrs={"class": "form-control"}),
+            "contacto_emergencia_telefono": forms.TextInput(attrs={"class": "form-control"}),
+
+            "tipo_sangre": forms.TextInput(attrs={"class": "form-control", "placeholder": "Ej: O+, A-, B+"}),
+            "alergias": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+            "enfermedad_importante": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+            "medicacion_actual": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+            "seguro_medico": forms.TextInput(attrs={"class": "form-control"}),
             "activo": forms.CheckboxInput(attrs={"class": "form-check-input"}),
         }
         labels = {
@@ -1007,3 +1045,84 @@ class BancoHorasOtorgarForm(forms.Form):
             "rows": 3,
         })
     )
+
+class DocumentoFuncionarioForm(forms.ModelForm):
+    class Meta:
+        model = DocumentoFuncionario
+        fields = ["tipo", "titulo", "archivo", "observacion", "activo"]
+        widgets = {
+            "tipo": forms.Select(attrs={"class": "form-control"}),
+            "titulo": forms.TextInput(attrs={"class": "form-control"}),
+            "archivo": forms.ClearableFileInput(attrs={"class": "form-control"}),
+            "observacion": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+            "activo": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        }
+
+
+class HistorialLaboralFuncionarioForm(forms.ModelForm):
+    fecha = forms.DateField(
+        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"})
+    )
+
+    class Meta:
+        model = HistorialLaboralFuncionario
+        fields = ["fecha", "tipo", "titulo", "descripcion", "adjunto"]
+        widgets = {
+            "tipo": forms.Select(attrs={"class": "form-control"}),
+            "titulo": forms.TextInput(attrs={"class": "form-control"}),
+            "descripcion": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+            "adjunto": forms.ClearableFileInput(attrs={"class": "form-control"}),
+        }
+
+
+class ConductaFuncionarioForm(forms.ModelForm):
+    fecha = forms.DateField(
+        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"})
+    )
+
+    class Meta:
+        model = ConductaFuncionario
+        fields = ["fecha", "tipo", "titulo", "descripcion", "adjunto"]
+        widgets = {
+            "tipo": forms.Select(attrs={"class": "form-control"}),
+            "titulo": forms.TextInput(attrs={"class": "form-control"}),
+            "descripcion": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+            "adjunto": forms.ClearableFileInput(attrs={"class": "form-control"}),
+        }
+
+
+class HistorialSalarialFuncionarioForm(forms.ModelForm):
+    fecha = forms.DateField(
+        widget=forms.DateInput(attrs={"type": "date", "class": "form-control"})
+    )
+
+    class Meta:
+        model = HistorialSalarialFuncionario
+        fields = [
+            "fecha",
+            "salario_anterior",
+            "salario_nuevo",
+            "bono_anterior",
+            "bono_nuevo",
+            "motivo",
+            "observacion",
+        ]
+        widgets = {
+            "salario_anterior": forms.TextInput(attrs={
+                "class": "form-control money-mask"
+            }),
+
+            "salario_nuevo": forms.TextInput(attrs={
+                "class": "form-control money-mask"
+            }),
+
+            "bono_anterior": forms.TextInput(attrs={
+                "class": "form-control money-mask"
+            }),
+
+            "bono_nuevo": forms.TextInput(attrs={
+                "class": "form-control money-mask"
+            }),
+            "motivo": forms.TextInput(attrs={"class": "form-control"}),
+            "observacion": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+        }

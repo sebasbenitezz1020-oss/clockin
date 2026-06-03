@@ -22,6 +22,11 @@ from .views import (
     nomina_toggle_pagado,
 
     funcionarios_lista,
+    funcionario_detalle,
+    funcionario_documento_agregar,
+    funcionario_historial_laboral_agregar,
+    funcionario_conducta_agregar,
+    funcionario_historial_salarial_agregar,
     funcionario_nuevo,
     funcionario_editar,
     funcionario_toggle_activo,
@@ -44,6 +49,8 @@ from .views import (
 
     icl_lista,
     reportes,
+    reporte_diario_pdf,
+    reporte_mensual_pdf,
     historial_lista,
     configuracion_general,
 
@@ -118,6 +125,11 @@ urlpatterns = [
     path("aguinaldo/<int:pk>/pdf/", aguinaldo_pdf, name="aguinaldo_pdf"),
 
     path("funcionarios/", funcionarios_lista, name="funcionarios_lista"),
+    path("funcionarios/<int:pk>/", funcionario_detalle, name="funcionario_detalle"),
+    path("funcionarios/<int:pk>/documento/agregar/", funcionario_documento_agregar, name="funcionario_documento_agregar"),
+    path("funcionarios/<int:pk>/historial-laboral/agregar/", funcionario_historial_laboral_agregar, name="funcionario_historial_laboral_agregar"),
+    path("funcionarios/<int:pk>/conducta/agregar/", funcionario_conducta_agregar, name="funcionario_conducta_agregar"),
+    path("funcionarios/<int:pk>/historial-salarial/agregar/", funcionario_historial_salarial_agregar, name="funcionario_historial_salarial_agregar"),
     path("funcionarios/nuevo/", funcionario_nuevo, name="funcionario_nuevo"),
     path("funcionarios/<int:pk>/editar/", funcionario_editar, name="funcionario_editar"),
     path("funcionarios/<int:pk>/toggle-activo/", funcionario_toggle_activo, name="funcionario_toggle_activo"),
@@ -141,6 +153,8 @@ urlpatterns = [
 
     path("icl/", icl_lista, name="icl_lista"),
     path("reportes/", reportes, name="reportes"),
+    path("reportes/diario/pdf/", reporte_diario_pdf, name="reporte_diario_pdf"),
+    path("reportes/mensual/pdf/", reporte_mensual_pdf, name="reporte_mensual_pdf"),
     path("historial/", historial_lista, name="historial_lista"),
     path("configuracion/", configuracion_general, name="configuracion_general"),
 

@@ -439,6 +439,25 @@ class Funcionario(models.Model):
     fecha_ingreso = models.DateField(null=True, blank=True)
     foto = models.ImageField(upload_to="funcionarios/", null=True, blank=True)
 
+    direccion = models.CharField(max_length=255, blank=True, default="")
+    ciudad = models.CharField(max_length=120, blank=True, default="")
+    departamento = models.CharField(max_length=120, blank=True, default="")
+    telefono = models.CharField(max_length=50, blank=True, default="")
+    correo = models.EmailField(blank=True, default="")
+    fecha_nacimiento = models.DateField(null=True, blank=True)
+    nacionalidad = models.CharField(max_length=100, blank=True, default="")
+    estado_civil = models.CharField(max_length=80, blank=True, default="")
+
+    contacto_emergencia_nombre = models.CharField(max_length=150, blank=True, default="")
+    contacto_emergencia_parentesco = models.CharField(max_length=100, blank=True, default="")
+    contacto_emergencia_telefono = models.CharField(max_length=50, blank=True, default="")
+
+    tipo_sangre = models.CharField(max_length=20, blank=True, default="")
+    alergias = models.TextField(blank=True, default="")
+    enfermedad_importante = models.TextField(blank=True, default="")
+    medicacion_actual = models.TextField(blank=True, default="")
+    seguro_medico = models.CharField(max_length=150, blank=True, default="")
+
     activo = models.BooleanField(default=True)
     creado_en = models.DateTimeField(auto_now_add=True)
     actualizado_en = models.DateTimeField(auto_now=True)
@@ -552,6 +571,156 @@ class Funcionario(models.Model):
         if neto < 0:
             return Decimal("0.00")
         return neto.quantize(Decimal("0.01"))
+    
+class DocumentoFuncionario(models.Model):
+    class Tipos(models.TextChoices):
+        CEDULA_FRENTE = "cedula_frente", "Cédula frente"
+        CEDULA_DORSO = "cedula_dorso", "Cédula dorso"
+        CONTRATO = "contrato", "Contrato laboral"
+        CURRICULUM = "curriculum", "Currículum"
+        CERTIFICADO = "certificado", "Certificado"
+        ANTECEDENTE = "antecedente", "Antecedente"
+        MEDICO = "medico", "Documento médico"
+        OTRO = "otro", "Otro"
+
+    funcionario = models.ForeignKey(
+        Funcionario,
+        on_delete=models.CASCADE,
+        related_name="documentos_personales"
+    )
+    empresa = models.ForeignKey(Empresa, on_delete=models.SET_NULL, null=True, blank=True)
+    sucursal = models.ForeignKey(Sucursal, on_delete=models.SET_NULL, null=True, blank=True)
+
+    tipo = models.CharField(max_length=40, choices=Tipos.choices, default=Tipos.OTRO)
+    titulo = models.CharField(max_length=180)
+    archivo = models.FileField(upload_to="funcionarios/documentos/")
+    observacion = models.TextField(blank=True, default="")
+    activo = models.BooleanField(default=True)
+
+    creado_en = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-creado_en"]
+
+    def save(self, *args, **kwargs):
+        if self.funcionario and self.funcionario.sucursal_rel:
+            self.empresa = self.funcionario.sucursal_rel.empresa
+            self.sucursal = self.funcionario.sucursal_rel
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.funcionario.nombre_completo} - {self.titulo}"
+
+
+class HistorialLaboralFuncionario(models.Model):
+    class Tipos(models.TextChoices):
+        INGRESO = "ingreso", "Ingreso"
+        ASCENSO = "ascenso", "Ascenso"
+        TRASLADO = "traslado", "Traslado"
+        CAMBIO_CARGO = "cambio_cargo", "Cambio de cargo"
+        CAMBIO_SUCURSAL = "cambio_sucursal", "Cambio de sucursal"
+        REINCORPORACION = "reincorporacion", "Reincorporación"
+        OTRO = "otro", "Otro"
+
+    funcionario = models.ForeignKey(
+        Funcionario,
+        on_delete=models.CASCADE,
+        related_name="historial_laboral"
+    )
+    empresa = models.ForeignKey(Empresa, on_delete=models.SET_NULL, null=True, blank=True)
+    sucursal = models.ForeignKey(Sucursal, on_delete=models.SET_NULL, null=True, blank=True)
+
+    fecha = models.DateField(default=timezone.localdate)
+    tipo = models.CharField(max_length=40, choices=Tipos.choices, default=Tipos.OTRO)
+    titulo = models.CharField(max_length=180)
+    descripcion = models.TextField(blank=True, default="")
+    adjunto = models.FileField(upload_to="funcionarios/historial_laboral/", null=True, blank=True)
+
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-fecha", "-creado_en"]
+
+    def save(self, *args, **kwargs):
+        if self.funcionario and self.funcionario.sucursal_rel:
+            self.empresa = self.funcionario.sucursal_rel.empresa
+            self.sucursal = self.funcionario.sucursal_rel
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.funcionario.nombre_completo} - {self.titulo}"
+
+
+class ConductaFuncionario(models.Model):
+    class Tipos(models.TextChoices):
+        RECONOCIMIENTO = "reconocimiento", "Reconocimiento"
+        FELICITACION = "felicitacion", "Felicitación"
+        OBSERVACION = "observacion", "Observación"
+        AMONESTACION = "amonestacion", "Amonestación"
+        APERCIBIMIENTO = "apercibimiento", "Apercibimiento"
+        SUSPENSION = "suspension", "Suspensión"
+        OTRO = "otro", "Otro"
+
+    funcionario = models.ForeignKey(
+        Funcionario,
+        on_delete=models.CASCADE,
+        related_name="conductas"
+    )
+    empresa = models.ForeignKey(Empresa, on_delete=models.SET_NULL, null=True, blank=True)
+    sucursal = models.ForeignKey(Sucursal, on_delete=models.SET_NULL, null=True, blank=True)
+
+    fecha = models.DateField(default=timezone.localdate)
+    tipo = models.CharField(max_length=40, choices=Tipos.choices, default=Tipos.OBSERVACION)
+    titulo = models.CharField(max_length=180)
+    descripcion = models.TextField()
+    adjunto = models.FileField(upload_to="funcionarios/conducta/", null=True, blank=True)
+
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-fecha", "-creado_en"]
+
+    def save(self, *args, **kwargs):
+        if self.funcionario and self.funcionario.sucursal_rel:
+            self.empresa = self.funcionario.sucursal_rel.empresa
+            self.sucursal = self.funcionario.sucursal_rel
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.funcionario.nombre_completo} - {self.get_tipo_display()}"
+
+
+class HistorialSalarialFuncionario(models.Model):
+    funcionario = models.ForeignKey(
+        Funcionario,
+        on_delete=models.CASCADE,
+        related_name="historial_salarial"
+    )
+    empresa = models.ForeignKey(Empresa, on_delete=models.SET_NULL, null=True, blank=True)
+    sucursal = models.ForeignKey(Sucursal, on_delete=models.SET_NULL, null=True, blank=True)
+
+    fecha = models.DateField(default=timezone.localdate)
+    salario_anterior = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    salario_nuevo = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    bono_anterior = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    bono_nuevo = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    motivo = models.CharField(max_length=180, blank=True, default="")
+    observacion = models.TextField(blank=True, default="")
+
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-fecha", "-creado_en"]
+
+    def save(self, *args, **kwargs):
+        if self.funcionario and self.funcionario.sucursal_rel:
+            self.empresa = self.funcionario.sucursal_rel.empresa
+            self.sucursal = self.funcionario.sucursal_rel
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.funcionario.nombre_completo} - {self.fecha}"
 
 
 class Asistencia(models.Model):

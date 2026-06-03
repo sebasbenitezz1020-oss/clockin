@@ -59,7 +59,12 @@ from .forms import (
     ComunicacionLaboralForm,
     PlanillaBancariaForm,
     BancoHorasOtorgarForm,
+    DocumentoFuncionarioForm,
+    HistorialLaboralFuncionarioForm,
+    ConductaFuncionarioForm,
+    HistorialSalarialFuncionarioForm,
 )
+
 from .liquidacion_utils import calcular_liquidacion_funcionario
 from .models import (
     Asistencia,
@@ -82,6 +87,10 @@ from .models import (
     PlanillaBancaria,
     BancoHorasMovimiento,
     DocumentoFirmado,
+    DocumentoFuncionario,
+    HistorialLaboralFuncionario,
+    ConductaFuncionario,
+    HistorialSalarialFuncionario,
 )
 
 def _bloquear_si_no_admin_master(request):
@@ -1032,6 +1041,7 @@ def deudas_lista(request):
 
     q = request.GET.get("q", "").strip()
     funcionario_id = request.GET.get("funcionario", "").strip()
+    q = request.GET.get("q", "").strip()
 
     empresa_usuario = obtener_empresa_usuario(request.user)
     admin_master = es_admin_master(request.user)
@@ -1056,6 +1066,18 @@ def deudas_lista(request):
     if funcionario_id:
         deudas = deudas.filter(funcionario_id=funcionario_id)
 
+    if q:
+        funcionarios = funcionarios.filter(
+            Q(nombre__icontains=q) |
+            Q(apellido__icontains=q) |
+            Q(cedula__icontains=q)
+        )
+        asistencias_dia = asistencias_dia.filter(
+            Q(funcionario__nombre__icontains=q) |
+            Q(funcionario__apellido__icontains=q) |
+            Q(funcionario__cedula__icontains=q)
+        )
+
     if admin_master:
         funcionarios = Funcionario.objects.filter(activo=True).order_by("apellido", "nombre")
     else:
@@ -1068,6 +1090,7 @@ def deudas_lista(request):
         "deudas": deudas.order_by("-fecha", "-creado_en"),
         "funcionarios": funcionarios,
         "funcionario_id": funcionario_id,
+        "q": q,
         "q": q,
     })
 
@@ -1277,6 +1300,238 @@ def funcionarios_lista(request):
     }
     return render(request, "core/funcionarios_lista.html", context)
 
+@login_required
+def funcionario_detalle(request, pk):
+    permiso = validar_permiso_o_redirigir(request, "funcionarios", "puede_ver")
+    if permiso:
+        return permiso
+
+    empresa_usuario = obtener_empresa_usuario(request.user)
+    admin_master = es_admin_master(request.user)
+
+    funcionario = get_object_or_404(
+        Funcionario.objects.select_related(
+            "turno",
+            "sucursal_rel",
+            "sucursal_rel__empresa"
+        ),
+        pk=pk
+    )
+
+    if not admin_master:
+        if not funcionario.sucursal_rel or funcionario.sucursal_rel.empresa != empresa_usuario:
+            messages.error(request, "No puedes ver funcionarios de otra empresa.")
+            return redirect("funcionarios_lista")
+
+    hoy = timezone.localdate()
+    anio_actual = hoy.year
+    mes_actual = hoy.month
+
+    asistencias = funcionario.asistencias.all().order_by("-fecha")[:30]
+    permisos = funcionario.permisos_licencias.all().order_by("-fecha_desde")[:10]
+    vacaciones = funcionario.vacaciones.all().order_by("-fecha_desde")[:10]
+    movimientos_horas = funcionario.movimientos_banco_horas.all().order_by("-fecha")[:20]
+
+    documentos = funcionario.documentos_personales.filter(activo=True)
+    historial_laboral = funcionario.historial_laboral.all()
+    conductas = funcionario.conductas.all()
+    historial_salarial = funcionario.historial_salarial.all()
+
+    asistencias_anio = funcionario.asistencias.filter(
+        fecha__year=anio_actual,
+        hora_entrada__isnull=False
+    ).count()
+
+    atrasos_anio = funcionario.asistencias.filter(
+        fecha__year=anio_actual,
+        llego_tarde=True
+    ).count()
+
+    permisos_anio = funcionario.permisos_licencias.filter(
+        fecha_desde__year=anio_actual
+    ).count()
+
+    vacaciones_anio = funcionario.vacaciones.filter(
+        fecha_desde__year=anio_actual
+    ).count()
+
+    resumen_icl_mes = calcular_icl_funcionario_mes(
+        funcionario=funcionario,
+        mes=mes_actual,
+        anio=anio_actual
+    )
+
+    documento_form = DocumentoFuncionarioForm()
+    laboral_form = HistorialLaboralFuncionarioForm()
+    conducta_form = ConductaFuncionarioForm()
+    salarial_form = HistorialSalarialFuncionarioForm(initial={
+    "salario_anterior": f"{int(funcionario.salario_base):,}".replace(",", "."),
+    "salario_nuevo": f"{int(funcionario.salario_base):,}".replace(",", "."),
+    "bono_anterior": f"{int(funcionario.bono):,}".replace(",", "."),
+    "bono_nuevo": f"{int(funcionario.bono):,}".replace(",", "."),
+})
+
+    return render(request, "core/funcionario_detalle.html", {
+        "funcionario": funcionario,
+        "asistencias": asistencias,
+        "permisos": permisos,
+        "vacaciones": vacaciones,
+        "movimientos_horas": movimientos_horas,
+
+        "documentos": documentos,
+        "historial_laboral": historial_laboral,
+        "conductas": conductas,
+        "historial_salarial": historial_salarial,
+
+        "asistencias_anio": asistencias_anio,
+        "atrasos_anio": atrasos_anio,
+        "permisos_anio": permisos_anio,
+        "vacaciones_anio": vacaciones_anio,
+        "resumen_icl_mes": resumen_icl_mes,
+
+        "documento_form": documento_form,
+        "laboral_form": laboral_form,
+        "conducta_form": conducta_form,
+        "salarial_form": salarial_form,
+
+        "empresa_usuario": empresa_usuario,
+        "es_admin_master": admin_master,
+    })
+
+@login_required
+def funcionario_documento_agregar(request, pk):
+    permiso = validar_permiso_o_redirigir(request, "funcionarios", "puede_editar")
+    if permiso:
+        return permiso
+
+    funcionario = get_object_or_404(Funcionario.objects.select_related("sucursal_rel", "sucursal_rel__empresa"), pk=pk)
+
+    if not es_admin_master(request.user):
+        empresa_usuario = obtener_empresa_usuario(request.user)
+        if not funcionario.sucursal_rel or funcionario.sucursal_rel.empresa != empresa_usuario:
+            messages.error(request, "No puedes agregar documentos a funcionarios de otra empresa.")
+            return redirect("funcionarios_lista")
+
+    if request.method == "POST":
+        form = DocumentoFuncionarioForm(request.POST, request.FILES)
+        if form.is_valid():
+            documento = form.save(commit=False)
+            documento.funcionario = funcionario
+            documento.save()
+
+            registrar_historial(
+                request,
+                "Funcionarios",
+                "Documento digital",
+                f"Se agregó documento {documento.titulo} a {funcionario.nombre_completo}."
+            )
+
+            messages.success(request, "Documento agregado correctamente.")
+
+    return redirect("funcionario_detalle", pk=funcionario.id)
+
+
+@login_required
+def funcionario_historial_laboral_agregar(request, pk):
+    permiso = validar_permiso_o_redirigir(request, "funcionarios", "puede_editar")
+    if permiso:
+        return permiso
+
+    funcionario = get_object_or_404(Funcionario.objects.select_related("sucursal_rel", "sucursal_rel__empresa"), pk=pk)
+
+    if not es_admin_master(request.user):
+        empresa_usuario = obtener_empresa_usuario(request.user)
+        if not funcionario.sucursal_rel or funcionario.sucursal_rel.empresa != empresa_usuario:
+            messages.error(request, "No puedes agregar historial laboral a funcionarios de otra empresa.")
+            return redirect("funcionarios_lista")
+
+    if request.method == "POST":
+        form = HistorialLaboralFuncionarioForm(request.POST, request.FILES)
+        if form.is_valid():
+            item = form.save(commit=False)
+            item.funcionario = funcionario
+            item.save()
+
+            registrar_historial(
+                request,
+                "Funcionarios",
+                "Historial laboral",
+                f"Se agregó historial laboral a {funcionario.nombre_completo}: {item.titulo}."
+            )
+
+            messages.success(request, "Historial laboral agregado correctamente.")
+
+    return redirect("funcionario_detalle", pk=funcionario.id)
+
+
+@login_required
+def funcionario_conducta_agregar(request, pk):
+    permiso = validar_permiso_o_redirigir(request, "funcionarios", "puede_editar")
+    if permiso:
+        return permiso
+
+    funcionario = get_object_or_404(Funcionario.objects.select_related("sucursal_rel", "sucursal_rel__empresa"), pk=pk)
+
+    if not es_admin_master(request.user):
+        empresa_usuario = obtener_empresa_usuario(request.user)
+        if not funcionario.sucursal_rel or funcionario.sucursal_rel.empresa != empresa_usuario:
+            messages.error(request, "No puedes agregar conducta a funcionarios de otra empresa.")
+            return redirect("funcionarios_lista")
+
+    if request.method == "POST":
+        form = ConductaFuncionarioForm(request.POST, request.FILES)
+        if form.is_valid():
+            item = form.save(commit=False)
+            item.funcionario = funcionario
+            item.save()
+
+            registrar_historial(
+                request,
+                "Funcionarios",
+                "Historial de conducta",
+                f"Se agregó {item.get_tipo_display()} a {funcionario.nombre_completo}: {item.titulo}."
+            )
+
+            messages.success(request, "Historial de conducta agregado correctamente.")
+
+    return redirect("funcionario_detalle", pk=funcionario.id)
+
+
+@login_required
+def funcionario_historial_salarial_agregar(request, pk):
+    permiso = validar_permiso_o_redirigir(request, "funcionarios", "puede_editar")
+    if permiso:
+        return permiso
+
+    funcionario = get_object_or_404(Funcionario.objects.select_related("sucursal_rel", "sucursal_rel__empresa"), pk=pk)
+
+    if not es_admin_master(request.user):
+        empresa_usuario = obtener_empresa_usuario(request.user)
+        if not funcionario.sucursal_rel or funcionario.sucursal_rel.empresa != empresa_usuario:
+            messages.error(request, "No puedes agregar historial salarial a funcionarios de otra empresa.")
+            return redirect("funcionarios_lista")
+
+    if request.method == "POST":
+        form = HistorialSalarialFuncionarioForm(request.POST)
+        if form.is_valid():
+            item = form.save(commit=False)
+            item.funcionario = funcionario
+            item.save()
+
+            funcionario.salario_base = item.salario_nuevo
+            funcionario.bono = item.bono_nuevo
+            funcionario.save(update_fields=["salario_base", "bono", "actualizado_en"])
+
+            registrar_historial(
+                request,
+                "Funcionarios",
+                "Historial salarial",
+                f"Se actualizó historial salarial de {funcionario.nombre_completo}."
+            )
+
+            messages.success(request, "Historial salarial agregado y salario actualizado correctamente.")
+
+    return redirect("funcionario_detalle", pk=funcionario.id)
 
 @login_required
 def funcionario_nuevo(request):
@@ -2550,8 +2805,18 @@ def reportes(request):
 
     fecha_str = request.GET.get("fecha", str(hoy))
     funcionario_id = request.GET.get("funcionario", "")
-    mes = int(request.GET.get("mes", hoy.month))
-    anio = int(request.GET.get("anio", hoy.year))
+    sucursal_id = request.GET.get("sucursal", "")
+    q = request.GET.get("q", "").strip()
+
+    try:
+        mes = int(request.GET.get("mes", hoy.month))
+    except (TypeError, ValueError):
+        mes = hoy.month
+
+    try:
+        anio = int(request.GET.get("anio", hoy.year))
+    except (TypeError, ValueError):
+        anio = hoy.year
 
     empresa_usuario = obtener_empresa_usuario(request.user)
     admin_master = es_admin_master(request.user)
@@ -2563,31 +2828,67 @@ def reportes(request):
 
     funcionarios = Funcionario.objects.filter(activo=True)
 
+    sucursales = Sucursal.objects.filter(activo=True)
+
     if not admin_master:
         if empresa_usuario:
             funcionarios = funcionarios.filter(sucursal_rel__empresa=empresa_usuario)
+            sucursales = sucursales.filter(empresa=empresa_usuario)
         else:
             funcionarios = funcionarios.none()
+            sucursales = sucursales.none()
 
-    funcionarios = funcionarios.select_related("turno", "sucursal_rel").order_by("apellido", "nombre")
+    if sucursal_id:
+        funcionarios = funcionarios.filter(sucursal_rel_id=sucursal_id)
+
+    if q:
+        funcionarios = funcionarios.filter(
+            Q(nombre__icontains=q) |
+            Q(apellido__icontains=q) |
+            Q(cedula__icontains=q)
+        )
+
+    funcionarios = funcionarios.select_related(
+        "turno",
+        "sucursal_rel",
+        "sucursal_rel__empresa"
+    ).order_by("apellido", "nombre")
 
     asistencias_dia = Asistencia.objects.select_related(
         "funcionario",
         "funcionario__turno",
         "funcionario__sucursal_rel",
+        "funcionario__sucursal_rel__empresa",
     ).filter(fecha=fecha_reporte)
 
     if not admin_master:
         if empresa_usuario:
-            asistencias_dia = asistencias_dia.filter(funcionario__sucursal_rel__empresa=empresa_usuario)
+            asistencias_dia = asistencias_dia.filter(
+                funcionario__sucursal_rel__empresa=empresa_usuario
+            )
         else:
             asistencias_dia = asistencias_dia.none()
+
+    if sucursal_id:
+        asistencias_dia = asistencias_dia.filter(
+            funcionario__sucursal_rel_id=sucursal_id
+        )
+
+    if q:
+        asistencias_dia = asistencias_dia.filter(
+            Q(funcionario__nombre__icontains=q) |
+            Q(funcionario__apellido__icontains=q) |
+            Q(funcionario__cedula__icontains=q)
+        )
 
     if funcionario_id:
         funcionarios = funcionarios.filter(id=funcionario_id)
         asistencias_dia = asistencias_dia.filter(funcionario_id=funcionario_id)
 
-    asistencias_dia = asistencias_dia.order_by("funcionario__apellido", "funcionario__nombre")
+    asistencias_dia = asistencias_dia.order_by(
+        "funcionario__apellido",
+        "funcionario__nombre"
+    )
 
     funcionarios_con_turno = funcionarios.filter(turno__isnull=False)
 
@@ -2599,6 +2900,7 @@ def reportes(request):
         "funcionario",
         "funcionario__turno",
         "funcionario__sucursal_rel",
+        "funcionario__sucursal_rel__empresa",
     ).filter(
         funcionario__in=funcionarios,
         estado=PermisoLicencia.Estados.APROBADO,
@@ -2609,6 +2911,7 @@ def reportes(request):
         "funcionario",
         "funcionario__turno",
         "funcionario__sucursal_rel",
+        "funcionario__sucursal_rel__empresa",
     ).filter(
         funcionario__in=funcionarios,
         estado=Vacacion.Estados.APROBADO,
@@ -2643,8 +2946,6 @@ def reportes(request):
             ausentes_ids_inteligentes.append(funcionario.id)
         elif fecha_reporte == hoy and ahora >= entrada_limite:
             ausentes_ids_inteligentes.append(funcionario.id)
-        elif fecha_reporte > hoy:
-            pass
 
     ausentes_dia = funcionarios_con_turno.filter(id__in=ausentes_ids_inteligentes)
 
@@ -2664,6 +2965,7 @@ def reportes(request):
     )
 
     permisos_licencias_dia = []
+
     for item in permisos_dia:
         permisos_licencias_dia.append({
             "tipo": "Permiso / Licencia",
@@ -2679,7 +2981,7 @@ def reportes(request):
         })
 
     permisos_reporte_dia = permisos_dia
-    vacaciones_reporte_dia = vacaciones_dia    
+    vacaciones_reporte_dia = vacaciones_dia
 
     presentes_dia = asistencias_dia.filter(hora_entrada__isnull=False).count()
     tardanzas_dia = llegadas_tarde.count()
@@ -2712,6 +3014,7 @@ def reportes(request):
     funcionarios_para_mes = funcionarios
 
     dias_mes = monthrange(anio, mes)[1]
+
     total_dias_laborales_estimados = sum(
         1 for dia in range(1, dias_mes + 1)
         if date(anio, mes, dia).weekday() != 6
@@ -2729,8 +3032,16 @@ def reportes(request):
         atrasos_count = asistencias_mes.filter(llego_tarde=True).count()
 
         dias_libres_mes = contar_dias_libres_mes(funcionario, mes, anio)
-        total_dias_laborales_reales = max(total_dias_laborales_estimados - dias_libres_mes, 0)
-        ausencias_estimadas = max(total_dias_laborales_reales - asistencias_count, 0)
+
+        total_dias_laborales_reales = max(
+            total_dias_laborales_estimados - dias_libres_mes,
+            0
+        )
+
+        ausencias_estimadas = max(
+            total_dias_laborales_reales - asistencias_count,
+            0
+        )
 
         permisos_aprobados = PermisoLicencia.objects.filter(
             funcionario=funcionario,
@@ -2773,6 +3084,7 @@ def reportes(request):
         (5, "Mayo"), (6, "Junio"), (7, "Julio"), (8, "Agosto"),
         (9, "Septiembre"), (10, "Octubre"), (11, "Noviembre"), (12, "Diciembre"),
     ]
+
     anios = list(range(hoy.year - 2, hoy.year + 2))
 
     dias_libres_reporte_dia = []
@@ -2785,6 +3097,10 @@ def reportes(request):
         "fecha_reporte": fecha_reporte,
         "funcionarios": funcionarios,
         "funcionario_id": funcionario_id,
+        "sucursal_id": sucursal_id,
+        "sucursales": sucursales.order_by("nombre"),
+        "q": q,
+
         "asistencias_dia": asistencias_dia,
         "presentes_dia": presentes_dia,
         "tardanzas_dia": tardanzas_dia,
@@ -2806,11 +3122,13 @@ def reportes(request):
         "dias_libres_reporte_dia": dias_libres_reporte_dia,
         "sin_salida": sin_salida,
         "presentes_en_horario": presentes_en_horario,
+
         "mes": mes,
         "anio": anio,
         "meses": meses,
         "anios": anios,
         "resultados_mensuales": resultados_mensuales,
+
         "empresa_usuario": empresa_usuario,
         "es_admin_master": admin_master,
     })
@@ -6193,3 +6511,209 @@ def asistencia_eliminar(request, pk):
     return render(request, "core/asistencia_eliminar.html", {
         "asistencia": asistencia,
     })
+from reportlab.lib.pagesizes import landscape
+
+@login_required
+def reporte_diario_pdf(request):
+    permiso = validar_permiso_o_redirigir(request, "reportes", "puede_ver")
+    if permiso:
+        return permiso
+
+    fecha_str = request.GET.get("fecha", str(timezone.localdate()))
+
+    try:
+        fecha_reporte = datetime.strptime(fecha_str, "%Y-%m-%d").date()
+    except ValueError:
+        fecha_reporte = timezone.localdate()
+
+    empresa_usuario = obtener_empresa_usuario(request.user)
+    admin_master = es_admin_master(request.user)
+
+    asistencias = Asistencia.objects.select_related(
+        "funcionario",
+        "funcionario__turno",
+        "funcionario__sucursal_rel",
+        "funcionario__sucursal_rel__empresa",
+    ).filter(fecha=fecha_reporte)
+
+    if not admin_master:
+        if empresa_usuario:
+            asistencias = asistencias.filter(funcionario__sucursal_rel__empresa=empresa_usuario)
+        else:
+            asistencias = asistencias.none()
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(A4),
+        leftMargin=12 * mm,
+        rightMargin=12 * mm,
+        topMargin=12 * mm,
+        bottomMargin=12 * mm,
+    )
+
+    elementos = []
+    empresa_pdf = empresa_usuario if empresa_usuario else None
+
+    elementos += construir_encabezado_empresa_pdf(
+        empresa_pdf,
+        f"REPORTE DIARIO - {fecha_reporte.strftime('%d/%m/%Y')}"
+    )
+
+    data = [[
+        "Funcionario", "CI", "Sucursal", "Turno", "Entrada", "Salida", "Atraso", "Estado"
+    ]]
+
+    for a in asistencias.order_by("funcionario__apellido", "funcionario__nombre"):
+        data.append([
+            a.funcionario.nombre_completo,
+            a.funcionario.cedula,
+            a.funcionario.sucursal_mostrar,
+            a.funcionario.turno.nombre if a.funcionario.turno else "-",
+            a.hora_entrada.strftime("%H:%M") if a.hora_entrada else "-",
+            a.hora_salida.strftime("%H:%M") if a.hora_salida else "-",
+            f"{a.minutos_atraso} min",
+            a.estado_jornada,
+        ])
+
+    tabla = Table(data, colWidths=[55*mm, 24*mm, 40*mm, 38*mm, 22*mm, 22*mm, 22*mm, 34*mm])
+    tabla.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#dbeafe")),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 7),
+        ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#cbd5e1")),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+    ]))
+
+    elementos.append(tabla)
+    doc.build(elementos)
+
+    pdf = buffer.getvalue()
+    buffer.close()
+
+    response = HttpResponse(content_type="application/pdf")
+    response["Content-Disposition"] = f'inline; filename="reporte_diario_{fecha_reporte}.pdf"'
+    response.write(pdf)
+    return response
+
+
+@login_required
+def reporte_mensual_pdf(request):
+    permiso = validar_permiso_o_redirigir(request, "reportes", "puede_ver")
+    if permiso:
+        return permiso
+
+    hoy = timezone.localdate()
+    mes = int(request.GET.get("mes", hoy.month))
+    anio = int(request.GET.get("anio", hoy.year))
+
+    empresa_usuario = obtener_empresa_usuario(request.user)
+    admin_master = es_admin_master(request.user)
+
+    funcionarios = Funcionario.objects.filter(activo=True).select_related(
+        "turno",
+        "sucursal_rel",
+        "sucursal_rel__empresa"
+    )
+
+    if not admin_master:
+        if empresa_usuario:
+            funcionarios = funcionarios.filter(sucursal_rel__empresa=empresa_usuario)
+        else:
+            funcionarios = funcionarios.none()
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=landscape(A4),
+        leftMargin=12 * mm,
+        rightMargin=12 * mm,
+        topMargin=12 * mm,
+        bottomMargin=12 * mm,
+    )
+
+    elementos = []
+    empresa_pdf = empresa_usuario if empresa_usuario else None
+
+    elementos += construir_encabezado_empresa_pdf(
+        empresa_pdf,
+        f"REPORTE MENSUAL - {mes:02d}/{anio}"
+    )
+
+    data = [[
+        "Funcionario", "CI", "Sucursal", "Cargo", "Asistencias", "Atrasos",
+        "Días libres", "Ausencias", "Permisos", "Vacaciones", "ICL"
+    ]]
+
+    dias_mes = monthrange(anio, mes)[1]
+    total_dias_laborales_estimados = sum(
+        1 for dia in range(1, dias_mes + 1)
+        if date(anio, mes, dia).weekday() != 6
+    )
+
+    for funcionario in funcionarios.order_by("apellido", "nombre"):
+        asistencias_mes = Asistencia.objects.filter(
+            funcionario=funcionario,
+            fecha__year=anio,
+            fecha__month=mes,
+            hora_entrada__isnull=False,
+        )
+
+        asistencias_count = asistencias_mes.count()
+        atrasos_count = asistencias_mes.filter(llego_tarde=True).count()
+        dias_libres_mes = contar_dias_libres_mes(funcionario, mes, anio)
+
+        permisos_aprobados = PermisoLicencia.objects.filter(
+            funcionario=funcionario,
+            estado=PermisoLicencia.Estados.APROBADO,
+            fecha_desde__year=anio,
+            fecha_desde__month=mes,
+        ).count()
+
+        vacaciones_aprobadas = Vacacion.objects.filter(
+            funcionario=funcionario,
+            estado=Vacacion.Estados.APROBADO,
+            fecha_desde__year=anio,
+            fecha_desde__month=mes,
+        ).count()
+
+        total_reales = max(total_dias_laborales_estimados - dias_libres_mes, 0)
+        ausencias = max(total_reales - asistencias_count, 0)
+        ausencias_no_justificadas = max(ausencias - permisos_aprobados - vacaciones_aprobadas, 0)
+
+        icl = 100 - (atrasos_count * 2) - (ausencias_no_justificadas * 5)
+        icl = max(0, min(100, icl))
+
+        data.append([
+            funcionario.nombre_completo,
+            funcionario.cedula,
+            funcionario.sucursal_mostrar,
+            funcionario.cargo or "-",
+            asistencias_count,
+            atrasos_count,
+            dias_libres_mes,
+            ausencias,
+            permisos_aprobados,
+            vacaciones_aprobadas,
+            f"{icl}%",
+        ])
+
+    tabla = Table(data, colWidths=[45*mm, 21*mm, 34*mm, 32*mm, 22*mm, 20*mm, 22*mm, 22*mm, 22*mm, 24*mm, 18*mm])
+    tabla.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#dbeafe")),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 6.5),
+        ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor("#cbd5e1")),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+    ]))
+
+    elementos.append(tabla)
+    doc.build(elementos)
+
+    pdf = buffer.getvalue()
+    buffer.close()
+
+    response = HttpResponse(content_type="application/pdf")
+    response["Content-Disposition"] = f'inline; filename="reporte_mensual_{mes:02d}_{anio}.pdf"'
+    response.write(pdf)
+    return response

@@ -426,6 +426,26 @@
             min-width: 1040px;
         }
     }
+        .func-name-link {
+        color: #fff;
+        text-decoration: none;
+    }
+
+    .func-name-link:hover {
+        color: var(--brand-primary);
+        text-decoration: underline;
+    }
+
+    .func-table {
+        min-width: 760px;
+    }
+
+    .func-table th:nth-child(1), .func-table td:nth-child(1) { width: 12%; }
+    .func-table th:nth-child(2), .func-table td:nth-child(2) { width: 28%; }
+    .func-table th:nth-child(3), .func-table td:nth-child(3) { width: 20%; }
+    .func-table th:nth-child(4), .func-table td:nth-child(4) { width: 20%; }
+    .func-table th:nth-child(5), .func-table td:nth-child(5) { width: 10%; }
+    .func-table th:nth-child(6), .func-table td:nth-child(6) { width: 10%; }
 </style>
 
 <div class="container-fluid func-page">
@@ -534,14 +554,10 @@
             <table class="func-table">
                 <thead>
                     <tr>
-                        <th>Nombre y apellido</th>
                         <th>CI</th>
-                        <th>Empresa / Sucursal</th>
-                        <th>Cargo / Sector / Turno</th>
-                        <th>Bono / Salario</th>
-                        <th>IPS</th>
-                        <th>Neto</th>
-                        <th>Rostro registrado</th>
+                        <th>Nombre completo</th>
+                        <th>Cargo</th>
+                        <th>Sucursal</th>
                         <th>Estado</th>
                         <th>Acciones</th>
                     </tr>
@@ -550,22 +566,17 @@
                 <tbody>
                     {% for funcionario in funcionarios %}
                     <tr>
-                        <td>
-                            <div class="func-main">
-                                <strong>{{ funcionario.nombre }} {{ funcionario.apellido }}</strong>
-                                <span class="func-sub">CI real: {{ funcionario.cedula|millares }}</span>
-                                {% if funcionario.fecha_ingreso %}
-                                    <span class="func-sub">Ingreso: {{ funcionario.fecha_ingreso|date:"d/m/Y" }}</span>
-                                {% endif %}
-                            </div>
-                        </td>
-
                         <td class="func-data">{{ funcionario.cedula|millares }}</td>
 
                         <td>
                             <div class="func-main">
-                                <span class="func-sub">{{ funcionario.empresa_mostrar }}</span>
-                                <span class="func-sub-strong">{{ funcionario.sucursal_mostrar }}</span>
+                                <a href="{% url 'funcionario_detalle' funcionario.id %}" class="func-name-link">
+                                    <strong>{{ funcionario.nombre_completo }}</strong>
+                                </a>
+
+                                {% if funcionario.fecha_ingreso %}
+                                    <span class="func-sub">Ingreso: {{ funcionario.fecha_ingreso|date:"d/m/Y" }}</span>
+                                {% endif %}
                             </div>
                         </td>
 
@@ -573,41 +584,14 @@
                             <div class="func-main">
                                 <strong>{{ funcionario.cargo|default:"Sin cargo" }}</strong>
                                 <span class="func-sub">{{ funcionario.sector|default:"Sin sector" }}</span>
-                                <span class="func-sub">
-                                    {% if funcionario.turno %}
-                                        Turno: {{ funcionario.turno.nombre }}
-                                    {% else %}
-                                        Sin turno
-                                    {% endif %}
-                                </span>
                             </div>
                         </td>
 
-                        <td class="text-right">
-                            <span class="money-bono">Bono: {{ funcionario.bono|guaranies }}</span>
-                            <span class="money">{{ funcionario.salario_base|guaranies }}</span>
-                            <span class="money-sub">Salario base</span>
-                        </td>
-
                         <td>
-                            {% if funcionario.ips %}
-                                <span class="badge-soft badge-ips-si">Aporta IPS</span>
-                            {% else %}
-                                <span class="badge-soft badge-ips-no">Sin IPS</span>
-                            {% endif %}
-                        </td>
-
-                        <td class="text-right">
-                            <span class="money">{{ funcionario.neto_referencial|guaranies }}</span>
-                            <span class="money-sub">Salario + bono</span>
-                        </td>
-
-                        <td>
-                            {% if funcionario.face_encoding %}
-                                <span class="badge-soft badge-rostro-ok">📸 OK</span>
-                            {% else %}
-                                <span class="badge-soft badge-rostro-pend">⏳ Pendiente</span>
-                            {% endif %}
+                            <div class="func-main">
+                                <span class="func-sub">{{ funcionario.empresa_mostrar }}</span>
+                                <span class="func-sub-strong">{{ funcionario.sucursal_mostrar }}</span>
+                            </div>
                         </td>
 
                         <td>
@@ -620,31 +604,23 @@
 
                         <td>
                             <div class="acciones-box">
+                                <a href="{% url 'funcionario_detalle' funcionario.id %}" class="btn-accion btn-editar">
+                                    👁️ Ficha
+                                </a>
+
                                 <a href="{% url 'funcionario_editar' funcionario.id %}" class="btn-accion btn-editar">
                                     ✏️ Editar
                                 </a>
 
                                 <a href="{% url 'registrar_rostro' funcionario.id %}" class="btn-accion btn-rostro">
-                                    {% if funcionario.face_encoding %}
-                                        📸 Actualizar
-                                    {% else %}
-                                        📸 Registrar
-                                    {% endif %}
-                                </a>
-
-                                <a href="{% url 'funcionario_toggle_activo' funcionario.id %}" class="btn-accion btn-estado">
-                                    {% if funcionario.activo %}
-                                        ⛔ Inactivar
-                                    {% else %}
-                                        ✅ Activar
-                                    {% endif %}
+                                    📸 Rostro
                                 </a>
                             </div>
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="10" class="tabla-vacia">
+                        <td colspan="6" class="tabla-vacia">
                             No se encontraron funcionarios.
                         </td>
                     </tr>

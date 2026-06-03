@@ -1,0 +1,793 @@
+{% extends "base.html" %}
+{% load number_filters %}
+
+{% block title %}Ficha de {{ funcionario.nombre_completo }} | ClockIn{% endblock %}
+
+{% block content %}
+<style>
+    .ficha-page {
+        padding: 24px 0;
+    }
+
+    .ficha-hero {
+        position: relative;
+        overflow: hidden;
+        border-radius: 30px;
+        padding: 26px;
+        background:
+            radial-gradient(circle at top right, var(--brand-soft), transparent 34%),
+            linear-gradient(135deg, rgba(19,24,34,.98), rgba(10,14,22,.98));
+        border: 1px solid rgba(255,255,255,.08);
+        box-shadow: 0 18px 50px rgba(0,0,0,.28);
+        margin-bottom: 18px;
+    }
+
+    .ficha-hero::before {
+        content: "";
+        position: absolute;
+        inset: 0 0 auto 0;
+        height: 4px;
+        background: linear-gradient(90deg, var(--brand-primary), var(--brand-primary-dark));
+    }
+
+    .ficha-hero-grid {
+        position: relative;
+        z-index: 1;
+        display: grid;
+        grid-template-columns: 170px 1fr;
+        gap: 22px;
+        align-items: center;
+    }
+
+    .ficha-photo {
+        width: 150px;
+        height: 150px;
+        border-radius: 34px;
+        overflow: hidden;
+        background: rgba(255,255,255,.06);
+        border: 1px solid rgba(255,255,255,.09);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 54px;
+        box-shadow: 0 14px 34px rgba(0,0,0,.28);
+    }
+
+    .ficha-photo img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+    }
+
+    .ficha-kicker {
+        display: inline-flex;
+        padding: 8px 12px;
+        border-radius: 999px;
+        background: var(--brand-soft);
+        color: var(--brand-text-soft);
+        border: 1px solid var(--brand-border);
+        font-size: 12px;
+        font-weight: 900;
+        margin-bottom: 10px;
+    }
+
+    .ficha-hero h2 {
+        margin: 0;
+        color: #fff;
+        font-size: 38px;
+        font-weight: 950;
+        letter-spacing: -.7px;
+    }
+
+    .ficha-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 14px;
+    }
+
+    .ficha-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        padding: 9px 12px;
+        border-radius: 999px;
+        background: rgba(255,255,255,.045);
+        border: 1px solid rgba(255,255,255,.07);
+        color: #e5e7eb;
+        font-size: 12px;
+        font-weight: 800;
+    }
+
+    .ficha-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 18px;
+    }
+
+    .ficha-btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 7px;
+        padding: 11px 14px;
+        border-radius: 14px;
+        text-decoration: none;
+        font-size: 13px;
+        font-weight: 900;
+        background: rgba(255,255,255,.05);
+        color: #fff;
+        border: 1px solid rgba(255,255,255,.08);
+    }
+
+    .ficha-btn-main {
+        background: linear-gradient(135deg, var(--brand-primary), var(--brand-primary-dark));
+        box-shadow: 0 10px 24px var(--brand-shadow);
+        border: none;
+    }
+
+    .ficha-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 14px;
+        margin-bottom: 18px;
+    }
+
+    .ficha-card {
+        background: linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
+        border: 1px solid rgba(255,255,255,.07);
+        border-radius: 24px;
+        padding: 18px;
+        box-shadow: 0 14px 38px rgba(0,0,0,.24);
+    }
+
+    .ficha-card h3 {
+        margin: 0 0 14px;
+        color: #fff;
+        font-size: 18px;
+        font-weight: 950;
+    }
+
+    .ficha-stat-label {
+        color: #94a3b8;
+        font-size: 12px;
+        font-weight: 800;
+        margin-bottom: 6px;
+    }
+
+    .ficha-stat-value {
+        color: #fff;
+        font-size: 24px;
+        font-weight: 950;
+    }
+
+    .ficha-main-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+    }
+
+    .ficha-info-row {
+        display: flex;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 10px 0;
+        border-bottom: 1px solid rgba(255,255,255,.055);
+    }
+
+    .ficha-info-row span {
+        color: #94a3b8;
+        font-size: 13px;
+        font-weight: 800;
+    }
+
+    .ficha-info-row strong {
+        color: #fff;
+        font-size: 13px;
+        text-align: right;
+    }
+
+    .ficha-table {
+        width: 100%;
+        border-collapse: separate;
+        border-spacing: 0 8px;
+    }
+
+    .ficha-table th {
+        color: #94a3b8;
+        font-size: 11px;
+        text-transform: uppercase;
+        text-align: left;
+        padding: 0 8px;
+    }
+
+    .ficha-table td {
+        background: rgba(255,255,255,.03);
+        border-top: 1px solid rgba(255,255,255,.05);
+        border-bottom: 1px solid rgba(255,255,255,.05);
+        padding: 10px 8px;
+        color: #e5e7eb;
+        font-size: 13px;
+    }
+
+    .ficha-table td:first-child {
+        border-left: 1px solid rgba(255,255,255,.05);
+        border-radius: 14px 0 0 14px;
+    }
+
+    .ficha-table td:last-child {
+        border-right: 1px solid rgba(255,255,255,.05);
+        border-radius: 0 14px 14px 0;
+    }
+
+    .semaforo-verde { color: #86efac !important; }
+    .semaforo-amarillo { color: #facc15 !important; }
+    .semaforo-rojo { color: #fca5a5 !important; }
+
+    @media (max-width: 1000px) {
+        .ficha-grid {
+            grid-template-columns: repeat(2, 1fr);
+        }
+
+        .ficha-main-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+
+    @media (max-width: 700px) {
+        .ficha-hero-grid {
+            grid-template-columns: 1fr;
+            text-align: center;
+        }
+
+        .ficha-photo {
+            margin: 0 auto;
+        }
+
+        .ficha-hero h2 {
+            font-size: 30px;
+        }
+
+        .ficha-grid {
+            grid-template-columns: 1fr;
+        }
+
+        .ficha-actions {
+            justify-content: center;
+        }
+    }
+</style>
+
+<div class="container-fluid ficha-page">
+
+    <div class="ficha-hero">
+        <div class="ficha-hero-grid">
+            <div class="ficha-photo">
+                {% if funcionario.foto %}
+                    <img src="{{ funcionario.foto.url }}" alt="{{ funcionario.nombre_completo }}">
+                {% else %}
+                    👤
+                {% endif %}
+            </div>
+
+            <div>
+                <div class="ficha-kicker">Hoja de vida laboral</div>
+                <h2>{{ funcionario.nombre_completo }}</h2>
+
+                <div class="ficha-meta">
+                    <span class="ficha-pill">🪪 CI {{ funcionario.cedula|millares }}</span>
+                    <span class="ficha-pill">💼 {{ funcionario.cargo|default:"Sin cargo" }}</span>
+                    <span class="ficha-pill">🏬 {{ funcionario.sucursal_mostrar }}</span>
+
+                    {% if funcionario.activo %}
+                        <span class="ficha-pill semaforo-verde">🟢 Activo</span>
+                    {% else %}
+                        <span class="ficha-pill semaforo-rojo">🔴 Inactivo</span>
+                    {% endif %}
+
+                    {% if funcionario.face_encoding %}
+                        <span class="ficha-pill semaforo-verde">📸 Rostro registrado</span>
+                    {% else %}
+                        <span class="ficha-pill semaforo-amarillo">📸 Rostro pendiente</span>
+                    {% endif %}
+                </div>
+
+                <div class="ficha-actions">
+                    <a href="{% url 'funcionarios_lista' %}" class="ficha-btn">← Volver</a>
+                    <a href="{% url 'funcionario_editar' funcionario.id %}" class="ficha-btn ficha-btn-main">✏️ Editar</a>
+                    <a href="{% url 'registrar_rostro' funcionario.id %}" class="ficha-btn">📸 Rostro</a>
+                    <a href="{% url 'vacacion_nueva' %}" class="ficha-btn">🏖 Vacaciones</a>
+                    <a href="{% url 'banco_horas_historial' funcionario.id %}" class="ficha-btn">⏱ Banco horas</a>
+                    <a href="{% url 'liquidacion_nueva' %}" class="ficha-btn">📑 Liquidación</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="ficha-grid">
+        <div class="ficha-card">
+            <div class="ficha-stat-label">Salario base</div>
+            <div class="ficha-stat-value">{{ funcionario.salario_base|guaranies }}</div>
+        </div>
+
+        <div class="ficha-card">
+            <div class="ficha-stat-label">Bono base</div>
+            <div class="ficha-stat-value">{{ funcionario.bono|guaranies }}</div>
+        </div>
+
+        <div class="ficha-card">
+            <div class="ficha-stat-label">IPS estimado</div>
+            <div class="ficha-stat-value">{{ funcionario.descuento_ips|guaranies }}</div>
+        </div>
+
+        <div class="ficha-card">
+            <div class="ficha-stat-label">Neto referencial</div>
+            <div class="ficha-stat-value">{{ funcionario.salario_neto_estimado|guaranies }}</div>
+        </div>
+    </div>
+
+    <div class="ficha-main-grid">
+
+        <div class="ficha-card">
+            <h3>👤 Datos personales</h3>
+
+            <div class="ficha-info-row">
+                <span>Cédula</span>
+                <strong>{{ funcionario.cedula|millares }}</strong>
+            </div>
+
+            <div class="ficha-info-row">
+                <span>Nombre completo</span>
+                <strong>{{ funcionario.nombre_completo }}</strong>
+            </div>
+
+            <div class="ficha-info-row">
+                <span>Correo</span>
+                <strong>{{ funcionario.correo|default:"Pendiente" }}</strong>
+            </div>
+
+            <div class="ficha-info-row">
+                <span>Teléfono</span>
+                <strong>{{ funcionario.telefono|default:"Pendiente" }}</strong>
+            </div>
+
+            <div class="ficha-info-row">
+                <span>Dirección</span>
+                <strong>{{ funcionario.direccion|default:"Pendiente" }}</strong>
+            </div>
+
+            <div class="ficha-info-row">
+                <span>Emergencia</span>
+                <strong>{{ funcionario.contacto_emergencia|default:"Pendiente" }}</strong>
+            </div>
+        </div>
+
+        <div class="ficha-card">
+            <h3>🏢 Datos laborales</h3>
+
+            <div class="ficha-info-row">
+                <span>Empresa</span>
+                <strong>{{ funcionario.empresa_mostrar }}</strong>
+            </div>
+
+            <div class="ficha-info-row">
+                <span>Sucursal</span>
+                <strong>{{ funcionario.sucursal_mostrar }}</strong>
+            </div>
+
+            <div class="ficha-info-row">
+                <span>Cargo</span>
+                <strong>{{ funcionario.cargo|default:"-" }}</strong>
+            </div>
+
+            <div class="ficha-info-row">
+                <span>Sector</span>
+                <strong>{{ funcionario.sector|default:"-" }}</strong>
+            </div>
+
+            <div class="ficha-info-row">
+                <span>Turno</span>
+                <strong>{% if funcionario.turno %}{{ funcionario.turno.nombre }}{% else %}-{% endif %}</strong>
+            </div>
+
+            <div class="ficha-info-row">
+                <span>Ingreso</span>
+                <strong>{% if funcionario.fecha_ingreso %}{{ funcionario.fecha_ingreso|date:"d/m/Y" }}{% else %}-{% endif %}</strong>
+            </div>
+
+            <div class="ficha-info-row">
+                <span>Antigüedad</span>
+                <strong>{{ funcionario.antiguedad_anios }} año(s)</strong>
+            </div>
+        </div>
+
+        <div class="ficha-card">
+            <h3>🏖 Vacaciones</h3>
+
+            <div class="ficha-info-row">
+                <span>Corresponden</span>
+                <strong>{{ funcionario.dias_vacaciones_corresponden }} día(s)</strong>
+            </div>
+
+            <div class="ficha-info-row">
+                <span>Usados</span>
+                <strong>{{ funcionario.dias_vacaciones_usados }} día(s)</strong>
+            </div>
+
+            <div class="ficha-info-row">
+                <span>Saldo</span>
+                <strong>{{ funcionario.saldo_vacaciones }} día(s)</strong>
+            </div>
+        </div>
+
+        <div class="ficha-card">
+            <h3>💳 Deudas</h3>
+
+            <div class="ficha-info-row">
+                <span>Total activo</span>
+                <strong>{{ funcionario.total_deuda_activa|guaranies }}</strong>
+            </div>
+
+            <div class="ficha-info-row">
+                <span>Descuento mensual</span>
+                <strong>{{ funcionario.descuento_deudas_mes|guaranies }}</strong>
+            </div>
+
+            <div class="ficha-info-row">
+                <span>Límite</span>
+                <strong>{{ funcionario.limite_deuda_monto|guaranies }}</strong>
+            </div>
+
+            <div class="ficha-info-row">
+                <span>Disponible</span>
+                <strong>{{ funcionario.disponible_deuda|guaranies }}</strong>
+            </div>
+        </div>
+
+        <div class="ficha-card">
+            <h3>⏱ Banco de horas</h3>
+
+            <table class="ficha-table">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Tipo</th>
+                        <th>Horas</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for mov in movimientos_horas %}
+                    <tr>
+                        <td>{{ mov.fecha|date:"d/m/Y" }}</td>
+                        <td>{{ mov.get_tipo_display }}</td>
+                        <td>{{ mov.horas_texto }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="3">Sin movimientos.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="ficha-card">
+            <h3>🕘 Últimas asistencias</h3>
+
+            <table class="ficha-table">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Estado</th>
+                        <th>Atraso</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for a in asistencias %}
+                    <tr>
+                        <td>{{ a.fecha|date:"d/m/Y" }}</td>
+                        <td>{{ a.estado_jornada }}</td>
+                        <td>{{ a.minutos_atraso }} min</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="3">Sin asistencias registradas.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="ficha-card">
+            <h3>📄 Permisos / Licencias</h3>
+
+            <table class="ficha-table">
+                <thead>
+                    <tr>
+                        <th>Desde</th>
+                        <th>Tipo</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for p in permisos %}
+                    <tr>
+                        <td>{{ p.fecha_desde|date:"d/m/Y" }}</td>
+                        <td>{{ p.get_tipo_display }}</td>
+                        <td>{{ p.get_estado_display }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="3">Sin permisos registrados.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="ficha-card">
+            <h3>🏖 Historial vacaciones</h3>
+
+            <table class="ficha-table">
+                <thead>
+                    <tr>
+                        <th>Desde</th>
+                        <th>Días</th>
+                        <th>Estado</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for v in vacaciones %}
+                    <tr>
+                        <td>{{ v.fecha_desde|date:"d/m/Y" }}</td>
+                        <td>{{ v.dias_solicitados }}</td>
+                        <td>{{ v.get_estado_display }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="3">Sin vacaciones registradas.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="ficha-card">
+            <h3>📂 Documentos digitales</h3>
+
+            <form method="post" enctype="multipart/form-data" action="{% url 'funcionario_documento_agregar' funcionario.id %}">
+                {% csrf_token %}
+                <div class="ficha-info-row"><span>Tipo</span><strong>{{ documento_form.tipo }}</strong></div>
+                <div class="ficha-info-row"><span>Título</span><strong>{{ documento_form.titulo }}</strong></div>
+                <div class="ficha-info-row"><span>Archivo</span><strong>{{ documento_form.archivo }}</strong></div>
+                <div class="ficha-info-row"><span>Observación</span><strong>{{ documento_form.observacion }}</strong></div>
+                <button type="submit" class="ficha-btn ficha-btn-main">➕ Agregar documento</button>
+            </form>
+
+            <table class="ficha-table" style="margin-top:14px;">
+                <thead>
+                    <tr>
+                        <th>Tipo</th>
+                        <th>Título</th>
+                        <th>Archivo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for doc in documentos %}
+                    <tr>
+                        <td>{{ doc.get_tipo_display }}</td>
+                        <td>{{ doc.titulo }}</td>
+                        <td>
+                            {% if doc.archivo %}
+                                <a href="{{ doc.archivo.url }}" target="_blank" class="ficha-btn">Ver</a>
+                            {% else %}
+                                -
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="3">Sin documentos cargados.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="ficha-card">
+            <h3>💼 Historial laboral interno</h3>
+
+            <form method="post" enctype="multipart/form-data" action="{% url 'funcionario_historial_laboral_agregar' funcionario.id %}">
+                {% csrf_token %}
+                <div class="ficha-info-row"><span>Fecha</span><strong>{{ laboral_form.fecha }}</strong></div>
+                <div class="ficha-info-row"><span>Tipo</span><strong>{{ laboral_form.tipo }}</strong></div>
+                <div class="ficha-info-row"><span>Título</span><strong>{{ laboral_form.titulo }}</strong></div>
+                <div class="ficha-info-row"><span>Descripción</span><strong>{{ laboral_form.descripcion }}</strong></div>
+                <div class="ficha-info-row"><span>Adjunto</span><strong>{{ laboral_form.adjunto }}</strong></div>
+                <button type="submit" class="ficha-btn ficha-btn-main">➕ Agregar historial</button>
+            </form>
+
+            <table class="ficha-table" style="margin-top:14px;">
+                <thead><tr><th>Fecha</th><th>Tipo</th><th>Título</th></tr></thead>
+                <tbody>
+                    {% for item in historial_laboral %}
+                    <tr>
+                        <td>{{ item.fecha|date:"d/m/Y" }}</td>
+                        <td>{{ item.get_tipo_display }}</td>
+                        <td>{{ item.titulo }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="3">Sin historial laboral cargado.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="ficha-card">
+            <h3>⭐ Historial de conducta</h3>
+
+            <form method="post" enctype="multipart/form-data" action="{% url 'funcionario_conducta_agregar' funcionario.id %}">
+                {% csrf_token %}
+                <div class="ficha-info-row"><span>Fecha</span><strong>{{ conducta_form.fecha }}</strong></div>
+                <div class="ficha-info-row"><span>Tipo</span><strong>{{ conducta_form.tipo }}</strong></div>
+                <div class="ficha-info-row"><span>Título</span><strong>{{ conducta_form.titulo }}</strong></div>
+                <div class="ficha-info-row"><span>Descripción</span><strong>{{ conducta_form.descripcion }}</strong></div>
+                <div class="ficha-info-row"><span>Adjunto</span><strong>{{ conducta_form.adjunto }}</strong></div>
+                <button type="submit" class="ficha-btn ficha-btn-main">➕ Agregar conducta</button>
+            </form>
+
+            <table class="ficha-table" style="margin-top:14px;">
+                <thead><tr><th>Fecha</th><th>Tipo</th><th>Título</th></tr></thead>
+                <tbody>
+                    {% for item in conductas %}
+                    <tr>
+                        <td>{{ item.fecha|date:"d/m/Y" }}</td>
+                        <td>{{ item.get_tipo_display }}</td>
+                        <td>{{ item.titulo }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="3">Sin historial de conducta.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="ficha-card">
+            <h3>💰 Historial salarial</h3>
+
+            <form method="post" action="{% url 'funcionario_historial_salarial_agregar' funcionario.id %}">
+                {% csrf_token %}
+                <div class="ficha-info-row"><span>Fecha</span><strong>{{ salarial_form.fecha }}</strong></div>
+                <div class="ficha-info-row"><span>Salario anterior</span><strong>{{ salarial_form.salario_anterior }}</strong></div>
+                <div class="ficha-info-row"><span>Salario nuevo</span><strong>{{ salarial_form.salario_nuevo }}</strong></div>
+                <div class="ficha-info-row"><span>Bono anterior</span><strong>{{ salarial_form.bono_anterior }}</strong></div>
+                <div class="ficha-info-row"><span>Bono nuevo</span><strong>{{ salarial_form.bono_nuevo }}</strong></div>
+                <div class="ficha-info-row"><span>Motivo</span><strong>{{ salarial_form.motivo }}</strong></div>
+                <div class="ficha-info-row"><span>Observación</span><strong>{{ salarial_form.observacion }}</strong></div>
+                <button type="submit" class="ficha-btn ficha-btn-main">💾 Guardar cambio salarial</button>
+            </form>
+
+            <table class="ficha-table" style="margin-top:14px;">
+                <thead>
+                    <tr>
+                        <th>Fecha</th>
+                        <th>Salario nuevo</th>
+                        <th>Bono nuevo</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in historial_salarial %}
+                    <tr>
+                        <td>{{ item.fecha|date:"d/m/Y" }}</td>
+                        <td>{{ item.salario_nuevo|guaranies }}</td>
+                        <td>{{ item.bono_nuevo|guaranies }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr><td colspan="3">Sin historial salarial.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="ficha-card">
+            <h3>🎁 Resumen de beneficios</h3>
+
+            <div class="ficha-info-row">
+                <span>Vacaciones correspondientes</span>
+                <strong>{{ funcionario.dias_vacaciones_corresponden }} día(s)</strong>
+            </div>
+
+            <div class="ficha-info-row">
+                <span>Vacaciones usadas</span>
+                <strong>{{ funcionario.dias_vacaciones_usados }} día(s)</strong>
+            </div>
+
+            <div class="ficha-info-row">
+                <span>Saldo vacaciones</span>
+                <strong>{{ funcionario.saldo_vacaciones }} día(s)</strong>
+            </div>
+
+            <div class="ficha-info-row">
+                <span>Permisos del año</span>
+                <strong>{{ permisos_anio }}</strong>
+            </div>
+
+            <div class="ficha-info-row">
+                <span>Vacaciones del año</span>
+                <strong>{{ vacaciones_anio }}</strong>
+            </div>
+        </div>
+
+        <div class="ficha-card">
+            <h3>📊 Resumen de asistencias</h3>
+
+            <div class="ficha-info-row">
+                <span>Asistencias del año</span>
+                <strong>{{ asistencias_anio }}</strong>
+            </div>
+
+            <div class="ficha-info-row">
+                <span>Atrasos del año</span>
+                <strong>{{ atrasos_anio }}</strong>
+            </div>
+
+            <div class="ficha-info-row">
+                <span>ICL del mes</span>
+                <strong>{{ resumen_icl_mes.icl }}%</strong>
+            </div>
+
+            <div class="ficha-info-row">
+                <span>Ausencias no justificadas</span>
+                <strong>{{ resumen_icl_mes.ausencias_no_justificadas }}</strong>
+            </div>
+        </div>
+
+        <div class="ficha-card">
+            <h3>🩺 Información médica</h3>
+
+            <div class="ficha-info-row">
+                <span>Tipo de sangre</span>
+                <strong>{{ funcionario.tipo_sangre|default:"Pendiente" }}</strong>
+            </div>
+
+            <div class="ficha-info-row">
+                <span>Seguro médico</span>
+                <strong>{{ funcionario.seguro_medico|default:"Pendiente" }}</strong>
+            </div>
+
+            <div class="ficha-info-row">
+                <span>Alergias</span>
+                <strong>{{ funcionario.alergias|default:"Pendiente" }}</strong>
+            </div>
+
+            <div class="ficha-info-row">
+                <span>Enfermedad importante</span>
+                <strong>{{ funcionario.enfermedad_importante|default:"Pendiente" }}</strong>
+            </div>
+
+            <div class="ficha-info-row">
+                <span>Medicación actual</span>
+                <strong>{{ funcionario.medicacion_actual|default:"Pendiente" }}</strong>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+<script>
+document.querySelectorAll('.money-mask').forEach(function(el){
+
+    el.addEventListener('input', function(){
+
+        let value = this.value.replace(/\D/g,'');
+
+        if(value === ''){
+            this.value='';
+            return;
+        }
+
+        this.value = Number(value).toLocaleString('es-PY');
+    });
+
+});
+</script>
+{% endblock %}

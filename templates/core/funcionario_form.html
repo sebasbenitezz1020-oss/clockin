@@ -383,6 +383,108 @@
                 </label>
             </div>
 
+            <div class="func-form-section">Contacto y datos personales ampliados</div>
+
+            <div class="func-form-field">
+                <label>Dirección</label>
+                <div class="func-input-shell">{{ form.direccion }}</div>
+                {{ form.direccion.errors }}
+            </div>
+
+            <div class="func-form-field">
+                <label>Ciudad</label>
+                <div class="func-input-shell">{{ form.ciudad }}</div>
+                {{ form.ciudad.errors }}
+            </div>
+
+            <div class="func-form-field">
+                <label>Departamento</label>
+                <div class="func-input-shell">{{ form.departamento }}</div>
+                {{ form.departamento.errors }}
+            </div>
+
+            <div class="func-form-field">
+                <label>Teléfono</label>
+                <div class="func-input-shell">{{ form.telefono }}</div>
+                {{ form.telefono.errors }}
+            </div>
+
+            <div class="func-form-field">
+                <label>Correo</label>
+                <div class="func-input-shell">{{ form.correo }}</div>
+                {{ form.correo.errors }}
+            </div>
+
+            <div class="func-form-field">
+                <label>Fecha de nacimiento</label>
+                <div class="func-input-shell">{{ form.fecha_nacimiento }}</div>
+                {{ form.fecha_nacimiento.errors }}
+            </div>
+
+            <div class="func-form-field">
+                <label>Nacionalidad</label>
+                <div class="func-input-shell">{{ form.nacionalidad }}</div>
+                {{ form.nacionalidad.errors }}
+            </div>
+
+            <div class="func-form-field">
+                <label>Estado civil</label>
+                <div class="func-input-shell">{{ form.estado_civil }}</div>
+                {{ form.estado_civil.errors }}
+            </div>
+
+            <div class="func-form-section">Contacto de emergencia</div>
+
+            <div class="func-form-field">
+                <label>Nombre del contacto</label>
+                <div class="func-input-shell">{{ form.contacto_emergencia_nombre }}</div>
+                {{ form.contacto_emergencia_nombre.errors }}
+            </div>
+
+            <div class="func-form-field">
+                <label>Parentesco</label>
+                <div class="func-input-shell">{{ form.contacto_emergencia_parentesco }}</div>
+                {{ form.contacto_emergencia_parentesco.errors }}
+            </div>
+
+            <div class="func-form-field">
+                <label>Teléfono de emergencia</label>
+                <div class="func-input-shell">{{ form.contacto_emergencia_telefono }}</div>
+                {{ form.contacto_emergencia_telefono.errors }}
+            </div>
+
+            <div class="func-form-section">Información médica</div>
+
+            <div class="func-form-field">
+                <label>Tipo de sangre</label>
+                <div class="func-input-shell">{{ form.tipo_sangre }}</div>
+                {{ form.tipo_sangre.errors }}
+            </div>
+
+            <div class="func-form-field">
+                <label>Seguro médico</label>
+                <div class="func-input-shell">{{ form.seguro_medico }}</div>
+                {{ form.seguro_medico.errors }}
+            </div>
+
+            <div class="func-form-field">
+                <label>Alergias</label>
+                <div class="func-input-shell">{{ form.alergias }}</div>
+                {{ form.alergias.errors }}
+            </div>
+
+            <div class="func-form-field">
+                <label>Enfermedad importante</label>
+                <div class="func-input-shell">{{ form.enfermedad_importante }}</div>
+                {{ form.enfermedad_importante.errors }}
+            </div>
+
+            <div class="func-form-field">
+                <label>Medicación actual</label>
+                <div class="func-input-shell">{{ form.medicacion_actual }}</div>
+                {{ form.medicacion_actual.errors }}
+            </div>
+
             <div class="form-actions">
                 <a href="{% url 'funcionarios_lista' %}" class="btn-soft">Volver</a>
                 <button type="submit" class="btn-main">{{ boton_texto }}</button>
