@@ -182,6 +182,25 @@
             color: #fff !important;
             box-shadow: 0 10px 24px var(--brand-shadow);
         }
+        .menu a{
+            position:relative;
+            overflow:hidden;
+        }
+
+        .menu a.active::before,
+        .menu a[aria-current="page"]::before{
+            content:"";
+            position:absolute;
+            left:0;
+            top:8px;
+            bottom:8px;
+            width:4px;
+            border-radius:999px;
+            background:#fff;
+            box-shadow:
+                0 0 12px rgba(255,255,255,.9),
+                0 0 24px rgba(255,255,255,.5);
+        }
 
         .topbar {
             position: relative;
@@ -478,6 +497,200 @@
             }
 
         }
+
+        /* =========================
+        CLOCKIN TRANSICIONES PRO
+        ========================= */
+
+        .page-transition {
+            animation: clockinPageIn .32s ease both;
+        }
+
+        @keyframes clockinPageIn {
+            from {
+                opacity: 0;
+                transform: translateY(14px) scale(.992);
+                filter: blur(3px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+                filter: blur(0);
+            }
+        }
+
+        body.page-leaving .page-transition {
+            animation: clockinPageOut .18s ease both;
+        }
+
+        @keyframes clockinPageOut {
+            from {
+                opacity: 1;
+                transform: translateY(0);
+            }
+            to {
+                opacity: 0;
+                transform: translateY(8px);
+            }
+        }
+
+        /* Loader global */
+        .clockin-loader {
+            position: fixed;
+            inset: 0;
+            background: rgba(5, 10, 18, .72);
+            backdrop-filter: blur(8px);
+            z-index: 99999;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .clockin-loader.active {
+            display: flex;
+        }
+
+        .clockin-loader-box {
+            width: 210px;
+            padding: 26px;
+            border-radius: 26px;
+            background: linear-gradient(145deg, rgba(17,24,39,.96), rgba(8,13,22,.96));
+            border: 1px solid rgba(255,255,255,.08);
+            box-shadow: 0 24px 70px rgba(0,0,0,.45);
+            text-align: center;
+        }
+
+        .clockin-spinner {
+            width: 52px;
+            height: 52px;
+            margin: 0 auto 16px;
+            border-radius: 50%;
+            border: 4px solid rgba(255,255,255,.12);
+            border-top-color: var(--brand-primary);
+            animation: clockinSpin .8s linear infinite;
+        }
+
+        @keyframes clockinSpin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .clockin-loader-text {
+            color: #fff;
+            font-weight: 900;
+            font-size: 15px;
+        }
+
+        .clockin-loader-sub {
+            color: #94a3b8;
+            font-size: 12px;
+            margin-top: 5px;
+        }
+
+        /* Microanimaciones premium */
+        .card,
+        .section-card-pro,
+        .ficha-card,
+        .dash-card-pro,
+        .report-toggle-btn,
+        .kpi-card {
+            transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+        }
+
+       .card:hover,
+        .section-card-pro:hover,
+        .ficha-card:hover,
+        .dash-card-pro:hover,
+        .report-toggle-btn:hover,
+        .kpi-card:hover{
+            transform:translateY(-5px);
+            box-shadow:
+                0 22px 60px rgba(0,0,0,.35);
+        }
+        /* Botones con sensación app */
+        button,
+        .btn-primary,
+        .ficha-btn,
+        .report-btn,
+        .quick-btn {
+            transition: transform .16s ease, filter .16s ease, box-shadow .16s ease;
+        }
+
+        button:active,
+        .btn-primary:active,
+        .ficha-btn:active,
+        .report-btn:active,
+        .quick-btn:active {
+            transform: scale(.97);
+        }
+
+        .skeleton{
+            position:relative;
+            overflow:hidden;
+            background:#18212e;
+            border-radius:18px;
+        }
+
+        .skeleton::after{
+            content:"";
+            position:absolute;
+            top:0;
+            left:-150%;
+            width:150%;
+            height:100%;
+
+            background:
+                linear-gradient(
+                    90deg,
+                    transparent,
+                    rgba(255,255,255,.08),
+                    transparent
+                );
+
+            animation:skeletonMove 1.2s infinite;
+        }
+
+        @keyframes skeletonMove{
+            100%{
+                left:150%;
+            }
+        }
+
+        .clockin-toast{
+            position:fixed;
+            right:20px;
+            bottom:20px;
+
+            min-width:320px;
+
+            padding:16px 18px;
+
+            border-radius:18px;
+
+            background:#111827;
+
+            color:white;
+
+            z-index:999999;
+
+            box-shadow:
+                0 20px 50px rgba(0,0,0,.35);
+
+            animation:
+                toastIn .25s ease;
+        }
+
+        @keyframes toastIn{
+            from{
+                opacity:0;
+                transform:translateY(20px);
+            }
+            to{
+                opacity:1;
+                transform:translateY(0);
+            }
+        }
     </style>
 </head>
 <body class="theme-{% if config_general and config_general.color_primario %}{{ config_general.color_primario }}{% else %}azul{% endif %}">
@@ -674,7 +887,7 @@
             {% endif %}
         </header>
 
-        <section class="page">
+        <section class="page page-transition">
             {% if messages %}
                 <div style="margin-bottom: 16px;">
                     {% for message in messages %}
@@ -682,12 +895,45 @@
                             {{ message }}
                         </div>
                     {% endfor %}
+                    <script>
+
+                    document.addEventListener("DOMContentLoaded", function(){
+
+                        document.querySelectorAll(".alert-box").forEach(function(alert){
+
+                            const toast = document.createElement("div");
+
+                            toast.className = "clockin-toast";
+
+                            toast.innerHTML = alert.innerHTML;
+
+                            document.body.appendChild(toast);
+
+                            alert.style.display="none";
+
+                            setTimeout(()=>{
+                                toast.remove();
+                            },4500);
+
+                        });
+
+                    });
+
+                    </script>
                 </div>
             {% endif %}
 
             {% block content %}{% endblock %}
         </section>
     </main>
+</div>
+
+<div id="clockinLoader" class="clockin-loader">
+    <div class="clockin-loader-box">
+        <div class="clockin-spinner"></div>
+        <div class="clockin-loader-text">Cargando ClockIn</div>
+        <div class="clockin-loader-sub">Actualizando información...</div>
+    </div>
 </div>
 
 <script>
@@ -744,6 +990,61 @@ document.addEventListener("DOMContentLoaded", function () {
 
 });
 </script>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const loader = document.getElementById("clockinLoader");
+
+    function showLoader(text = "Cargando ClockIn", sub = "Actualizando información...") {
+        if (!loader) return;
+
+        const title = loader.querySelector(".clockin-loader-text");
+        const subtitle = loader.querySelector(".clockin-loader-sub");
+
+        if (title) title.textContent = text;
+        if (subtitle) subtitle.textContent = sub;
+
+        loader.classList.add("active");
+    }
+
+    function hideLoader() {
+        if (!loader) return;
+        loader.classList.remove("active");
+    }
+
+    window.addEventListener("pageshow", hideLoader);
+
+    document.querySelectorAll("a").forEach(function (link) {
+        link.addEventListener("click", function (e) {
+            const href = link.getAttribute("href");
+
+            if (!href) return;
+            if (href.startsWith("#")) return;
+            if (href.startsWith("javascript:")) return;
+            if (link.target === "_blank") return;
+            if (link.hasAttribute("download")) return;
+
+            document.body.classList.add("page-leaving");
+            showLoader("Abriendo módulo", "Preparando la información...");
+        });
+    });
+
+    document.querySelectorAll("form").forEach(function (form) {
+        form.addEventListener("submit", function () {
+            showLoader("Procesando", "Guardando y actualizando datos...");
+        });
+    });
+
+    document.querySelectorAll("[data-loader-text]").forEach(function (el) {
+        el.addEventListener("click", function () {
+            showLoader(
+                el.dataset.loaderText || "Procesando",
+                el.dataset.loaderSub || "Actualizando información..."
+            );
+        });
+    });
+});
+</script>
+<script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
 
 </body>
 </html>

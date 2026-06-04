@@ -530,6 +530,35 @@
         align-items: stretch;
     }
 }
+.charts-grid-pro {
+    display: grid;
+    grid-template-columns: 0.8fr 1.2fr;
+    gap: 18px;
+}
+
+.chart-card-pro {
+    background: linear-gradient(145deg, #111a28, #0b111a);
+    border: 1px solid rgba(255,255,255,.06);
+    border-radius: 22px;
+    padding: 18px;
+    box-shadow: 0 12px 28px rgba(0,0,0,.22);
+}
+
+.chart-card-pro h4 {
+    margin: 0 0 14px;
+    color: #fff;
+    font-size: 17px;
+}
+
+.mt-20 {
+    margin-top: 20px;
+}
+
+@media (max-width: 1000px) {
+    .charts-grid-pro {
+        grid-template-columns: 1fr;
+    }
+}
 </style>
 
 <div class="page-header">
@@ -688,6 +717,30 @@
         <a href="#panel-ausentes" class="kpi-card danger js-open-panel" data-target="panel-ausentes"><span class="kpi-label">Ausencias</span><div class="kpi-value">{{ ausencias_dia }}</div></a>
         <a href="#panel-permisos" class="kpi-card info js-open-panel" data-target="panel-permisos"><span class="kpi-label">Permisos / licencias</span><div class="kpi-value">{{ justificados_dia }}</div></a>
     </div>
+
+<div class="section-card-pro">
+    <div class="section-head">
+        <h3>📊 Estadísticas visuales</h3>
+        <span class="section-subtitle">Gráficos dinámicos del reporte actual</span>
+    </div>
+
+    <div class="charts-grid-pro">
+        <div class="chart-card-pro">
+            <h4>🍩 Resumen diario</h4>
+            <div id="chartDonutDiario"></div>
+        </div>
+
+        <div class="chart-card-pro">
+            <h4>📈 Rendimiento mensual</h4>
+            <div id="chartMensualBarras"></div>
+        </div>
+    </div>
+
+    <div class="chart-card-pro mt-20">
+        <h4>🔥 Heatmap de cumplimiento mensual</h4>
+        <div id="chartHeatmapAsistencia"></div>
+    </div>
+</div>
 
     <div class="section-card-pro">
         <div class="section-head">
@@ -1044,6 +1097,297 @@ document.addEventListener("DOMContentLoaded", function () {
             }
         });
     });
+});
+</script>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+
+    if (typeof ApexCharts === "undefined") {
+        console.warn("ApexCharts no está cargado.");
+        return;
+    }
+
+    const chartTheme = {
+        foreColor: "#94a3b8",
+        toolbar: { show: false }
+    };
+
+    const colores = [
+        "#22c55e",
+        "#f59e0b",
+        "#ef4444",
+        "#3b82f6",
+        "#f97316"
+    ];
+
+    const donutDiario = new ApexCharts(
+        document.querySelector("#chartDonutDiario"),
+        {
+            chart: {
+                type: "donut",
+                height: 310,
+                background: "transparent"
+            },
+            theme: {
+                mode: "dark"
+            },
+            labels: [
+                "En horario",
+                "Tardanzas",
+                "Ausencias",
+                "Justificados",
+                "Sin salida"
+            ],
+            series: [
+                Number("{{ en_horario_dia|default:0 }}"),
+                Number("{{ tardanzas_dia|default:0 }}"),
+                Number("{{ ausencias_dia|default:0 }}"),
+                Number("{{ justificados_dia|default:0 }}"),
+                Number("{{ sin_salida_dia|default:0 }}")
+            ],
+            colors: colores,
+            legend: {
+                position: "bottom",
+                labels: {
+                    colors: "#cbd5e1"
+                }
+            },
+            dataLabels: {
+                enabled: true
+            },
+            stroke: {
+                colors: ["#0b111a"]
+            },
+            plotOptions: {
+                pie: {
+                    donut: {
+                        size: "68%",
+                        labels: {
+                            show: true,
+                            total: {
+                                show: true,
+                                label: "Total",
+                                color: "#94a3b8"
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    );
+
+    donutDiario.render();
+
+    const nombresMensuales = [
+        {% for item in resultados_mensuales %}
+            "{{ item.funcionario.nombre_completo|escapejs }}"{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    const asistenciasMensuales = [
+        {% for item in resultados_mensuales %}
+            {{ item.asistencias|default:0 }}{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    const atrasosMensuales = [
+        {% for item in resultados_mensuales %}
+            {{ item.atrasos|default:0 }}{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    const ausenciasMensuales = [
+        {% for item in resultados_mensuales %}
+            {{ item.ausencias|default:0 }}{% if not forloop.last %},{% endif %}
+        {% endfor %}
+    ];
+
+    const chartMensual = new ApexCharts(
+        document.querySelector("#chartMensualBarras"),
+        {
+            chart: {
+                type: "bar",
+                height: 330,
+                background: "transparent",
+                toolbar: { show: false }
+            },
+            theme: {
+                mode: "dark"
+            },
+            series: [
+                {
+                    name: "Asistencias",
+                    data: asistenciasMensuales
+                },
+                {
+                    name: "Atrasos",
+                    data: atrasosMensuales
+                },
+                {
+                    name: "Ausencias",
+                    data: ausenciasMensuales
+                }
+            ],
+            xaxis: {
+                categories: nombresMensuales,
+                labels: {
+                    rotate: -35,
+                    style: {
+                        colors: "#94a3b8",
+                        fontSize: "11px"
+                    }
+                }
+            },
+            yaxis: {
+                labels: {
+                    style: {
+                        colors: "#94a3b8"
+                    }
+                }
+            },
+            colors: ["#22c55e", "#f59e0b", "#ef4444"],
+            plotOptions: {
+                bar: {
+                    borderRadius: 6,
+                    columnWidth: "45%"
+                }
+            },
+            legend: {
+                labels: {
+                    colors: "#cbd5e1"
+                }
+            },
+            grid: {
+                borderColor: "rgba(255,255,255,.06)"
+            },
+            dataLabels: {
+                enabled: false
+            }
+        }
+    );
+
+    chartMensual.render();
+
+    const heatmapData = [
+        {
+            name: "ICL",
+            data: [
+                {% for item in resultados_mensuales %}
+                    {
+                        x: "{{ item.funcionario.nombre_completo|escapejs }}",
+                        y: {{ item.icl|default:0 }}
+                    }{% if not forloop.last %},{% endif %}
+                {% endfor %}
+            ]
+        },
+        {
+            name: "Asistencias",
+            data: [
+                {% for item in resultados_mensuales %}
+                    {
+                        x: "{{ item.funcionario.nombre_completo|escapejs }}",
+                        y: {{ item.asistencias|default:0 }}
+                    }{% if not forloop.last %},{% endif %}
+                {% endfor %}
+            ]
+        },
+        {
+            name: "Atrasos",
+            data: [
+                {% for item in resultados_mensuales %}
+                    {
+                        x: "{{ item.funcionario.nombre_completo|escapejs }}",
+                        y: {{ item.atrasos|default:0 }}
+                    }{% if not forloop.last %},{% endif %}
+                {% endfor %}
+            ]
+        },
+        {
+            name: "Ausencias",
+            data: [
+                {% for item in resultados_mensuales %}
+                    {
+                        x: "{{ item.funcionario.nombre_completo|escapejs }}",
+                        y: {{ item.ausencias|default:0 }}
+                    }{% if not forloop.last %},{% endif %}
+                {% endfor %}
+            ]
+        }
+    ];
+
+    const chartHeatmap = new ApexCharts(
+        document.querySelector("#chartHeatmapAsistencia"),
+        {
+            chart: {
+                type: "heatmap",
+                height: 360,
+                background: "transparent",
+                toolbar: { show: false }
+            },
+            theme: {
+                mode: "dark"
+            },
+            series: heatmapData,
+            dataLabels: {
+                enabled: true,
+                style: {
+                    colors: ["#fff"]
+                }
+            },
+            colors: ["#2563eb"],
+            plotOptions: {
+                heatmap: {
+                    shadeIntensity: 0.6,
+                    radius: 8,
+                    colorScale: {
+                        ranges: [
+                            {
+                                from: 0,
+                                to: 40,
+                                color: "#ef4444",
+                                name: "Bajo"
+                            },
+                            {
+                                from: 41,
+                                to: 75,
+                                color: "#f59e0b",
+                                name: "Medio"
+                            },
+                            {
+                                from: 76,
+                                to: 100,
+                                color: "#22c55e",
+                                name: "Alto"
+                            }
+                        ]
+                    }
+                }
+            },
+            xaxis: {
+                labels: {
+                    rotate: -35,
+                    style: {
+                        colors: "#94a3b8",
+                        fontSize: "11px"
+                    }
+                }
+            },
+            yaxis: {
+                labels: {
+                    style: {
+                        colors: "#94a3b8"
+                    }
+                }
+            },
+            grid: {
+                borderColor: "rgba(255,255,255,.06)"
+            }
+        }
+    );
+
+    chartHeatmap.render();
+
 });
 </script>
 {% endblock %}
