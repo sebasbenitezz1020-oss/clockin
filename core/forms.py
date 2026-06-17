@@ -240,11 +240,17 @@ class TurnoForm(forms.ModelForm):
 
 
 class ConfiguracionGeneralForm(forms.ModelForm):
+    color_primario = forms.ChoiceField(
+        choices=ConfiguracionGeneral.TEMAS_CHOICES,
+        widget=forms.Select(attrs={"class": "form-control"})
+    )
+
     class Meta:
         model = ConfiguracionGeneral
         fields = [
             "nombre_sistema",
             "subtitulo_sistema",
+            "color_primario",
             "logo_url",
 
             "salario_base_default",
@@ -267,6 +273,7 @@ class ConfiguracionGeneralForm(forms.ModelForm):
         widgets = {
             "nombre_sistema": forms.TextInput(attrs={"class": "form-control"}),
             "subtitulo_sistema": forms.TextInput(attrs={"class": "form-control"}),
+            "color_primario": forms.Select(attrs={"class": "form-control"}),
             "logo_url": forms.URLInput(attrs={"class": "form-control", "placeholder": "https://..."}),
 
             "salario_base_default": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
@@ -290,6 +297,7 @@ class ConfiguracionGeneralForm(forms.ModelForm):
         labels = {
             "nombre_sistema": "Nombre del sistema",
             "subtitulo_sistema": "Subtítulo del sistema",
+            "color_primario": "Tema de color",
             "logo_url": "URL del logo",
 
             "salario_base_default": "Salario base global",
@@ -311,7 +319,7 @@ class ConfiguracionGeneralForm(forms.ModelForm):
         }
 
 
-    def _validar_lista(self, valor, nombre, minimo=0):
+    def _validar_lista(self, valor, nombre, minimo=0, max_item_length=None):
         items = [x.strip() for x in (valor or "").splitlines() if x.strip()]
         items_unicos = []
 
@@ -321,6 +329,14 @@ class ConfiguracionGeneralForm(forms.ModelForm):
 
         if len(items_unicos) > 150:
             raise forms.ValidationError(f"{nombre} tiene demasiadas opciones. Reduce la lista.")
+
+        if max_item_length:
+            largos = [item for item in items_unicos if len(item) > max_item_length]
+            if largos:
+                raise forms.ValidationError(
+                    f"{nombre} contiene opciones de mas de {max_item_length} caracteres. "
+                    f"Revisa: {largos[0]}"
+                )
 
         return "\n".join(items_unicos)
 
@@ -353,14 +369,16 @@ class ConfiguracionGeneralForm(forms.ModelForm):
         return self._validar_lista(
             self.cleaned_data.get("cargos_personalizados"),
             "cargos personalizados",
-            minimo=0
+            minimo=0,
+            max_item_length=100
         )
 
     def clean_sectores_personalizados(self):
         return self._validar_lista(
             self.cleaned_data.get("sectores_personalizados"),
             "sectores personalizados",
-            minimo=0
+            minimo=0,
+            max_item_length=100
         )
 
 
@@ -793,13 +811,26 @@ class LiquidacionForm(forms.ModelForm):
             "dias_trabajados_pendientes": forms.NumberInput(attrs={
                 "class": "form-control",
                 "min": "0",
-                "placeholder": "Automático según fecha de salida"
+                "placeholder": "Automático según fecha de salida",
+                "readonly": "readonly",
+                "data-auto-field": "true",
             }),
+
             "vacaciones_causadas_pendientes_dias": forms.NumberInput(attrs={
                 "class": "form-control",
                 "min": "0",
-                "placeholder": "Solo vacaciones no gozadas"
+                "placeholder": "Automático según saldo de vacaciones",
+                "readonly": "readonly",
+                "data-auto-field": "true",
             }),
+
+            "otros_descuentos": forms.NumberInput(attrs={
+                "class": "form-control",
+                "step": "0.01",
+                "min": "0",
+                "placeholder": "0"
+            }),
+            
             "preaviso_dias_otorgados": forms.NumberInput(attrs={
                 "class": "form-control",
                 "min": "0",
@@ -807,12 +838,7 @@ class LiquidacionForm(forms.ModelForm):
             }),
             "preaviso_cumplido": forms.CheckboxInput(attrs={"class": "form-check-input"}),
             "descontar_preaviso": forms.CheckboxInput(attrs={"class": "form-check-input"}),
-            "otros_descuentos": forms.NumberInput(attrs={
-                "class": "form-control",
-                "step": "0.01",
-                "min": "0",
-                "placeholder": "0"
-            }),
+            
             "motivo_observacion": forms.Textarea(attrs={
                 "class": "form-control",
                 "rows": 4,

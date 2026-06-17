@@ -1308,6 +1308,10 @@ class Vacacion(models.Model):
     def save(self, *args, **kwargs):
         if self.fecha_desde:
             self.fecha_notificacion = self.fecha_desde - timedelta(days=15)
+
+        if self.funcionario and self.funcionario.sucursal_rel:
+            self.empresa = self.funcionario.sucursal_rel.empresa
+
         super().save(*args, **kwargs)
 
     class Meta:
@@ -1315,12 +1319,6 @@ class Vacacion(models.Model):
 
     def __str__(self):
         return f"{self.funcionario.nombre_completo} - Vacaciones ({self.fecha_desde} a {self.fecha_hasta})"
-    
-    def save(self, *args, **kwargs):
-        if self.funcionario and self.funcionario.sucursal_rel:
-            self.empresa = self.funcionario.sucursal_rel.empresa
-
-        super().save(*args, **kwargs)
 
 
 class HistorialAccion(models.Model):
@@ -1345,6 +1343,7 @@ class HistorialAccion(models.Model):
 class Liquidacion(models.Model):
     class TiposSalida(models.TextChoices):
         DESPIDO_JUSTA_CAUSA = "despido_justa_causa", "Despido por Justa Causa"
+        PERIODO_PRUEBA = "periodo_prueba", "Periodo de Prueba"
         DESPIDO_SIN_JUSTA_CAUSA = "despido_sin_justa_causa", "Despido sin Justa Causa"
         RENUNCIA = "renuncia", "Renuncia"
         ABANDONO = "abandono", "Abandono"

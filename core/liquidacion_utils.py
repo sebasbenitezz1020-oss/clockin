@@ -42,6 +42,7 @@ def calcular_antiguedad_detalle(fecha_ingreso, fecha_salida):
 def calcular_preaviso_dias(tipo_salida, fecha_ingreso, fecha_salida):
     if tipo_salida in [
         Liquidacion.TiposSalida.DESPIDO_JUSTA_CAUSA,
+        Liquidacion.TiposSalida.PERIODO_PRUEBA,
         Liquidacion.TiposSalida.ABANDONO,
     ]:
         return 0

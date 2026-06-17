@@ -3,60 +3,308 @@
 {% block title %}Historial | ClockIn{% endblock %}
 
 {% block content %}
-<div class="page-header page-header-flex">
-    <div>
-        <h2>🕘 Historial de acciones</h2>
-        <p>Registro de movimientos administrativos realizados en el sistema.</p>
-    </div>
-</div>
+<style>
+.hist-page {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
 
-<div class="card mb-20">
-    <form method="get" class="search-bar">
-        <input
-            type="text"
-            name="q"
-            value="{{ q }}"
-            placeholder="Buscar por módulo, acción, usuario o descripción..."
-            class="form-control"
-        >
-        <button type="submit" class="btn-primary btn-search">Buscar</button>
-    </form>
-</div>
+.hist-hero {
+    display: flex;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 18px;
+    padding: 22px;
+    background: linear-gradient(145deg, #101827, #0b111a);
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 20px;
+    box-shadow: 0 18px 40px rgba(0,0,0,.24);
+}
 
-<div class="card">
-    <div class="table-wrap">
-        <table class="table-dark">
-            <thead>
-                <tr>
-                    <th>Fecha y hora</th>
-                    <th>Usuario</th>
-                    <th>Módulo</th>
-                    <th>Acción</th>
-                    <th>Descripción</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for item in historial %}
-                    <tr>
-                        <td>{{ item.creado_en|date:"d/m/Y H:i:s" }}</td>
-                        <td>
-                            {% if item.usuario %}
-                                {{ item.usuario.get_full_name|default:item.usuario.username }}
-                            {% else %}
-                                Sistema
-                            {% endif %}
-                        </td>
-                        <td>{{ item.modulo }}</td>
-                        <td>{{ item.accion }}</td>
-                        <td>{{ item.descripcion }}</td>
-                    </tr>
-                {% empty %}
-                    <tr>
-                        <td colspan="5" class="empty-row">Todavía no hay acciones registradas.</td>
-                    </tr>
-                {% endfor %}
-            </tbody>
-        </table>
+.hist-hero h2 {
+    margin: 6px 0 8px;
+    font-size: 30px;
+    line-height: 1.12;
+    font-weight: 900;
+}
+
+.hist-hero p,
+.hist-muted {
+    color: #94a3b8;
+}
+
+.hist-limit-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 38px;
+    padding: 9px 13px;
+    border-radius: 999px;
+    background: rgba(59,130,246,.12);
+    border: 1px solid rgba(59,130,246,.24);
+    color: #bfdbfe;
+    font-size: 13px;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.hist-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.hist-summary-card {
+    min-height: 112px;
+    padding: 18px;
+    border-radius: 18px;
+    background: linear-gradient(145deg, #111a28, #0b111a);
+    border: 1px solid rgba(255,255,255,.07);
+    box-shadow: 0 14px 30px rgba(0,0,0,.20);
+}
+
+.hist-summary-card span {
+    display: block;
+    color: #94a3b8;
+    font-size: 12px;
+    font-weight: 800;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+}
+
+.hist-summary-card strong {
+    display: block;
+    color: #fff;
+    font-size: 34px;
+    line-height: 1;
+}
+
+.hist-summary-card small {
+    display: block;
+    color: #94a3b8;
+    margin-top: 9px;
+}
+
+.hist-filter-card,
+.hist-table-card {
+    background: #141922;
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 20px;
+    box-shadow: 0 18px 40px rgba(0,0,0,.22);
+}
+
+.hist-filter-card {
+    padding: 18px;
+}
+
+.hist-search-form {
+    display: grid;
+    grid-template-columns: minmax(240px, 1fr) auto auto;
+    gap: 12px;
+    align-items: end;
+}
+
+.hist-search-field label {
+    display: block;
+    margin-bottom: 8px;
+    color: #d1d5db;
+    font-size: 13px;
+    font-weight: 800;
+}
+
+.hist-table-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    padding: 18px 20px;
+    border-bottom: 1px solid rgba(255,255,255,.08);
+}
+
+.hist-table-head h3 {
+    margin: 0 0 4px;
+    color: #fff;
+    font-size: 20px;
+}
+
+.hist-table-wrap {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.hist-table {
+    min-width: 920px;
+}
+
+.hist-table thead th {
+    background: rgba(255,255,255,.025);
+    color: #dbeafe;
+    text-transform: uppercase;
+    font-size: 12px;
+}
+
+.hist-user {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.hist-user strong {
+    color: #fff;
+    font-size: 13px;
+}
+
+.hist-user span {
+    color: #94a3b8;
+    font-size: 12px;
+}
+
+.hist-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 28px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.hist-badge-module {
+    background: rgba(59,130,246,.14);
+    border: 1px solid rgba(59,130,246,.24);
+    color: #bfdbfe;
+}
+
+.hist-badge-action {
+    background: rgba(16,185,129,.14);
+    border: 1px solid rgba(16,185,129,.24);
+    color: #bbf7d0;
+}
+
+.hist-description {
+    color: #e5e7eb;
+    line-height: 1.45;
+}
+
+@media (max-width: 900px) {
+    .hist-hero {
+        align-items: stretch;
+        flex-direction: column;
+    }
+
+    .hist-summary-grid,
+    .hist-search-form {
+        grid-template-columns: 1fr;
+    }
+
+    .hist-search-form .btn-primary,
+    .hist-search-form .btn-secondary {
+        width: 100%;
+        text-align: center;
+    }
+}
+</style>
+
+<section class="hist-page">
+    <div class="hist-hero">
+        <div>
+            <span class="section-kicker">Auditoria del sistema</span>
+            <h2>Historial de acciones</h2>
+            <p>Registro de movimientos administrativos realizados en ClockIn.</p>
+        </div>
+        <span class="hist-limit-pill">Ultimos 300 registros</span>
     </div>
-</div>
+
+    <div class="hist-summary-grid">
+        <article class="hist-summary-card">
+            <span>Registros visibles</span>
+            <strong>{{ historial|length }}</strong>
+            <small>Segun el filtro actual</small>
+        </article>
+        <article class="hist-summary-card">
+            <span>Busqueda</span>
+            <strong>{% if q %}Activa{% else %}Libre{% endif %}</strong>
+            <small>{% if q %}Filtro: {{ q }}{% else %}Sin texto de busqueda{% endif %}</small>
+        </article>
+        <article class="hist-summary-card">
+            <span>Alcance</span>
+            <strong>Master</strong>
+            <small>Auditoria general del sistema</small>
+        </article>
+    </div>
+
+    <div class="hist-filter-card">
+        <form method="get" class="hist-search-form">
+            <div class="hist-search-field">
+                <label for="hist-q">Buscar en el historial</label>
+                <input
+                    id="hist-q"
+                    type="text"
+                    name="q"
+                    value="{{ q }}"
+                    placeholder="Modulo, accion, usuario o descripcion..."
+                    class="form-control"
+                >
+            </div>
+            <button type="submit" class="btn-primary btn-search">Buscar</button>
+            <a href="{% url 'historial_lista' %}" class="btn-secondary">Limpiar</a>
+        </form>
+    </div>
+
+    <div class="hist-table-card">
+        <div class="hist-table-head">
+            <div>
+                <h3>Bitacora de actividad</h3>
+                <p class="hist-muted">Movimientos ordenados desde el mas reciente.</p>
+            </div>
+        </div>
+
+        <div class="hist-table-wrap">
+            <table class="table-dark hist-table">
+                <thead>
+                    <tr>
+                        <th>Fecha y hora</th>
+                        <th>Usuario</th>
+                        <th>Modulo</th>
+                        <th>Accion</th>
+                        <th>Descripcion</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in historial %}
+                        <tr>
+                            <td>{{ item.creado_en|date:"d/m/Y H:i:s" }}</td>
+                            <td>
+                                <div class="hist-user">
+                                    <strong>
+                                        {% if item.usuario %}
+                                            {{ item.usuario.get_full_name|default:item.usuario.username }}
+                                        {% else %}
+                                            Sistema
+                                        {% endif %}
+                                    </strong>
+                                    {% if item.usuario %}
+                                        <span>{{ item.usuario.username }}</span>
+                                    {% else %}
+                                        <span>Proceso interno</span>
+                                    {% endif %}
+                                </div>
+                            </td>
+                            <td><span class="hist-badge hist-badge-module">{{ item.modulo }}</span></td>
+                            <td><span class="hist-badge hist-badge-action">{{ item.accion }}</span></td>
+                            <td class="hist-description">{{ item.descripcion }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="5" class="empty-row">Todavia no hay acciones registradas.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</section>
 {% endblock %}

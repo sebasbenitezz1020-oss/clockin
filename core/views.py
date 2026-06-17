@@ -3002,14 +3002,6 @@ def reportes(request):
     if programados_dia > 0:
         porcentaje_cumplimiento = round((en_horario_dia / programados_dia) * 100, 1)
 
-    resumen_semaforo = {
-        "verde": en_horario_dia,
-        "amarillo": tardanzas_dia,
-        "rojo": ausencias_dia,
-        "naranja": sin_salida_dia,
-        "azul": justificados_dia,
-    }
-
     resultados_mensuales = []
     funcionarios_para_mes = funcionarios
 
@@ -3093,8 +3085,59 @@ def reportes(request):
         if funcionario_tiene_dia_libre(funcionario, fecha_reporte):
             dias_libres_reporte_dia.append(funcionario)
 
+    fecha_jornada_incompleta = fecha_reporte - timezone.timedelta(days=1)
+
+    permisos_jornada_incompleta = PermisoLicencia.objects.filter(
+        funcionario__in=funcionarios,
+        estado=PermisoLicencia.Estados.APROBADO,
+        fecha_desde__lte=fecha_jornada_incompleta,
+        fecha_hasta__gte=fecha_jornada_incompleta,
+    )
+
+    vacaciones_jornada_incompleta = Vacacion.objects.filter(
+        funcionario__in=funcionarios,
+        estado=Vacacion.Estados.APROBADO,
+        fecha_desde__lte=fecha_jornada_incompleta,
+        fecha_hasta__gte=fecha_jornada_incompleta,
+    )
+
+    ids_justificados_jornada_incompleta = set(
+        permisos_jornada_incompleta.values_list("funcionario_id", flat=True)
+    )
+    ids_justificados_jornada_incompleta.update(
+        vacaciones_jornada_incompleta.values_list("funcionario_id", flat=True)
+    )
+
+    asistencias_jornada_incompleta = Asistencia.objects.select_related(
+        "funcionario",
+        "funcionario__turno",
+        "funcionario__sucursal_rel",
+        "funcionario__sucursal_rel__empresa",
+    ).filter(
+        fecha=fecha_jornada_incompleta,
+        hora_entrada__isnull=False,
+        funcionario__in=funcionarios,
+    ).order_by("funcionario__apellido", "funcionario__nombre")
+
+    jornadas_incompletas = []
+
+    for asistencia in asistencias_jornada_incompleta:
+        funcionario = asistencia.funcionario
+
+        if funcionario.id in ids_justificados_jornada_incompleta:
+            continue
+
+        if funcionario_tiene_dia_libre(funcionario, fecha_jornada_incompleta):
+            continue
+
+        if asistencia.horas_trabajadas_segundos < 8 * 60 * 60:
+            jornadas_incompletas.append(asistencia)
+
+    jornadas_incompletas_dia = len(jornadas_incompletas)
+
     return render(request, "core/reportes.html", {
         "fecha_reporte": fecha_reporte,
+        "fecha_jornada_incompleta": fecha_jornada_incompleta,
         "funcionarios": funcionarios,
         "funcionario_id": funcionario_id,
         "sucursal_id": sucursal_id,
@@ -3113,7 +3156,6 @@ def reportes(request):
         "porcentaje_asistencia": porcentaje_asistencia,
         "porcentaje_cumplimiento": porcentaje_cumplimiento,
         "requieren_atencion_hoy": requieren_atencion_hoy,
-        "resumen_semaforo": resumen_semaforo,
         "llegadas_tarde": llegadas_tarde,
         "ausentes_dia": ausentes_dia,
         "permisos_licencias_dia": permisos_licencias_dia,
@@ -3122,6 +3164,8 @@ def reportes(request):
         "dias_libres_reporte_dia": dias_libres_reporte_dia,
         "sin_salida": sin_salida,
         "presentes_en_horario": presentes_en_horario,
+        "jornadas_incompletas": jornadas_incompletas,
+        "jornadas_incompletas_dia": jornadas_incompletas_dia,
 
         "mes": mes,
         "anio": anio,
@@ -3635,7 +3679,7 @@ def planilla_bancaria_nueva(request):
 
 @login_required
 def planilla_bancaria_exportar(request, pk):
-    permiso = validar_permiso_o_redirigir(request, "planilla_bancaria", "puede_exportar")
+    permiso = validar_permiso_o_redirigir(request, "planilla_bancaria", "puede_ver")
     if permiso:
         return permiso
 
@@ -4609,7 +4653,6 @@ def configuracion_general(request):
             return redirect("configuracion_general")
 
         messages.error(request, "No se pudo guardar la configuración. Revisa los campos marcados.")
-        print(form.errors)
 
     else:
         form = ConfiguracionGeneralForm(instance=config)
@@ -4618,6 +4661,8 @@ def configuracion_general(request):
         "form": form,
         "config": config,
     })
+
+from decimal import Decimal, ROUND_HALF_UP
 
 def calcular_liquidacion_funcionario(
     funcionario,
@@ -4681,7 +4726,15 @@ def calcular_liquidacion_funcionario(
     except Exception:
         dias_trabajados_pendientes = 0
 
-    salario_pendiente_monto = salario_diario * Decimal(dias_trabajados_pendientes)
+    # Salario pendiente del mes trabajado
+    # Ejemplo: salario 2.899.048 / 30 * 5 días = 483.175
+    dias_trabajados_pendientes = int(dias_trabajados_pendientes or 0)
+
+    salario_diario = salario_base / Decimal("30")
+
+    salario_pendiente_monto = (
+        salario_diario * Decimal(dias_trabajados_pendientes)
+    ).quantize(Decimal("1"), rounding=ROUND_HALF_UP)
 
     ausencias_descuento = 0
 
@@ -4823,7 +4876,7 @@ def calcular_liquidacion_funcionario(
     requiere_revision_juridica = False
     alerta_revision = ""
 
-    if tipo_normalizado in ["despido_justa_causa", "despido_por_justa_causa", "abandono"]:
+    if tipo_normalizado in ["despido_justa_causa", "despido_por_justa_causa", "periodo_prueba", "abandono"]:
         requiere_revision_juridica = True
         alerta_revision = "Este tipo de salida requiere revisión jurídica antes de confirmar la liquidación."
 
@@ -4908,6 +4961,65 @@ def liquidaciones_lista(request):
         "es_admin_master": admin_master,
     })
 
+def _liq_dias_salario_auto(fecha_salida):
+    if not fecha_salida:
+        return 0
+    return int(fecha_salida.day)
+
+
+def _liq_vacaciones_pendientes_auto(funcionario):
+    if not funcionario:
+        return 0
+
+    try:
+        saldo = funcionario.saldo_vacaciones
+        return max(int(saldo or 0), 0)
+    except Exception:
+        return 0
+
+
+def _liq_int_auto(valor, default):
+    try:
+        valor_int = int(valor or 0)
+    except Exception:
+        valor_int = 0
+
+    if valor_int <= 0:
+        return default
+
+    return valor_int
+
+
+def _liq_alertas_funcionario(funcionario):
+    alertas = []
+
+    try:
+        if funcionario.total_deuda_activa and funcionario.total_deuda_activa > 0:
+            alertas.append(f"Tiene deuda activa: Gs. {int(funcionario.total_deuda_activa):,}".replace(",", "."))
+    except Exception:
+        pass
+
+    try:
+        saldo_vac = funcionario.saldo_vacaciones
+        if saldo_vac and saldo_vac > 0:
+            alertas.append(f"Tiene {saldo_vac} día(s) de vacaciones pendientes.")
+    except Exception:
+        pass
+
+    try:
+        if funcionario.conductas.exists():
+            alertas.append("Tiene historial de conducta registrado.")
+    except Exception:
+        pass
+
+    try:
+        if not funcionario.fecha_ingreso:
+            alertas.append("No tiene fecha de ingreso cargada.")
+    except Exception:
+        pass
+
+    return alertas
+
 
 @login_required
 def liquidacion_nueva(request):
@@ -4937,6 +5049,22 @@ def liquidacion_nueva(request):
                     messages.error(request, "No puedes crear liquidaciones para otra empresa.")
                     return redirect("liquidaciones_lista")
 
+            dias_auto = _liq_dias_salario_auto(liquidacion.fecha_salida)
+            vacaciones_auto = _liq_vacaciones_pendientes_auto(liquidacion.funcionario)
+
+            liquidacion.dias_trabajados_pendientes = _liq_int_auto(
+                liquidacion.dias_trabajados_pendientes,
+                dias_auto
+            )
+
+            liquidacion.vacaciones_causadas_pendientes_dias = _liq_int_auto(
+                liquidacion.vacaciones_causadas_pendientes_dias,
+                vacaciones_auto
+            )
+
+            if not liquidacion.fecha_calculo:
+                liquidacion.fecha_calculo = timezone.localdate()
+
             resumen = calcular_liquidacion_funcionario(
                 funcionario=liquidacion.funcionario,
                 tipo_salida=liquidacion.tipo_salida,
@@ -4952,9 +5080,6 @@ def liquidacion_nueva(request):
             for campo, valor in resumen.items():
                 setattr(liquidacion, campo, valor)
 
-            if not liquidacion.fecha_calculo:
-                liquidacion.fecha_calculo = timezone.localdate()
-
             liquidacion.save()
 
             registrar_historial(
@@ -4966,6 +5091,7 @@ def liquidacion_nueva(request):
 
             messages.success(request, "Liquidación generada correctamente.")
             return redirect("liquidacion_detalle", pk=liquidacion.pk)
+
     else:
         form = LiquidacionForm(initial={"fecha_calculo": timezone.localdate()})
 
@@ -5006,10 +5132,11 @@ def liquidacion_preview(request):
         return JsonResponse({"ok": False, "error": "Faltan datos para calcular."})
 
     try:
-        funcionario = Funcionario.objects.select_related("sucursal_rel", "sucursal_rel__empresa").get(
-            pk=funcionario_id,
-            activo=True
-        )
+        funcionario = Funcionario.objects.select_related(
+            "sucursal_rel",
+            "sucursal_rel__empresa",
+            "turno"
+        ).get(pk=funcionario_id, activo=True)
     except Funcionario.DoesNotExist:
         return JsonResponse({"ok": False, "error": "Funcionario no encontrado."})
 
@@ -5023,18 +5150,21 @@ def liquidacion_preview(request):
         return JsonResponse({"ok": False, "error": "Fecha de salida inválida."})
 
     try:
-        if dias_trabajados_pendientes in [None, ""]:
-            dias_trabajados_pendientes = None
-        else:
-            dias_trabajados_pendientes = int(dias_trabajados_pendientes)
+        dias_auto = _liq_dias_salario_auto(fecha_salida_obj)
+        vacaciones_auto = _liq_vacaciones_pendientes_auto(funcionario)
 
-        if vacaciones_causadas_pendientes_dias in [None, ""]:
-            vacaciones_causadas_pendientes_dias = None
-        else:
-            vacaciones_causadas_pendientes_dias = int(vacaciones_causadas_pendientes_dias)
+        dias_trabajados_pendientes = _liq_int_auto(
+            dias_trabajados_pendientes,
+            dias_auto
+        )
+
+        vacaciones_causadas_pendientes_dias = _liq_int_auto(
+            vacaciones_causadas_pendientes_dias,
+            vacaciones_auto
+        )
 
         preaviso_dias_otorgados = int(preaviso_dias_otorgados or 0)
-        otros_descuentos = Decimal(otros_descuentos or 0)
+        otros_descuentos = Decimal(str(otros_descuentos or 0))
     except (ValueError, InvalidOperation):
         return JsonResponse({"ok": False, "error": "Hay valores numéricos inválidos."})
 
@@ -5050,15 +5180,47 @@ def liquidacion_preview(request):
         otros_descuentos=otros_descuentos,
     )
 
+    liquidaciones_previas = Liquidacion.objects.filter(
+        funcionario=funcionario
+    ).order_by("-fecha_salida")[:5]
+
+    alertas = _liq_alertas_funcionario(funcionario)
+
     return JsonResponse({
         "ok": True,
         "funcionario": funcionario.nombre_completo,
+        "cedula": funcionario.cedula,
+        "cargo": funcionario.cargo or "-",
+        "sector": funcionario.sector or "-",
+        "sucursal": funcionario.sucursal_mostrar,
+        "empresa": funcionario.empresa_mostrar,
+        "fecha_ingreso": funcionario.fecha_ingreso.strftime("%d/%m/%Y") if funcionario.fecha_ingreso else "-",
         "tipo_salida": tipo_salida,
+
+        "auto": {
+            "dias_trabajados_pendientes": dias_auto,
+            "vacaciones_pendientes": vacaciones_auto,
+            "fecha_calculo": timezone.localdate().strftime("%Y-%m-%d"),
+        },
+
+        "alertas": alertas,
+
+        "liquidaciones_previas": [
+            {
+                "fecha": l.fecha_salida.strftime("%d/%m/%Y"),
+                "tipo": l.get_tipo_salida_display(),
+                "total": str(l.total_liquidacion),
+                "estado": l.get_estado_display(),
+            }
+            for l in liquidaciones_previas
+        ],
+
         "antiguedad": {
             "anios": resumen["antiguedad_anios"],
             "meses": resumen["antiguedad_meses"],
             "dias": resumen["antiguedad_dias"],
         },
+
         "salario_base_snapshot": str(resumen["salario_base_snapshot"]),
         "bono_base_snapshot": str(resumen["bono_base_snapshot"]),
         "dias_trabajados_pendientes": resumen["dias_trabajados_pendientes"],

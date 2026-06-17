@@ -121,6 +121,10 @@
     font-size: 13px;
     font-weight: 800;
     transition: .18s ease;
+    border: 1px solid rgba(255,255,255,.08);
+    border-radius: 12px;
+    padding: 12px;
+    cursor: pointer;
 }
 
 .color-option:hover {
@@ -130,6 +134,35 @@
 
 #id_color_primario {
     display: none;
+}
+
+.theme-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+    margin-top: 8px;
+}
+
+.catalog-input-row {
+    display: flex;
+    gap: 10px;
+}
+
+.catalog-meta {
+    color: #94a3b8;
+    font-size: 12px;
+    margin-top: 6px;
+}
+
+.catalog-error {
+    display: none;
+    margin-top: 8px;
+    color: #fecaca;
+    background: rgba(220,38,38,.12);
+    border: 1px solid rgba(220,38,38,.25);
+    border-radius: 10px;
+    padding: 8px 10px;
+    font-size: 12px;
 }
 
 .theme-help,
@@ -271,8 +304,13 @@
 
 @media (max-width: 900px) {
     .config-grid,
-    .check-grid {
+    .check-grid,
+    .theme-grid {
         grid-template-columns: 1fr;
+    }
+
+    .catalog-input-row {
+        flex-direction: column;
     }
 
     .card-config {
@@ -342,6 +380,23 @@
                         {{ form.logo_url }}
                         {{ form.logo_url.errors }}
                     </div>
+
+                    <div class="config-field full">
+                        <label for="{{ form.color_primario.id_for_label }}">Tema de color</label>
+                        {{ form.color_primario }}
+                        <div class="theme-grid">
+                            <button type="button" class="color-option" data-color="azul" onclick="seleccionarColor('azul')">Azul</button>
+                            <button type="button" class="color-option" data-color="verde" onclick="seleccionarColor('verde')">Verde</button>
+                            <button type="button" class="color-option" data-color="rojo" onclick="seleccionarColor('rojo')">Rojo</button>
+                            <button type="button" class="color-option" data-color="naranja" onclick="seleccionarColor('naranja')">Naranja</button>
+                            <button type="button" class="color-option" data-color="morado" onclick="seleccionarColor('morado')">Morado</button>
+                            <button type="button" class="color-option" data-color="turquesa" onclick="seleccionarColor('turquesa')">Turquesa</button>
+                            <button type="button" class="color-option" data-color="gris" onclick="seleccionarColor('gris')">Gris</button>
+                        </div>
+                        <div id="themePreview" class="color-preview-box"></div>
+                        <div class="theme-help">Este tema se aplica a los acentos visuales del sistema.</div>
+                        {{ form.color_primario.errors }}
+                    </div>
                 </div>
             </div>
 
@@ -395,11 +450,13 @@
                     <div class="config-field">
                         <label>Bancos</label>
 
-                        <div style="display:flex; gap:10px;">
-                            <input type="text" id="input_banco" class="form-control" placeholder="Ej: Continental">
+                        <div class="catalog-input-row">
+                            <input type="text" id="input_banco" class="form-control" placeholder="Ej: Continental" maxlength="100">
                             <button type="button" onclick="agregarItem('banco')" class="btn-guardar btn-add-chip">➕</button>
                         </div>
 
+                        <div class="catalog-meta">Hasta 100 caracteres por opcion. Presiona Enter o el boton para agregar.</div>
+                        <div id="error_banco" class="catalog-error"></div>
                         <div id="lista_banco" class="chips-container"></div>
 
                         {{ form.bancos_personalizados }}
@@ -409,11 +466,13 @@
                     <div class="config-field">
                         <label>Cargos</label>
 
-                        <div style="display:flex; gap:10px;">
-                            <input type="text" id="input_cargo" class="form-control" placeholder="Ej: Cajera/o">
+                        <div class="catalog-input-row">
+                            <input type="text" id="input_cargo" class="form-control" placeholder="Ej: Cajera/o" maxlength="100">
                             <button type="button" onclick="agregarItem('cargo')" class="btn-guardar btn-add-chip">➕</button>
                         </div>
 
+                        <div class="catalog-meta">Los cargos se usan en la ficha del funcionario. Maximo 100 caracteres.</div>
+                        <div id="error_cargo" class="catalog-error"></div>
                         <div id="lista_cargo" class="chips-container"></div>
 
                         {{ form.cargos_personalizados }}
@@ -423,11 +482,13 @@
                     <div class="config-field full">
                         <label>Sectores</label>
 
-                        <div style="display:flex; gap:10px;">
-                            <input type="text" id="input_sector" class="form-control" placeholder="Ej: Administración">
+                        <div class="catalog-input-row">
+                            <input type="text" id="input_sector" class="form-control" placeholder="Ej: Administración" maxlength="100">
                             <button type="button" onclick="agregarItem('sector')" class="btn-guardar btn-add-chip">➕</button>
                         </div>
 
+                        <div class="catalog-meta">Los sectores se usan en funcionarios, reportes y dias libres. Maximo 100 caracteres.</div>
+                        <div id="error_sector" class="catalog-error"></div>
                         <div id="lista_sector" class="chips-container"></div>
 
                         {{ form.sectores_personalizados }}
@@ -565,6 +626,19 @@ function obtenerHidden(tipo) {
     return document.getElementById(MAPA_CAMPOS[tipo]);
 }
 
+function mostrarErrorCatalogo(tipo, mensaje) {
+    const error = document.getElementById("error_" + tipo);
+    if (!error) return;
+
+    if (mensaje) {
+        error.textContent = mensaje;
+        error.style.display = "block";
+    } else {
+        error.textContent = "";
+        error.style.display = "none";
+    }
+}
+
 function obtenerItems(hidden) {
     if (!hidden || !hidden.value) return [];
 
@@ -597,12 +671,22 @@ function agregarItem(tipo) {
     if (!input || !hidden) return;
 
     const valor = input.value.trim();
+    mostrarErrorCatalogo(tipo, "");
+
     if (!valor) return;
+
+    if (valor.length > 100) {
+        mostrarErrorCatalogo(tipo, "La opcion no puede superar 100 caracteres.");
+        return;
+    }
 
     const items = obtenerItems(hidden);
 
     if (!items.includes(valor)) {
         items.push(valor);
+    } else {
+        mostrarErrorCatalogo(tipo, "Esta opcion ya existe en la lista.");
+        return;
     }
 
     guardarItems(hidden, items);
@@ -651,6 +735,20 @@ function renderLista(tipo) {
     });
 }
 
+function validarCatalogo(tipo) {
+    const hidden = obtenerHidden(tipo);
+    if (!hidden) return true;
+
+    const invalido = obtenerItems(hidden).find(item => item.length > 100);
+    if (invalido) {
+        mostrarErrorCatalogo(tipo, "Revisa esta opcion: " + invalido + ". Maximo 100 caracteres.");
+        return false;
+    }
+
+    mostrarErrorCatalogo(tipo, "");
+    return true;
+}
+
 function inicializarCatalogo(tipo) {
     const hidden = obtenerHidden(tipo);
     if (!hidden) return;
@@ -678,13 +776,22 @@ document.addEventListener("DOMContentLoaded", function () {
     const form = document.querySelector("form");
 
     if (form) {
-        form.addEventListener("submit", function () {
+        form.addEventListener("submit", function (e) {
+            let valido = true;
+
             ["banco", "cargo", "sector"].forEach(function (tipo) {
                 const hidden = obtenerHidden(tipo);
                 if (hidden) {
                     guardarItems(hidden, obtenerItems(hidden));
+                    if (!validarCatalogo(tipo)) {
+                        valido = false;
+                    }
                 }
             });
+
+            if (!valido) {
+                e.preventDefault();
+            }
         });
     }
 });

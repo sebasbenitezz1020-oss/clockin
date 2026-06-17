@@ -41,7 +41,7 @@
 
 .kpi-grid {
     display: grid;
-    grid-template-columns: repeat(6, minmax(0, 1fr));
+    grid-template-columns: repeat(5, minmax(0, 1fr));
     gap: 14px;
 }
 
@@ -81,8 +81,48 @@
 
 .attention-strip {
     display: grid;
-    grid-template-columns: 1.4fr 1fr;
+    grid-template-columns: 1.1fr 1fr;
     gap: 18px;
+}
+
+.daily-summary-card {
+    border-radius: 20px;
+    padding: 18px;
+    background: linear-gradient(145deg, rgba(59,130,246,.08), rgba(15,23,34,.2));
+    border: 1px solid rgba(255,255,255,.06);
+}
+
+.daily-summary-card h3 {
+    margin: 0 0 12px;
+    color: #fff;
+    font-size: 18px;
+}
+
+.daily-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.daily-summary-item {
+    padding: 14px;
+    border-radius: 16px;
+    background: rgba(255,255,255,.03);
+    border: 1px solid rgba(255,255,255,.05);
+}
+
+.daily-summary-item span {
+    display: block;
+    color: #94a3b8;
+    font-size: 12px;
+    margin-bottom: 7px;
+}
+
+.daily-summary-item strong {
+    display: block;
+    color: #fff;
+    font-size: 26px;
+    line-height: 1;
 }
 
 .attention-box {
@@ -110,51 +150,6 @@
     color: #fca5a5;
     font-size: 13px;
 }
-
-.semaforo-box {
-    border-radius: 20px;
-    padding: 18px;
-    background: linear-gradient(145deg, rgba(59,130,246,.08), rgba(15,23,34,.2));
-    border: 1px solid rgba(255,255,255,.06);
-}
-
-.semaforo-box h3 {
-    margin: 0 0 14px;
-    color: #fff;
-    font-size: 18px;
-}
-
-.semaforo-grid {
-    display: grid;
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-    gap: 10px;
-}
-
-.semaforo-pill {
-    border-radius: 16px;
-    padding: 12px;
-    text-align: center;
-    border: 1px solid transparent;
-}
-
-.semaforo-pill strong {
-    display: block;
-    font-size: 22px;
-    line-height: 1;
-    margin-bottom: 6px;
-    color: #fff;
-}
-
-.semaforo-pill span {
-    font-size: 11px;
-    font-weight: 700;
-}
-
-.semaforo-verde { background: rgba(34,197,94,.14); border-color: rgba(34,197,94,.2); color: #bbf7d0; }
-.semaforo-amarillo { background: rgba(245,158,11,.14); border-color: rgba(245,158,11,.2); color: #fde68a; }
-.semaforo-rojo { background: rgba(239,68,68,.14); border-color: rgba(239,68,68,.2); color: #fecaca; }
-.semaforo-naranja { background: rgba(249,115,22,.14); border-color: rgba(249,115,22,.2); color: #fdba74; }
-.semaforo-azul { background: rgba(59,130,246,.14); border-color: rgba(59,130,246,.2); color: #bfdbfe; }
 
 .report-filter-form .form-grid {
     display: grid;
@@ -236,34 +231,6 @@
 .btn-report-pro.clear {
     background: rgba(255,255,255,.05);
     color: #e2e8f0;
-}
-
-.top-metrics-inline {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 14px;
-    margin-top: 14px;
-}
-
-.metric-inline-card {
-    background: rgba(255,255,255,.03);
-    border: 1px solid rgba(255,255,255,.05);
-    border-radius: 16px;
-    padding: 14px;
-}
-
-.metric-inline-card span {
-    display: block;
-    color: #94a3b8;
-    font-size: 12px;
-    margin-bottom: 6px;
-}
-
-.metric-inline-card strong {
-    display: block;
-    color: #fff;
-    font-size: 26px;
-    line-height: 1;
 }
 
 .report-button-grid {
@@ -508,7 +475,6 @@
 @media (max-width: 1200px) {
     .kpi-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .attention-strip { grid-template-columns: 1fr; }
-    .semaforo-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
     .report-button-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .monthly-filter-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
@@ -517,8 +483,7 @@
     .report-filter-form .form-grid,
     .report-filter-form .form-grid.month-grid,
     .kpi-grid,
-    .top-metrics-inline,
-    .semaforo-grid,
+    .daily-summary-grid,
     .report-button-grid,
     .monthly-filter-grid {
         grid-template-columns: 1fr;
@@ -620,17 +585,6 @@
                 <a href="{% url 'reporte_diario_pdf' %}?fecha={{ fecha_reporte|date:'Y-m-d' }}&sucursal={{ sucursal_id }}&q={{ q }}" class="btn-report-pro pdf" target="_blank">📄 Exportar PDF diario horizontal</a>
             </div>
         </form>
-
-        <div class="top-metrics-inline">
-            <div class="metric-inline-card">
-                <span>% Asistencia del día</span>
-                <strong>{{ porcentaje_asistencia }}%</strong>
-            </div>
-            <div class="metric-inline-card">
-                <span>% Cumplimiento en horario</span>
-                <strong>{{ porcentaje_cumplimiento }}%</strong>
-            </div>
-        </div>
     </div>
 
     <div class="section-card-pro">
@@ -696,15 +650,17 @@
                 Se suman tardanzas, ausencias y funcionarios con entrada registrada pero sin salida.
             </div>
         </div>
-
-        <div class="semaforo-box">
-            <h3>🎯 Semáforo operativo</h3>
-            <div class="semaforo-grid">
-                <div class="semaforo-pill semaforo-verde"><strong>{{ resumen_semaforo.verde }}</strong><span>En horario</span></div>
-                <div class="semaforo-pill semaforo-amarillo"><strong>{{ resumen_semaforo.amarillo }}</strong><span>Tarde</span></div>
-                <div class="semaforo-pill semaforo-rojo"><strong>{{ resumen_semaforo.rojo }}</strong><span>Ausente</span></div>
-                <div class="semaforo-pill semaforo-naranja"><strong>{{ resumen_semaforo.naranja }}</strong><span>Sin salida</span></div>
-                <div class="semaforo-pill semaforo-azul"><strong>{{ resumen_semaforo.azul }}</strong><span>Justificados</span></div>
+        <div class="daily-summary-card">
+            <h3>Resumen ejecutivo del dia</h3>
+            <div class="daily-summary-grid">
+                <div class="daily-summary-item">
+                    <span>Asistencia</span>
+                    <strong>{{ porcentaje_asistencia }}%</strong>
+                </div>
+                <div class="daily-summary-item">
+                    <span>Cumplimiento en horario</span>
+                    <strong>{{ porcentaje_cumplimiento }}%</strong>
+                </div>
             </div>
         </div>
     </div>
@@ -712,10 +668,9 @@
     <div class="kpi-grid">
         <a href="#tabla-general-dia" class="kpi-card info"><span class="kpi-label">Programados</span><div class="kpi-value">{{ programados_dia }}</div></a>
         <a href="#tabla-general-dia" class="kpi-card success"><span class="kpi-label">Presentes</span><div class="kpi-value">{{ presentes_dia }}</div></a>
-        <a href="#panel-presentes" class="kpi-card success js-open-panel" data-target="panel-presentes"><span class="kpi-label">En horario</span><div class="kpi-value">{{ en_horario_dia }}</div></a>
         <a href="#panel-atrasos" class="kpi-card warning js-open-panel" data-target="panel-atrasos"><span class="kpi-label">Tardanzas</span><div class="kpi-value">{{ tardanzas_dia }}</div></a>
         <a href="#panel-ausentes" class="kpi-card danger js-open-panel" data-target="panel-ausentes"><span class="kpi-label">Ausencias</span><div class="kpi-value">{{ ausencias_dia }}</div></a>
-        <a href="#panel-permisos" class="kpi-card info js-open-panel" data-target="panel-permisos"><span class="kpi-label">Permisos / licencias</span><div class="kpi-value">{{ justificados_dia }}</div></a>
+        <a href="#panel-jornada-incompleta" class="kpi-card warning js-open-panel" data-target="panel-jornada-incompleta"><span class="kpi-label">Jornada incompleta</span><div class="kpi-value">{{ jornadas_incompletas_dia }}</div></a>
     </div>
 
 <div class="section-card-pro">
@@ -755,6 +710,7 @@
             <button type="button" class="report-toggle-btn" data-target="panel-ausentes">🚫 Ausentes<span>Solo quienes ya debían presentarse</span><strong>{{ ausentes_dia|length }}</strong></button>
             <button type="button" class="report-toggle-btn" data-target="panel-presentes">✅ Presentes en hora<span>Funcionarios puntuales</span><strong>{{ presentes_en_horario|length }}</strong></button>
             <button type="button" class="report-toggle-btn" data-target="panel-sin-salida">🕘 Sin salida<span>Entrada sin salida final</span><strong>{{ sin_salida|length }}</strong></button>
+            <button type="button" class="report-toggle-btn" data-target="panel-jornada-incompleta">Jornada incompleta<span>Menos de 8 horas el dia anterior</span><strong>{{ jornadas_incompletas|length }}</strong></button>
             <button type="button" class="report-toggle-btn" data-target="panel-permisos">📄 Permisos<span>Permisos/licencias aprobados</span><strong>{{ permisos_reporte_dia|length }}</strong></button>
             <button type="button" class="report-toggle-btn" data-target="panel-vacaciones">🏖️ Vacaciones<span>Vacaciones activas del día</span><strong>{{ vacaciones_reporte_dia|length }}</strong></button>
             <button type="button" class="report-toggle-btn" data-target="panel-dias-libres">🗓️ Día Libre<span>Funcionarios libres hoy</span><strong>{{ dias_libres_reporte_dia|length }}</strong></button>
@@ -842,6 +798,31 @@
                     </div>
                 {% empty %}
                     <div class="empty-mini">No hay funcionarios pendientes de marcar salida.</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="alert-card-pro report-panel" id="panel-jornada-incompleta">
+            <div class="alert-card-head">
+                <h4>Jornada incompleta del {{ fecha_jornada_incompleta|date:"d/m/Y" }}</h4>
+                <span class="alert-counter yellow">{{ jornadas_incompletas|length }}</span>
+            </div>
+            <div class="mini-list">
+                {% for a in jornadas_incompletas %}
+                    <div class="mini-item">
+                        <strong>{{ a.funcionario.nombre_completo }}</strong>
+                        <span>CI: {{ a.funcionario.cedula }}</span>
+                        <span>Sucursal: {{ a.funcionario.sucursal_mostrar }}</span>
+                        <span>Sector: {{ a.funcionario.sector|default:"-" }}</span>
+                        <span>Total trabajado: {{ a.horas_trabajadas_texto }}</span>
+                        <div class="quick-actions">
+                            <a href="{% url 'funcionario_detalle' a.funcionario.id %}" class="quick-btn gray">Ficha</a>
+                            <a href="{% url 'asistencia_marcar' %}?funcionario={{ a.funcionario.id }}" class="quick-btn orange">Revisar asistencia</a>
+                            <a href="{% url 'historial_lista' %}?q={{ a.funcionario.cedula }}" class="quick-btn green">Historial</a>
+                        </div>
+                    </div>
+                {% empty %}
+                    <div class="empty-mini">No hay jornadas incompletas detectadas para el dia anterior.</div>
                 {% endfor %}
             </div>
         </div>
