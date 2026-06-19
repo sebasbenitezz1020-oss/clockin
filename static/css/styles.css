@@ -2593,6 +2593,223 @@ button.is-processing::after,
     }
 }
 
+/* Panel Global layout hardening */
+.global-panel-page {
+    width: 100%;
+    max-width: 100%;
+    padding: 24px 0 34px;
+}
+
+.global-panel-page .global-panel-header {
+    display: block;
+    margin-bottom: 18px;
+    padding: 28px;
+    border-radius: 30px;
+}
+
+.global-panel-page .dash-hero-row {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 18px;
+    flex-wrap: wrap;
+}
+
+.global-panel-page .global-panel-header h2 {
+    margin: 12px 0 6px;
+    color: #fff;
+    font-size: 38px;
+    line-height: 1.05;
+    font-weight: 950;
+    letter-spacing: 0;
+}
+
+.global-panel-page .global-panel-header p {
+    margin: 0;
+    color: #94a3b8;
+    font-size: 15px;
+}
+
+.global-panel-page .global-stats {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)) !important;
+    gap: 14px !important;
+    align-items: stretch;
+    margin-bottom: 18px;
+}
+
+.global-panel-page .global-stats .dash-stat-pro {
+    min-width: 0;
+    min-height: 112px;
+    padding: 18px;
+    border-radius: 24px;
+    background: linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
+    border: 1px solid rgba(255,255,255,.07);
+    box-shadow: 0 12px 32px rgba(0,0,0,.22);
+}
+
+.global-panel-page .global-stats .lab {
+    display: block;
+    color: #94a3b8;
+    font-size: 12px;
+    font-weight: 850;
+    line-height: 1.25;
+    text-transform: none;
+    margin: 0 0 8px;
+}
+
+.global-panel-page .global-stats .val {
+    display: block;
+    color: #fff;
+    font-size: 32px;
+    font-weight: 950;
+    line-height: 1;
+    margin: 0;
+}
+
+.global-panel-page .global-company-grid {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)) !important;
+    gap: 18px !important;
+    align-items: stretch;
+    width: 100%;
+}
+
+.global-panel-page .global-company-card {
+    min-width: 0;
+    overflow: hidden;
+    padding: 0;
+    border-radius: 26px;
+    background: linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
+    border: 1px solid rgba(255,255,255,.07);
+    box-shadow: 0 14px 42px rgba(0,0,0,.24);
+}
+
+.global-panel-page .global-company-head {
+    padding: 20px 22px 12px;
+}
+
+.global-panel-page .global-company-body {
+    padding: 0 22px 22px;
+}
+
+.global-panel-page .global-company-top {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    min-width: 0;
+    width: 100%;
+    margin: 0;
+}
+
+.global-panel-page .global-company-title {
+    min-width: 0;
+}
+
+.global-panel-page .global-company-title h3 {
+    margin: 0 0 4px;
+    color: #fff;
+    font-size: 18px;
+    font-weight: 950;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+}
+
+.global-panel-page .global-company-title p {
+    margin: 0;
+    color: #94a3b8;
+    font-size: 13px;
+}
+
+.global-panel-page .global-company-logo {
+    width: 58px !important;
+    min-width: 58px !important;
+    max-width: 58px !important;
+    height: 58px !important;
+    min-height: 58px !important;
+    max-height: 58px !important;
+    display: grid !important;
+    place-items: center;
+    overflow: hidden;
+    flex: 0 0 58px;
+    border-radius: 16px;
+    background: var(--brand-soft);
+    border: 1px solid var(--brand-border);
+    color: #fff;
+    font-size: 24px;
+    font-weight: 950;
+}
+
+.global-panel-page .global-company-logo img {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    object-fit: cover !important;
+}
+
+.global-panel-page .global-company-meta {
+    display: grid !important;
+    grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+    gap: 10px !important;
+    margin: 0 0 14px;
+}
+
+.global-panel-page .global-company-meta div {
+    min-width: 0;
+    padding: 12px;
+    border-radius: 14px;
+    background: rgba(255,255,255,.035);
+    border: 1px solid rgba(255,255,255,.08);
+}
+
+.global-panel-page .global-company-meta span {
+    display: block;
+    color: #94a3b8;
+    font-size: 12px;
+    line-height: 1.25;
+}
+
+.global-panel-page .global-company-meta strong {
+    display: block;
+    color: #fff;
+    font-weight: 900;
+    line-height: 1.25;
+    margin-top: 4px;
+    overflow-wrap: anywhere;
+}
+
+.global-panel-page .global-card-actions {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.global-panel-page .global-btn {
+    width: 100%;
+    min-height: 42px;
+    white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+    .global-panel-page .global-panel-header {
+        padding: 22px;
+        border-radius: 24px;
+    }
+
+    .global-panel-page .global-panel-header h2 {
+        font-size: 30px;
+    }
+
+    .global-panel-page .global-company-grid,
+    .global-panel-page .global-stats,
+    .global-panel-page .global-company-meta,
+    .global-panel-page .global-card-actions {
+        grid-template-columns: 1fr !important;
+    }
+}
+
 @media (max-width: 900px) {
     .subscription-header,
     .subscription-actions {

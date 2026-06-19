@@ -4,62 +4,68 @@
 {% block title %}Panel Global | ClockIn{% endblock %}
 
 {% block content %}
-<div class="global-panel-page">
-    <section class="global-panel-header">
-        <div>
-            <span class="global-kicker">Panel Global</span>
-            <h2>Selector de Empresas</h2>
-            <p>Vista ejecutiva de clientes, suscripciones y acceso operativo por empresa.</p>
+<div class="global-panel-page dash-pro">
+    <section class="global-panel-header dash-hero-pro">
+        <div class="dash-hero-row">
+            <div>
+                <span class="global-kicker dash-kicker">Panel Global</span>
+                <h2>Selector de Empresas</h2>
+                <p>Vista ejecutiva de clientes, suscripciones y acceso operativo por empresa.</p>
+            </div>
+            <a href="{% url 'empresa_nueva' %}" class="global-btn global-btn-main">Crear empresa</a>
         </div>
-        <a href="{% url 'empresa_nueva' %}" class="global-btn global-btn-main">Crear empresa</a>
     </section>
 
-    <section class="global-stats">
-        <article><span>Total empresas</span><strong>{{ total_empresas }}</strong></article>
-        <article><span>Activas</span><strong>{{ empresas_activas }}</strong></article>
-        <article><span>Suspendidas</span><strong>{{ empresas_suspendidas }}</strong></article>
-        <article><span>Funcionarios</span><strong>{{ total_funcionarios }}</strong></article>
-        <article><span>Sucursales</span><strong>{{ total_sucursales }}</strong></article>
-        <article><span>Por vencer</span><strong>{{ proximas_vencer }}</strong></article>
-        <article><span>Pagos pendientes</span><strong>{{ pagos_pendientes }}</strong></article>
+    <section class="global-stats dash-stats-pro">
+        <article class="dash-stat-pro"><span class="lab">Total empresas</span><strong class="val">{{ total_empresas }}</strong></article>
+        <article class="dash-stat-pro"><span class="lab">Activas</span><strong class="val">{{ empresas_activas }}</strong></article>
+        <article class="dash-stat-pro"><span class="lab">Suspendidas</span><strong class="val">{{ empresas_suspendidas }}</strong></article>
+        <article class="dash-stat-pro"><span class="lab">Funcionarios</span><strong class="val">{{ total_funcionarios }}</strong></article>
+        <article class="dash-stat-pro"><span class="lab">Sucursales</span><strong class="val">{{ total_sucursales }}</strong></article>
+        <article class="dash-stat-pro"><span class="lab">Por vencer</span><strong class="val">{{ proximas_vencer }}</strong></article>
+        <article class="dash-stat-pro"><span class="lab">Pagos pendientes</span><strong class="val">{{ pagos_pendientes }}</strong></article>
     </section>
 
     <section class="global-company-grid">
         {% for item in tarjetas %}
-            <article class="global-company-card">
-                <div class="global-company-top">
-                    <div class="global-company-logo">
-                        {% if item.empresa.logo %}
-                            <img src="{{ item.empresa.logo.url }}" alt="{{ item.empresa.nombre_visible }}">
+            <article class="global-company-card dash-card-pro">
+                <div class="dash-card-head global-company-head">
+                    <div class="global-company-top">
+                        <div class="global-company-logo">
+                            {% if item.empresa.logo %}
+                                <img src="{{ item.empresa.logo.url }}" alt="{{ item.empresa.nombre_visible }}">
+                            {% else %}
+                                <span>{{ item.empresa.nombre_visible|slice:":1" }}</span>
+                            {% endif %}
+                        </div>
+                        <div class="global-company-title">
+                            <h3>{{ item.empresa.nombre_visible }}</h3>
+                            <p>RUC: {{ item.empresa.ruc|default:"-" }}</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dash-card-body global-company-body">
+                    <div class="global-company-meta">
+                        <div><span>Plan</span><strong>{{ item.empresa.get_plan_contratado_display }}</strong></div>
+                        <div><span>Estado</span><strong>{{ item.empresa.get_estado_display }}</strong></div>
+                        <div><span>Funcionarios</span><strong>{{ item.funcionarios_activos }}</strong></div>
+                        <div><span>Sucursales</span><strong>{{ item.sucursales_count }}</strong></div>
+                    </div>
+
+                    <div class="global-subscription-line {% if item.empresa.suscripcion_vencida %}danger{% elif item.empresa.suscripcion_por_vencer %}warning{% endif %}">
+                        Suscripci&oacute;n:
+                        {% if item.empresa.fecha_vencimiento_suscripcion %}
+                            {{ item.empresa.fecha_vencimiento_suscripcion|date:"d/m/Y" }}
                         {% else %}
-                            <span>{{ item.empresa.nombre_visible|slice:":1" }}</span>
+                            Sin vencimiento
                         {% endif %}
                     </div>
-                    <div>
-                        <h3>{{ item.empresa.nombre_visible }}</h3>
-                        <p>RUC: {{ item.empresa.ruc|default:"-" }}</p>
+
+                    <div class="global-card-actions">
+                        <a href="{% url 'empresa_entrar' item.empresa.id %}" class="global-btn global-btn-main">Entrar a empresa</a>
+                        <a href="{% url 'empresa_detalle_global' item.empresa.id %}" class="global-btn global-btn-soft">Ver detalle</a>
                     </div>
-                </div>
-
-                <div class="global-company-meta">
-                    <div><span>Plan</span><strong>{{ item.empresa.get_plan_contratado_display }}</strong></div>
-                    <div><span>Estado</span><strong>{{ item.empresa.get_estado_display }}</strong></div>
-                    <div><span>Funcionarios</span><strong>{{ item.funcionarios_activos }}</strong></div>
-                    <div><span>Sucursales</span><strong>{{ item.sucursales_count }}</strong></div>
-                </div>
-
-                <div class="global-subscription-line {% if item.empresa.suscripcion_vencida %}danger{% elif item.empresa.suscripcion_por_vencer %}warning{% endif %}">
-                    Suscripci&oacute;n:
-                    {% if item.empresa.fecha_vencimiento_suscripcion %}
-                        {{ item.empresa.fecha_vencimiento_suscripcion|date:"d/m/Y" }}
-                    {% else %}
-                        Sin vencimiento
-                    {% endif %}
-                </div>
-
-                <div class="global-card-actions">
-                    <a href="{% url 'empresa_entrar' item.empresa.id %}" class="global-btn global-btn-main">Entrar a empresa</a>
-                    <a href="{% url 'empresa_detalle_global' item.empresa.id %}" class="global-btn global-btn-soft">Ver detalle</a>
                 </div>
             </article>
         {% empty %}
