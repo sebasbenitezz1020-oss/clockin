@@ -4,6 +4,128 @@
 {% block title %}Panel Global | ClockIn{% endblock %}
 
 {% block content %}
+<style>
+    .global-panel-page {
+        width: 100%;
+        max-width: 100%;
+        padding: 24px 0 34px;
+    }
+
+    .global-panel-page .global-stats {
+        display: grid !important;
+        grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)) !important;
+        gap: 14px !important;
+        align-items: stretch;
+        margin-bottom: 18px;
+    }
+
+    .global-panel-page .global-stats > article {
+        display: block !important;
+        min-width: 0 !important;
+        min-height: 112px !important;
+        padding: 18px !important;
+        border-radius: 24px !important;
+        background: linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98)) !important;
+        border: 1px solid rgba(255,255,255,.07) !important;
+        box-shadow: 0 12px 32px rgba(0,0,0,.22) !important;
+    }
+
+    .global-panel-page .global-stats .lab {
+        display: block !important;
+        color: #94a3b8 !important;
+        font-size: 12px !important;
+        font-weight: 850 !important;
+        line-height: 1.25 !important;
+        margin: 0 0 8px !important;
+    }
+
+    .global-panel-page .global-stats .val {
+        display: block !important;
+        color: #fff !important;
+        font-size: 32px !important;
+        font-weight: 950 !important;
+        line-height: 1 !important;
+        margin: 0 !important;
+    }
+
+    .global-panel-page .global-company-grid {
+        display: grid !important;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)) !important;
+        gap: 18px !important;
+        align-items: stretch;
+        width: 100%;
+    }
+
+    .global-panel-page .global-company-card {
+        min-width: 0;
+        overflow: hidden;
+        padding: 0;
+        border-radius: 26px;
+        background: linear-gradient(180deg, rgba(19,24,34,.98), rgba(14,18,27,.98));
+        border: 1px solid rgba(255,255,255,.07);
+        box-shadow: 0 14px 42px rgba(0,0,0,.24);
+    }
+
+    .global-panel-page .global-company-top {
+        display: flex;
+        align-items: center;
+        gap: 14px;
+        min-width: 0;
+        width: 100%;
+        margin: 0;
+    }
+
+    .global-panel-page .global-company-logo {
+        width: 64px !important;
+        min-width: 64px !important;
+        max-width: 72px !important;
+        height: 64px !important;
+        min-height: 64px !important;
+        max-height: 72px !important;
+        display: grid !important;
+        place-items: center;
+        overflow: hidden;
+        flex: 0 0 64px !important;
+        border-radius: 16px;
+        background: var(--brand-soft);
+        border: 1px solid var(--brand-border);
+        color: #fff;
+        font-size: 24px;
+        font-weight: 950;
+    }
+
+    .global-panel-page .global-company-logo img {
+        display: block !important;
+        width: 100% !important;
+        max-width: 72px !important;
+        height: 100% !important;
+        max-height: 72px !important;
+        object-fit: contain !important;
+    }
+
+    .global-panel-page .global-company-meta {
+        display: grid !important;
+        grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        gap: 10px !important;
+        margin: 0 0 14px;
+    }
+
+    .global-panel-page .global-card-actions {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+    }
+
+    @media (max-width: 760px) {
+        .global-panel-page .global-company-grid,
+        .global-panel-page .global-stats,
+        .global-panel-page .global-company-meta,
+        .global-panel-page .global-card-actions {
+            grid-template-columns: 1fr !important;
+        }
+    }
+</style>
+
 <div class="global-panel-page dash-pro">
     <section class="global-panel-header dash-hero-pro">
         <div class="dash-hero-row">
