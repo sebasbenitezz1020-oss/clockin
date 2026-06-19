@@ -2,12 +2,11 @@ from django.contrib import messages
 from django.shortcuts import redirect
 
 from .models import PermisoUsuario
+from .multiempresa import es_admin_master
 
 
 def es_admin_total(user):
-    if not user.is_authenticated:
-        return False
-    return user.is_superuser or getattr(user, "rol", "") == "admin"
+    return es_admin_master(user)
 
 
 def tiene_permiso(user, modulo, accion="puede_ver"):

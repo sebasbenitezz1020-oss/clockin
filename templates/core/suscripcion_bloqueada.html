@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+
+{% block title %}Sistema bloqueado | ClockIn{% endblock %}
+
+{% block content %}
+<div class="subscription-blocked-page">
+    <section class="subscription-blocked-card">
+        <span class="subscription-kicker">Acceso suspendido</span>
+        <h2>Suscripci&oacute;n pendiente</h2>
+        <p>{{ suscripcion.mensaje_bloqueo }}</p>
+
+        <div class="subscription-blocked-meta">
+            <div>
+                <span>Pr&oacute;ximo pago</span>
+                <strong>{{ suscripcion.fecha_proximo_pago|date:"d/m/Y" }}</strong>
+            </div>
+            <div>
+                <span>Fecha de bloqueo</span>
+                <strong>{{ suscripcion.fecha_bloqueo|date:"d/m/Y" }}</strong>
+            </div>
+            <div>
+                <span>Contacto</span>
+                <strong>{{ suscripcion.contacto_pago|default:"Administrador del sistema" }}</strong>
+            </div>
+        </div>
+
+        <form method="post" action="{% url 'logout' %}">
+            {% csrf_token %}
+            <button type="submit" class="subscription-btn subscription-btn-main">Cerrar sesi&oacute;n</button>
+        </form>
+    </section>
+</div>
+{% endblock %}

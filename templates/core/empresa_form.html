@@ -20,6 +20,18 @@
             </div>
 
             <div class="form-field">
+                <label for="{{ form.nombre_comercial.id_for_label }}">Nombre comercial</label>
+                {{ form.nombre_comercial }}
+                {{ form.nombre_comercial.errors }}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.razon_social.id_for_label }}">Raz&oacute;n social</label>
+                {{ form.razon_social }}
+                {{ form.razon_social.errors }}
+            </div>
+
+            <div class="form-field">
                 <label for="{{ form.ruc.id_for_label }}">RUC</label>
                 {{ form.ruc }}
                 {{ form.ruc.errors }}
@@ -47,6 +59,42 @@
                 <label for="{{ form.logo.id_for_label }}">Logo</label>
                 {{ form.logo }}
                 {{ form.logo.errors }}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.color_primario.id_for_label }}">Color principal</label>
+                {{ form.color_primario }}
+                {{ form.color_primario.errors }}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.color_secundario.id_for_label }}">Color secundario</label>
+                {{ form.color_secundario }}
+                {{ form.color_secundario.errors }}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.tema_visual.id_for_label }}">Tema visual</label>
+                {{ form.tema_visual }}
+                {{ form.tema_visual.errors }}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.estado.id_for_label }}">Estado SaaS</label>
+                {{ form.estado }}
+                {{ form.estado.errors }}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.plan_contratado.id_for_label }}">Plan contratado</label>
+                {{ form.plan_contratado }}
+                {{ form.plan_contratado.errors }}
+            </div>
+
+            <div class="form-field">
+                <label for="{{ form.fecha_vencimiento_suscripcion.id_for_label }}">Vencimiento de suscripci&oacute;n</label>
+                {{ form.fecha_vencimiento_suscripcion }}
+                {{ form.fecha_vencimiento_suscripcion.errors }}
             </div>
 
             <div class="form-field">

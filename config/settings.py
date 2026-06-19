@@ -29,6 +29,8 @@ MIDDLEWARE = [
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
+    "core.middleware.EmpresaActivaMiddleware",
+    "core.middleware.SuscripcionMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
 ]
@@ -46,6 +48,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 'core.context_processors.config_general',
+                'core.context_processors.suscripcion_context',
                 'usuarios.context_processors.permisos_menu',
                 'usuarios.context_processors.multiempresa_context',
             ],

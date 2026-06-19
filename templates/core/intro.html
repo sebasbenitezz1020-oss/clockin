@@ -1,0 +1,213 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="refresh" content="2.5;url=/accounts/login/">
+    <title>ClockIn | Sistema Web RRHH</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            min-height: 100%;
+            margin: 0;
+        }
+
+        body {
+            display: grid;
+            place-items: center;
+            min-height: 100vh;
+            padding: 24px;
+            overflow: hidden;
+            color: #ffffff;
+            font-family: "Segoe UI", Arial, sans-serif;
+            background:
+                radial-gradient(circle at 20% 18%, rgba(37, 99, 235, .34), transparent 34%),
+                radial-gradient(circle at 82% 78%, rgba(14, 165, 233, .18), transparent 32%),
+                linear-gradient(145deg, #07111f 0%, #0b1730 46%, #030712 100%);
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            background:
+                linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+            background-size: 54px 54px;
+            mask-image: linear-gradient(to bottom, rgba(0,0,0,.55), transparent 82%);
+        }
+
+        .intro-shell {
+            position: relative;
+            z-index: 1;
+            width: min(440px, 100%);
+            padding: 38px 34px 32px;
+            text-align: center;
+            border: 1px solid rgba(148, 163, 184, .20);
+            border-radius: 30px;
+            background:
+                linear-gradient(180deg, rgba(15, 23, 42, .84), rgba(2, 6, 23, .72));
+            box-shadow:
+                0 32px 90px rgba(0, 0, 0, .46),
+                0 0 0 1px rgba(255,255,255,.04) inset;
+            backdrop-filter: blur(18px);
+            animation: introIn .7s ease both, introOut .55s ease 2.05s forwards;
+        }
+
+        .logo-frame {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 136px;
+            height: 136px;
+            margin-bottom: 22px;
+            border-radius: 32px;
+            background:
+                radial-gradient(circle at 30% 25%, rgba(96, 165, 250, .22), transparent 54%),
+                rgba(255,255,255,.06);
+            border: 1px solid rgba(147, 197, 253, .22);
+            box-shadow:
+                0 20px 50px rgba(37, 99, 235, .22),
+                0 0 42px rgba(59, 130, 246, .12) inset;
+        }
+
+        .logo-frame img {
+            max-width: 104px;
+            max-height: 104px;
+            object-fit: contain;
+            filter: drop-shadow(0 12px 24px rgba(0,0,0,.30));
+        }
+
+        .intro-title {
+            margin: 0;
+            font-size: clamp(28px, 8vw, 42px);
+            line-height: 1;
+            font-weight: 950;
+            letter-spacing: 0;
+        }
+
+        .intro-subtitle {
+            margin: 12px 0 28px;
+            color: #bfdbfe;
+            font-size: 15px;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+        }
+
+        .loading-track {
+            position: relative;
+            width: 100%;
+            height: 9px;
+            overflow: hidden;
+            border-radius: 999px;
+            background: rgba(15, 23, 42, .92);
+            border: 1px solid rgba(147, 197, 253, .18);
+            box-shadow: 0 1px 0 rgba(255,255,255,.08) inset;
+        }
+
+        .loading-bar {
+            position: absolute;
+            inset: 0 auto 0 0;
+            width: 0%;
+            border-radius: inherit;
+            background: linear-gradient(90deg, #38bdf8, #2563eb, #93c5fd);
+            box-shadow: 0 0 26px rgba(59, 130, 246, .72);
+            animation: loadBar 2.25s cubic-bezier(.2, .75, .2, 1) forwards;
+        }
+
+        .intro-note {
+            margin-top: 16px;
+            color: #94a3b8;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        @keyframes introIn {
+            from {
+                opacity: 0;
+                transform: translateY(18px) scale(.97);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        @keyframes introOut {
+            to {
+                opacity: 0;
+                transform: translateY(-10px) scale(.985);
+            }
+        }
+
+        @keyframes loadBar {
+            0% {
+                width: 0%;
+            }
+            58% {
+                width: 72%;
+            }
+            100% {
+                width: 100%;
+            }
+        }
+
+        @media (max-width: 520px) {
+            body {
+                padding: 18px;
+            }
+
+            .intro-shell {
+                padding: 30px 22px 26px;
+                border-radius: 24px;
+            }
+
+            .logo-frame {
+                width: 112px;
+                height: 112px;
+                border-radius: 28px;
+            }
+
+            .logo-frame img {
+                max-width: 88px;
+                max-height: 88px;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            .intro-shell,
+            .loading-bar {
+                animation-duration: .01ms;
+                animation-iteration-count: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+    <main class="intro-shell" aria-label="Entrada ClockIn">
+        <div class="logo-frame">
+            <img src="{% static 'img/logo-clockin-horizontal.png' %}" alt="ClockIn">
+        </div>
+        <h1 class="intro-title">ClockIn</h1>
+        <p class="intro-subtitle">Sistema Web RRHH</p>
+        <div class="loading-track" aria-hidden="true">
+            <div class="loading-bar"></div>
+        </div>
+        <div class="intro-note">Preparando acceso seguro</div>
+    </main>
+
+    <script>
+        window.setTimeout(function () {
+            window.location.replace("/accounts/login/");
+        }, 2500);
+    </script>
+</body>
+</html>

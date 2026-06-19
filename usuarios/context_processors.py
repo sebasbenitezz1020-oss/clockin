@@ -1,5 +1,5 @@
 from .utils import tiene_permiso, es_admin_total
-from usuarios.multiempresa import es_admin_master, obtener_empresa_usuario
+from usuarios.multiempresa import es_admin_master, obtener_empresa_activa, obtener_empresa_usuario
 
 
 def multiempresa_context(request):
@@ -11,6 +11,7 @@ def multiempresa_context(request):
 
     return {
         "empresa_usuario": obtener_empresa_usuario(request.user),
+        "empresa_activa": obtener_empresa_activa(request),
         "es_admin_master": es_admin_master(request.user),
     }
 

@@ -1,9 +1,33 @@
 from django.contrib import admin
 from .models import Funcionario, Turno, Asistencia, PermisoLicencia, Vacacion, HistorialAccion
+from usuarios.multiempresa import es_admin_master
+
+
+class MasterOnlyAdminMixin:
+    def has_module_permission(self, request):
+        return es_admin_master(request.user)
+
+    def has_view_permission(self, request, obj=None):
+        return es_admin_master(request.user)
+
+    def has_add_permission(self, request):
+        return es_admin_master(request.user)
+
+    def has_change_permission(self, request, obj=None):
+        return es_admin_master(request.user)
+
+    def has_delete_permission(self, request, obj=None):
+        return es_admin_master(request.user)
+
+    def get_queryset(self, request):
+        queryset = super().get_queryset(request)
+        if es_admin_master(request.user):
+            return queryset
+        return queryset.none()
 
 
 @admin.register(Turno)
-class TurnoAdmin(admin.ModelAdmin):
+class TurnoAdmin(MasterOnlyAdminMixin, admin.ModelAdmin):
     list_display = (
         "nombre",
         "hora_entrada",
@@ -17,7 +41,7 @@ class TurnoAdmin(admin.ModelAdmin):
 
 
 @admin.register(Funcionario)
-class FuncionarioAdmin(admin.ModelAdmin):
+class FuncionarioAdmin(MasterOnlyAdminMixin, admin.ModelAdmin):
     list_display = (
         "cedula",
         "apellido",
@@ -36,7 +60,7 @@ class FuncionarioAdmin(admin.ModelAdmin):
 
 
 @admin.register(Asistencia)
-class AsistenciaAdmin(admin.ModelAdmin):
+class AsistenciaAdmin(MasterOnlyAdminMixin, admin.ModelAdmin):
     list_display = (
         "fecha",
         "funcionario",
@@ -54,7 +78,7 @@ class AsistenciaAdmin(admin.ModelAdmin):
 
 
 @admin.register(PermisoLicencia)
-class PermisoLicenciaAdmin(admin.ModelAdmin):
+class PermisoLicenciaAdmin(MasterOnlyAdminMixin, admin.ModelAdmin):
     list_display = (
         "funcionario",
         "tipo",
@@ -74,7 +98,7 @@ class PermisoLicenciaAdmin(admin.ModelAdmin):
 
 
 @admin.register(Vacacion)
-class VacacionAdmin(admin.ModelAdmin):
+class VacacionAdmin(MasterOnlyAdminMixin, admin.ModelAdmin):
     list_display = (
         "funcionario",
         "fecha_desde",
@@ -93,7 +117,14 @@ class VacacionAdmin(admin.ModelAdmin):
 
 
 @admin.register(HistorialAccion)
-class HistorialAccionAdmin(admin.ModelAdmin):
-    list_display = ("creado_en", "usuario", "modulo", "accion", "descripcion")
-    list_filter = ("modulo", "accion", "creado_en")
-    search_fields = ("descripcion", "usuario__username", "usuario__first_name", "usuario__last_name")
+class HistorialAccionAdmin(MasterOnlyAdminMixin, admin.ModelAdmin):
+    list_display = ("creado_en", "usuario", "empresa", "modulo", "accion", "descripcion")
+    list_filter = ("empresa", "modulo", "accion", "creado_en")
+    search_fields = (
+        "descripcion",
+        "empresa__nombre",
+        "empresa__nombre_comercial",
+        "usuario__username",
+        "usuario__first_name",
+        "usuario__last_name",
+    )

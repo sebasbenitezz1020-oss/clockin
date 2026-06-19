@@ -16,6 +16,8 @@ from .models import (
     HistorialLaboralFuncionario,
     ConductaFuncionario,
     HistorialSalarialFuncionario,
+    SuscripcionSistema,
+    PagoSuscripcionSistema,
 )
 
 from django import forms
@@ -68,30 +70,55 @@ class MarcacionManualForm(forms.Form):
     )
 
 class EmpresaForm(forms.ModelForm):
+    fecha_vencimiento_suscripcion = forms.DateField(
+        required=False,
+        input_formats=["%Y-%m-%d", "%d/%m/%Y"],
+        widget=forms.DateInput(
+            format="%Y-%m-%d",
+            attrs={"type": "date", "class": "form-control"}
+        )
+    )
+
     class Meta:
         model = Empresa
         fields = [
             "nombre",
+            "nombre_comercial",
+            "razon_social",
             "ruc",
             "direccion",
             "telefono",
             "email",
             "logo",
+            "color_primario",
+            "color_secundario",
+            "tema_visual",
             "texto_legal_pdf",
             "activo",
+            "estado",
+            "plan_contratado",
+            "fecha_vencimiento_suscripcion",
             "firma_gerente",
             "nombre_gerente",
             "cargo_gerente",
         ]
         widgets = {
             "nombre": forms.TextInput(attrs={"class": "form-control"}),
+            "nombre_comercial": forms.TextInput(attrs={"class": "form-control"}),
+            "razon_social": forms.TextInput(attrs={"class": "form-control"}),
             "ruc": forms.TextInput(attrs={"class": "form-control"}),
             "direccion": forms.TextInput(attrs={"class": "form-control"}),
             "telefono": forms.TextInput(attrs={"class": "form-control"}),
             "email": forms.EmailInput(attrs={"class": "form-control"}),
             "logo": forms.ClearableFileInput(attrs={"class": "form-control"}),
+            "color_primario": forms.TextInput(attrs={"class": "form-control", "placeholder": "#2563eb"}),
+            "color_secundario": forms.TextInput(attrs={"class": "form-control", "placeholder": "#1d4ed8"}),
+            "tema_visual": forms.Select(choices=[("", "Usar tema global")] + ConfiguracionGeneral.TEMAS_CHOICES, attrs={"class": "form-control"}),
             "texto_legal_pdf": forms.Textarea(attrs={"class": "form-control", "rows": 4}),
             "activo": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "estado": forms.Select(attrs={"class": "form-control"}),
+            "plan_contratado": forms.Select(attrs={"class": "form-control"}),
+            "fecha_vencimiento_suscripcion": forms.DateInput(attrs={"type": "date", "class": "form-control"}),
             "nombre_gerente": forms.TextInput(attrs={"class": "form-control"}),
             "cargo_gerente": forms.TextInput(attrs={"class": "form-control"}),
         }
@@ -1152,3 +1179,86 @@ class HistorialSalarialFuncionarioForm(forms.ModelForm):
             "motivo": forms.TextInput(attrs={"class": "form-control"}),
             "observacion": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
         }
+
+
+class SuscripcionSistemaForm(forms.ModelForm):
+    fecha_inicio = forms.DateField(
+        input_formats=["%Y-%m-%d", "%d/%m/%Y"],
+        widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date", "class": "form-control"})
+    )
+    fecha_proximo_pago = forms.DateField(
+        input_formats=["%Y-%m-%d", "%d/%m/%Y"],
+        widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date", "class": "form-control"})
+    )
+    fecha_ultimo_pago = forms.DateField(
+        required=False,
+        input_formats=["%Y-%m-%d", "%d/%m/%Y"],
+        widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date", "class": "form-control"})
+    )
+
+    class Meta:
+        model = SuscripcionSistema
+        fields = [
+            "nombre_cliente",
+            "estado",
+            "fecha_inicio",
+            "fecha_ultimo_pago",
+            "fecha_proximo_pago",
+            "dias_gracia",
+            "bloquear_al_vencer",
+            "contacto_pago",
+            "mensaje_bloqueo",
+            "observacion_interna",
+        ]
+        widgets = {
+            "nombre_cliente": forms.TextInput(attrs={"class": "form-control"}),
+            "estado": forms.Select(attrs={"class": "form-control"}),
+            "dias_gracia": forms.NumberInput(attrs={"class": "form-control", "min": "0", "max": "90"}),
+            "bloquear_al_vencer": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "contacto_pago": forms.TextInput(attrs={"class": "form-control"}),
+            "mensaje_bloqueo": forms.Textarea(attrs={"class": "form-control", "rows": 4}),
+            "observacion_interna": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+        }
+
+    def clean(self):
+        cleaned = super().clean()
+        fecha_inicio = cleaned.get("fecha_inicio")
+        fecha_proximo_pago = cleaned.get("fecha_proximo_pago")
+        dias_gracia = cleaned.get("dias_gracia")
+
+        if fecha_inicio and fecha_proximo_pago and fecha_proximo_pago < fecha_inicio:
+            raise forms.ValidationError("La fecha de proximo pago no puede ser menor que la fecha de inicio.")
+
+        if dias_gracia is not None and dias_gracia > 90:
+            raise forms.ValidationError("Los dias de gracia no pueden superar 90 dias.")
+
+        return cleaned
+
+
+class PagoSuscripcionSistemaForm(forms.ModelForm):
+    fecha_pago = forms.DateField(
+        input_formats=["%Y-%m-%d", "%d/%m/%Y"],
+        widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date", "class": "form-control"})
+    )
+
+    class Meta:
+        model = PagoSuscripcionSistema
+        fields = [
+            "fecha_pago",
+            "meses_cubiertos",
+            "monto",
+            "comprobante",
+            "observacion",
+        ]
+        widgets = {
+            "meses_cubiertos": forms.Select(attrs={"class": "form-control"}),
+            "monto": forms.NumberInput(attrs={"class": "form-control", "min": "0", "step": "0.01"}),
+            "comprobante": forms.TextInput(attrs={"class": "form-control"}),
+            "observacion": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+        }
+
+    def clean_monto(self):
+        monto = self.cleaned_data.get("monto") or 0
+        if monto < 0:
+            raise forms.ValidationError("El monto no puede ser negativo.")
+        return monto

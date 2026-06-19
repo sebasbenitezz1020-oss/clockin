@@ -7,14 +7,31 @@ from calendar import monthrange
 
 
 class Empresa(models.Model):
+    class Estados(models.TextChoices):
+        ACTIVA = "activa", "Activa"
+        SUSPENDIDA = "suspendida", "Suspendida"
+
+    class Planes(models.TextChoices):
+        BASICO = "basico", "Basico"
+        PROFESIONAL = "profesional", "Profesional"
+        EMPRESARIAL = "empresarial", "Empresarial"
+
     nombre = models.CharField(max_length=150, unique=True)
+    nombre_comercial = models.CharField(max_length=150, blank=True, default="")
+    razon_social = models.CharField(max_length=180, blank=True, default="")
     ruc = models.CharField(max_length=30, blank=True, default="")
     direccion = models.CharField(max_length=255, blank=True, default="")
     telefono = models.CharField(max_length=50, blank=True, default="")
     email = models.EmailField(blank=True, default="")
     logo = models.ImageField(upload_to="empresas/logos/", null=True, blank=True)
+    color_primario = models.CharField(max_length=20, blank=True, default="")
+    color_secundario = models.CharField(max_length=20, blank=True, default="")
+    tema_visual = models.CharField(max_length=20, blank=True, default="")
     texto_legal_pdf = models.TextField(blank=True, default="")
     activo = models.BooleanField(default=True)
+    estado = models.CharField(max_length=20, choices=Estados.choices, default=Estados.ACTIVA)
+    plan_contratado = models.CharField(max_length=30, choices=Planes.choices, default=Planes.PROFESIONAL)
+    fecha_vencimiento_suscripcion = models.DateField(null=True, blank=True)
     firma_gerente = models.ImageField(
         upload_to="empresas/firmas/",
         null=True,
@@ -41,6 +58,24 @@ class Empresa(models.Model):
 
     def __str__(self):
         return self.nombre
+
+    @property
+    def nombre_visible(self):
+        return self.nombre_comercial or self.nombre
+
+    @property
+    def suscripcion_vencida(self):
+        return bool(
+            self.fecha_vencimiento_suscripcion
+            and self.fecha_vencimiento_suscripcion < timezone.localdate()
+        )
+
+    @property
+    def suscripcion_por_vencer(self):
+        if not self.fecha_vencimiento_suscripcion:
+            return False
+        dias = (self.fecha_vencimiento_suscripcion - timezone.localdate()).days
+        return 0 <= dias <= 7
 
 
 class Sucursal(models.Model):
@@ -1329,6 +1364,13 @@ class HistorialAccion(models.Model):
         blank=True,
         related_name="acciones_historial"
     )
+    empresa = models.ForeignKey(
+        Empresa,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="acciones_historial"
+    )
     modulo = models.CharField(max_length=50)
     accion = models.CharField(max_length=50)
     descripcion = models.TextField()
@@ -1651,3 +1693,130 @@ class DocumentoFirmado(models.Model):
 
     def __str__(self):
         return f"{self.codigo} - {self.tipo_documento}"
+
+
+class SuscripcionSistema(models.Model):
+    class Estados(models.TextChoices):
+        ACTIVA = "activa", "Activa"
+        PAUSADA = "pausada", "Pausada"
+
+    nombre_cliente = models.CharField(max_length=150, blank=True, default="ClockIn")
+    estado = models.CharField(max_length=20, choices=Estados.choices, default=Estados.ACTIVA)
+    fecha_inicio = models.DateField(default=timezone.localdate)
+    fecha_proximo_pago = models.DateField(default=timezone.localdate)
+    fecha_ultimo_pago = models.DateField(null=True, blank=True)
+    dias_gracia = models.PositiveIntegerField(default=0)
+    bloquear_al_vencer = models.BooleanField(default=True)
+    contacto_pago = models.CharField(max_length=180, blank=True, default="")
+    mensaje_bloqueo = models.TextField(
+        blank=True,
+        default="El servicio se encuentra pendiente de regularizacion. Contacte al administrador para reactivar el acceso."
+    )
+    observacion_interna = models.TextField(blank=True, default="")
+    actualizado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="suscripciones_actualizadas"
+    )
+    creado_en = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        verbose_name = "Suscripcion del sistema"
+        verbose_name_plural = "Suscripciones del sistema"
+
+    def __str__(self):
+        return f"Suscripcion {self.nombre_cliente} - {self.estado_visible}"
+
+    @classmethod
+    def obtener(cls):
+        obj, _ = cls.objects.get_or_create(
+            pk=1,
+            defaults={
+                "nombre_cliente": "ClockIn",
+                "fecha_inicio": timezone.localdate(),
+                "fecha_proximo_pago": timezone.localdate() + timezone.timedelta(days=30),
+                "dias_gracia": 0,
+                "bloquear_al_vencer": True,
+            }
+        )
+        return obj
+
+    @property
+    def fecha_bloqueo(self):
+        return self.fecha_proximo_pago + timezone.timedelta(days=int(self.dias_gracia or 0))
+
+    @property
+    def dias_restantes(self):
+        return (self.fecha_proximo_pago - timezone.localdate()).days
+
+    @property
+    def dias_para_bloqueo(self):
+        return (self.fecha_bloqueo - timezone.localdate()).days
+
+    @property
+    def vencida(self):
+        return self.dias_restantes < 0
+
+    @property
+    def en_gracia(self):
+        return self.vencida and self.dias_para_bloqueo >= 0
+
+    @property
+    def bloqueada(self):
+        if self.estado != self.Estados.ACTIVA:
+            return True
+        if not self.bloquear_al_vencer:
+            return False
+        return timezone.localdate() > self.fecha_bloqueo
+
+    @property
+    def por_vencer(self):
+        return 0 <= self.dias_restantes <= 5
+
+    @property
+    def estado_visible(self):
+        if self.bloqueada:
+            return "Bloqueada"
+        if self.en_gracia:
+            return "En periodo de gracia"
+        if self.por_vencer:
+            return "Por vencer"
+        return self.get_estado_display()
+
+
+class PagoSuscripcionSistema(models.Model):
+    class Periodos(models.IntegerChoices):
+        MENSUAL = 1, "Mensual"
+        TRIMESTRAL = 3, "Trimestral"
+        SEMESTRAL = 6, "Semestral"
+        ANUAL = 12, "Anual"
+
+    suscripcion = models.ForeignKey(
+        SuscripcionSistema,
+        on_delete=models.CASCADE,
+        related_name="pagos"
+    )
+    fecha_pago = models.DateField(default=timezone.localdate)
+    meses_cubiertos = models.PositiveSmallIntegerField(choices=Periodos.choices, default=Periodos.MENSUAL)
+    monto = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    comprobante = models.CharField(max_length=120, blank=True, default="")
+    observacion = models.TextField(blank=True, default="")
+    registrado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="pagos_suscripcion_registrados"
+    )
+    creado_en = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-fecha_pago", "-creado_en"]
+        verbose_name = "Pago de suscripcion"
+        verbose_name_plural = "Pagos de suscripcion"
+
+    def __str__(self):
+        return f"Pago {self.fecha_pago:%d/%m/%Y} - {self.get_meses_cubiertos_display()}"

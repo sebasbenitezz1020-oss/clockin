@@ -231,8 +231,8 @@
         </article>
         <article class="hist-summary-card">
             <span>Alcance</span>
-            <strong>Master</strong>
-            <small>Auditoria general del sistema</small>
+            <strong>{% if empresa_activa %}Empresa{% else %}Global{% endif %}</strong>
+            <small>{% if empresa_activa %}{{ empresa_activa.nombre_visible }}{% else %}Auditoria general del sistema{% endif %}</small>
         </article>
     </div>
 
@@ -268,6 +268,7 @@
                     <tr>
                         <th>Fecha y hora</th>
                         <th>Usuario</th>
+                        <th>Empresa</th>
                         <th>Modulo</th>
                         <th>Accion</th>
                         <th>Descripcion</th>
@@ -293,13 +294,20 @@
                                     {% endif %}
                                 </div>
                             </td>
+                            <td>
+                                {% if item.empresa %}
+                                    {{ item.empresa.nombre_visible }}
+                                {% else %}
+                                    <span class="hist-muted">Global / anterior</span>
+                                {% endif %}
+                            </td>
                             <td><span class="hist-badge hist-badge-module">{{ item.modulo }}</span></td>
                             <td><span class="hist-badge hist-badge-action">{{ item.accion }}</span></td>
                             <td class="hist-description">{{ item.descripcion }}</td>
                         </tr>
                     {% empty %}
                         <tr>
-                            <td colspan="5" class="empty-row">Todavia no hay acciones registradas.</td>
+                            <td colspan="6" class="empty-row">Todavia no hay acciones registradas.</td>
                         </tr>
                     {% endfor %}
                 </tbody>

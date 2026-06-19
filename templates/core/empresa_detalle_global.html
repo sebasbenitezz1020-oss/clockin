@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+
+{% block title %}Detalle Global | ClockIn{% endblock %}
+
+{% block content %}
+<div class="global-panel-page">
+    <section class="global-panel-header">
+        <div>
+            <span class="global-kicker">Detalle Global</span>
+            <h2>{{ empresa.nombre_visible }}</h2>
+            <p>{{ empresa.razon_social|default:empresa.nombre }} · RUC {{ empresa.ruc|default:"-" }}</p>
+        </div>
+        <div class="global-header-actions">
+            <a href="{% url 'empresa_entrar' empresa.id %}" class="global-btn global-btn-main">Entrar a empresa</a>
+            <a href="{% url 'panel_global_empresas' %}" class="global-btn global-btn-soft">Volver</a>
+        </div>
+    </section>
+
+    <section class="global-detail-card">
+        <div class="global-detail-brand">
+            <div class="global-company-logo big">
+                {% if empresa.logo %}
+                    <img src="{{ empresa.logo.url }}" alt="{{ empresa.nombre_visible }}">
+                {% else %}
+                    <span>{{ empresa.nombre_visible|slice:":1" }}</span>
+                {% endif %}
+            </div>
+            <div>
+                <h3>{{ empresa.nombre_visible }}</h3>
+                <p>{{ empresa.direccion|default:"Sin direccion" }} · {{ empresa.telefono|default:"Sin telefono" }} · {{ empresa.email|default:"Sin correo" }}</p>
+            </div>
+        </div>
+
+        <div class="global-company-meta detail">
+            <div><span>Estado</span><strong>{{ empresa.get_estado_display }}</strong></div>
+            <div><span>Plan</span><strong>{{ empresa.get_plan_contratado_display }}</strong></div>
+            <div><span>Vencimiento</span><strong>{% if empresa.fecha_vencimiento_suscripcion %}{{ empresa.fecha_vencimiento_suscripcion|date:"d/m/Y" }}{% else %}-{% endif %}</strong></div>
+            <div><span>Color</span><strong>{{ empresa.color_primario|default:"Global" }}</strong></div>
+        </div>
+    </section>
+
+    <section class="global-stats">
+        <article><span>Funcionarios activos</span><strong>{{ metricas.funcionarios_activos }}</strong></article>
+        <article><span>Funcionarios total</span><strong>{{ metricas.funcionarios_total }}</strong></article>
+        <article><span>Sucursales</span><strong>{{ metricas.sucursales }}</strong></article>
+        <article><span>Turnos</span><strong>{{ metricas.turnos }}</strong></article>
+        <article><span>N&oacute;minas</span><strong>{{ metricas.nominas }}</strong></article>
+        <article><span>Liquidaciones</span><strong>{{ metricas.liquidaciones }}</strong></article>
+        <article><span>Comunicaciones</span><strong>{{ metricas.comunicaciones }}</strong></article>
+    </section>
+
+    <section class="global-two-col">
+        <article class="global-detail-card">
+            <h3>Sucursales</h3>
+            <div class="global-list">
+                {% for sucursal in sucursales %}
+                    <div><strong>{{ sucursal.nombre }}</strong><span>{{ sucursal.direccion|default:"Sin direccion" }}</span></div>
+                {% empty %}
+                    <p>No hay sucursales registradas.</p>
+                {% endfor %}
+            </div>
+        </article>
+
+        <article class="global-detail-card">
+            <h3>Usuarios</h3>
+            <div class="global-list">
+                {% for usuario in usuarios %}
+                    <div><strong>{{ usuario.get_full_name|default:usuario.username }}</strong><span>{{ usuario.get_rol_display }} · {{ usuario.email|default:"Sin correo" }}</span></div>
+                {% empty %}
+                    <p>No hay usuarios asignados.</p>
+                {% endfor %}
+            </div>
+        </article>
+    </section>
+</div>
+{% endblock %}

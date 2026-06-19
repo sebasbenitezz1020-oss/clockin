@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+
+{% block title %}Suscripci&oacute;n | ClockIn{% endblock %}
+
+{% block content %}
+<div class="subscription-page">
+    <section class="subscription-header">
+        <div>
+            <span class="subscription-kicker">Control de licencia</span>
+            <h2>Suscripci&oacute;n</h2>
+            <p>Administra la fecha de pago, el periodo de gracia y el bloqueo autom&aacute;tico del sistema.</p>
+        </div>
+
+        <div class="subscription-status {% if suscripcion.bloqueada %}is-blocked{% elif suscripcion.en_gracia %}is-grace{% elif suscripcion.por_vencer %}is-warning{% else %}is-active{% endif %}">
+            {{ suscripcion.estado_visible }}
+        </div>
+    </section>
+
+    <section class="subscription-stats">
+        <article class="subscription-stat">
+            <span>Pr&oacute;ximo pago</span>
+            <strong>{{ suscripcion.fecha_proximo_pago|date:"d/m/Y" }}</strong>
+            <small>{{ suscripcion.dias_restantes }} d&iacute;a(s) restantes</small>
+        </article>
+
+        <article class="subscription-stat">
+            <span>Fecha de bloqueo</span>
+            <strong>{{ suscripcion.fecha_bloqueo|date:"d/m/Y" }}</strong>
+            <small>{{ suscripcion.dias_gracia }} d&iacute;a(s) de gracia</small>
+        </article>
+
+        <article class="subscription-stat">
+            <span>&Uacute;ltimo pago</span>
+            <strong>{% if suscripcion.fecha_ultimo_pago %}{{ suscripcion.fecha_ultimo_pago|date:"d/m/Y" }}{% else %}-{% endif %}</strong>
+            <small>Referencia administrativa</small>
+        </article>
+
+        <article class="subscription-stat">
+            <span>Bloqueo</span>
+            <strong>{% if suscripcion.bloquear_al_vencer %}Activo{% else %}Inactivo{% endif %}</strong>
+            <small>Se aplica al pasar la fecha de bloqueo</small>
+        </article>
+    </section>
+
+    <section class="subscription-card">
+        <form method="post" class="subscription-form">
+            {% csrf_token %}
+            {{ form.non_field_errors }}
+
+            <div class="subscription-grid">
+                <div class="subscription-field">
+                    <label for="{{ form.nombre_cliente.id_for_label }}">Cliente / sistema</label>
+                    {{ form.nombre_cliente }}
+                    {{ form.nombre_cliente.errors }}
+                </div>
+
+                <div class="subscription-field">
+                    <label for="{{ form.estado.id_for_label }}">Estado</label>
+                    {{ form.estado }}
+                    {{ form.estado.errors }}
+                </div>
+
+                <div class="subscription-field">
+                    <label for="{{ form.fecha_inicio.id_for_label }}">Fecha de inicio</label>
+                    {{ form.fecha_inicio }}
+                    {{ form.fecha_inicio.errors }}
+                </div>
+
+                <div class="subscription-field">
+                    <label for="{{ form.fecha_ultimo_pago.id_for_label }}">&Uacute;ltimo pago</label>
+                    {{ form.fecha_ultimo_pago }}
+                    {{ form.fecha_ultimo_pago.errors }}
+                </div>
+
+                <div class="subscription-field">
+                    <label for="{{ form.fecha_proximo_pago.id_for_label }}">Pr&oacute;ximo pago</label>
+                    {{ form.fecha_proximo_pago }}
+                    {{ form.fecha_proximo_pago.errors }}
+                </div>
+
+                <div class="subscription-field">
+                    <label for="{{ form.dias_gracia.id_for_label }}">D&iacute;as de gracia</label>
+                    {{ form.dias_gracia }}
+                    {{ form.dias_gracia.errors }}
+                </div>
+
+                <div class="subscription-field">
+                    <label for="{{ form.contacto_pago.id_for_label }}">Contacto de pago</label>
+                    {{ form.contacto_pago }}
+                    {{ form.contacto_pago.errors }}
+                </div>
+
+                <div class="subscription-toggle">
+                    <label>
+                        {{ form.bloquear_al_vencer }}
+                        <span>Bloquear sistema al vencer</span>
+                    </label>
+                    {{ form.bloquear_al_vencer.errors }}
+                </div>
+            </div>
+
+            <div class="subscription-field">
+                <label for="{{ form.mensaje_bloqueo.id_for_label }}">Mensaje de bloqueo</label>
+                {{ form.mensaje_bloqueo }}
+                {{ form.mensaje_bloqueo.errors }}
+            </div>
+
+            <div class="subscription-field">
+                <label for="{{ form.observacion_interna.id_for_label }}">Observaci&oacute;n interna</label>
+                {{ form.observacion_interna }}
+                {{ form.observacion_interna.errors }}
+            </div>
+
+            <div class="subscription-actions">
+                <a href="{% url 'dashboard' %}" class="subscription-btn subscription-btn-soft">Volver</a>
+                <button type="submit" class="subscription-btn subscription-btn-main">Guardar suscripci&oacute;n</button>
+            </div>
+        </form>
+    </section>
+
+    <section class="subscription-two-col">
+        <article class="subscription-card">
+            <div class="subscription-section-head">
+                <h3>Registrar pago</h3>
+                <p>Al registrar un pago, el sistema actualiza autom&aacute;ticamente el pr&oacute;ximo vencimiento.</p>
+            </div>
+
+            <form method="post" action="{% url 'suscripcion_registrar_pago' %}" class="subscription-form">
+                {% csrf_token %}
+                {{ pago_form.non_field_errors }}
+
+                <div class="subscription-grid">
+                    <div class="subscription-field">
+                        <label for="{{ pago_form.fecha_pago.id_for_label }}">Fecha de pago</label>
+                        {{ pago_form.fecha_pago }}
+                        {{ pago_form.fecha_pago.errors }}
+                    </div>
+
+                    <div class="subscription-field">
+                        <label for="{{ pago_form.meses_cubiertos.id_for_label }}">Periodo cubierto</label>
+                        {{ pago_form.meses_cubiertos }}
+                        {{ pago_form.meses_cubiertos.errors }}
+                    </div>
+
+                    <div class="subscription-field">
+                        <label for="{{ pago_form.monto.id_for_label }}">Monto</label>
+                        {{ pago_form.monto }}
+                        {{ pago_form.monto.errors }}
+                    </div>
+
+                    <div class="subscription-field">
+                        <label for="{{ pago_form.comprobante.id_for_label }}">Comprobante</label>
+                        {{ pago_form.comprobante }}
+                        {{ pago_form.comprobante.errors }}
+                    </div>
+                </div>
+
+                <div class="subscription-field">
+                    <label for="{{ pago_form.observacion.id_for_label }}">Observaci&oacute;n</label>
+                    {{ pago_form.observacion }}
+                    {{ pago_form.observacion.errors }}
+                </div>
+
+                <div class="subscription-actions">
+                    <button type="submit" class="subscription-btn subscription-btn-main">Registrar pago</button>
+                </div>
+            </form>
+        </article>
+
+        <article class="subscription-card">
+            <div class="subscription-section-head">
+                <h3>Historial de pagos</h3>
+                <p>&Uacute;ltimos movimientos registrados para esta suscripci&oacute;n.</p>
+            </div>
+
+            <div class="subscription-payments">
+                {% for pago in pagos %}
+                    <div class="subscription-payment-row">
+                        <div>
+                            <strong>{{ pago.fecha_pago|date:"d/m/Y" }}</strong>
+                            <span>{{ pago.get_meses_cubiertos_display }}{% if pago.comprobante %} / {{ pago.comprobante }}{% endif %}</span>
+                        </div>
+                        <div>
+                            <strong>Gs. {{ pago.monto|floatformat:0 }}</strong>
+                            <span>{% if pago.registrado_por %}{{ pago.registrado_por }}{% else %}Sin usuario{% endif %}</span>
+                        </div>
+                    </div>
+                {% empty %}
+                    <div class="subscription-empty">Todav&iacute;a no hay pagos registrados.</div>
+                {% endfor %}
+            </div>
+        </article>
+    </section>
+</div>
+{% endblock %}

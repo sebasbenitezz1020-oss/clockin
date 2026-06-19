@@ -1,36 +1,472 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Iniciar sesión - ClockIn</title>
-    <link rel="stylesheet" href="/static/css/styles.css">
+    <title>Iniciar sesi&oacute;n | ClockIn</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            min-height: 100%;
+            margin: 0;
+        }
+
+        body {
+            min-height: 100vh;
+            color: #f8fafc;
+            font-family: "Segoe UI", Arial, sans-serif;
+            background:
+                radial-gradient(circle at 12% 12%, rgba(37, 99, 235, .34), transparent 30%),
+                radial-gradient(circle at 86% 78%, rgba(14, 165, 233, .18), transparent 28%),
+                linear-gradient(145deg, #06101f 0%, #0b1730 48%, #030712 100%);
+            overflow-x: hidden;
+        }
+
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            background:
+                linear-gradient(rgba(255,255,255,.035) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255,255,255,.035) 1px, transparent 1px);
+            background-size: 56px 56px;
+            mask-image: linear-gradient(to bottom, rgba(0,0,0,.55), transparent 78%);
+        }
+
+        .login-page {
+            position: relative;
+            z-index: 1;
+            display: grid;
+            grid-template-columns: minmax(0, 1.08fr) minmax(360px, .92fr);
+            align-items: center;
+            gap: clamp(28px, 5vw, 72px);
+            width: min(1180px, calc(100% - 40px));
+            min-height: 100vh;
+            margin: 0 auto;
+            padding: 48px 0;
+        }
+
+        .login-brand {
+            animation: loginFadeUp .7s ease both;
+        }
+
+        .logo-mark {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 112px;
+            height: 112px;
+            margin-bottom: 24px;
+            border-radius: 30px;
+            background:
+                radial-gradient(circle at 35% 22%, rgba(96, 165, 250, .24), transparent 52%),
+                rgba(255,255,255,.065);
+            border: 1px solid rgba(147, 197, 253, .24);
+            box-shadow:
+                0 24px 70px rgba(37, 99, 235, .24),
+                0 0 0 1px rgba(255,255,255,.04) inset;
+        }
+
+        .logo-mark img {
+            width: 86px;
+            height: 86px;
+            object-fit: contain;
+            filter: drop-shadow(0 14px 26px rgba(0,0,0,.34));
+        }
+
+        .login-brand h1 {
+            margin: 0;
+            font-size: clamp(44px, 7vw, 78px);
+            line-height: .96;
+            font-weight: 950;
+            letter-spacing: 0;
+        }
+
+        .login-brand p {
+            width: min(520px, 100%);
+            margin: 20px 0 0;
+            color: #bfdbfe;
+            font-size: clamp(16px, 2vw, 20px);
+            line-height: 1.6;
+            font-weight: 650;
+        }
+
+        .brand-pills {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-top: 30px;
+        }
+
+        .brand-pills span {
+            display: inline-flex;
+            align-items: center;
+            min-height: 36px;
+            padding: 8px 12px;
+            border-radius: 999px;
+            color: #dbeafe;
+            background: rgba(15, 23, 42, .58);
+            border: 1px solid rgba(147, 197, 253, .16);
+            font-size: 13px;
+            font-weight: 800;
+        }
+
+        .login-card {
+            position: relative;
+            overflow: hidden;
+            padding: 34px;
+            border-radius: 30px;
+            background:
+                linear-gradient(180deg, rgba(15, 23, 42, .88), rgba(2, 6, 23, .78));
+            border: 1px solid rgba(148, 163, 184, .20);
+            box-shadow:
+                0 34px 100px rgba(0, 0, 0, .48),
+                0 0 0 1px rgba(255,255,255,.04) inset;
+            backdrop-filter: blur(18px);
+            animation: loginCardIn .75s ease .12s both;
+        }
+
+        .login-card::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            background:
+                radial-gradient(circle at 22% 0%, rgba(59, 130, 246, .20), transparent 38%),
+                linear-gradient(90deg, transparent, rgba(255,255,255,.05), transparent);
+            opacity: .88;
+        }
+
+        .login-card > * {
+            position: relative;
+            z-index: 1;
+        }
+
+        .login-kicker {
+            margin: 0 0 10px;
+            color: #93c5fd;
+            font-size: 12px;
+            font-weight: 900;
+            letter-spacing: .13em;
+            text-transform: uppercase;
+        }
+
+        .login-card h2 {
+            margin: 0;
+            color: #ffffff;
+            font-size: 30px;
+            line-height: 1.15;
+            font-weight: 950;
+            letter-spacing: 0;
+        }
+
+        .login-card .subtitle {
+            margin: 10px 0 26px;
+            color: #94a3b8;
+            line-height: 1.5;
+            font-size: 14px;
+            font-weight: 650;
+        }
+
+        .form-group {
+            margin-bottom: 18px;
+        }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 9px;
+            color: #dbeafe;
+            font-size: 13px;
+            font-weight: 850;
+        }
+
+        .input-shell {
+            position: relative;
+        }
+
+        .input-shell svg {
+            position: absolute;
+            left: 14px;
+            top: 50%;
+            width: 18px;
+            height: 18px;
+            transform: translateY(-50%);
+            color: #60a5fa;
+            pointer-events: none;
+        }
+
+        .input-shell input {
+            width: 100%;
+            height: 52px;
+            padding: 0 15px 0 44px;
+            border-radius: 16px;
+            outline: none;
+            color: #f8fafc;
+            background: rgba(15, 23, 42, .74);
+            border: 1px solid rgba(148, 163, 184, .18);
+            box-shadow: 0 1px 0 rgba(255,255,255,.05) inset;
+            font-size: 15px;
+            font-weight: 700;
+            transition: border-color .18s ease, box-shadow .18s ease, background .18s ease;
+        }
+
+        .input-shell input:focus {
+            border-color: rgba(96, 165, 250, .72);
+            background: rgba(15, 23, 42, .92);
+            box-shadow:
+                0 0 0 4px rgba(37, 99, 235, .16),
+                0 1px 0 rgba(255,255,255,.06) inset;
+        }
+
+        .login-action {
+            position: relative;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            width: 100%;
+            height: 54px;
+            margin-top: 4px;
+            overflow: hidden;
+            border: 0;
+            border-radius: 17px;
+            color: #ffffff;
+            background: linear-gradient(135deg, #2563eb, #0ea5e9);
+            box-shadow: 0 18px 38px rgba(37, 99, 235, .34);
+            cursor: pointer;
+            font-size: 15px;
+            font-weight: 950;
+            letter-spacing: 0;
+            transition: transform .16s ease, filter .16s ease, box-shadow .16s ease;
+        }
+
+        .login-action::before {
+            content: "";
+            position: absolute;
+            inset: 0;
+            transform: translateX(-110%);
+            background: linear-gradient(90deg, transparent, rgba(255,255,255,.32), transparent);
+        }
+
+        .login-action:hover {
+            filter: brightness(1.05);
+            transform: translateY(-1px);
+            box-shadow: 0 24px 48px rgba(37, 99, 235, .40);
+        }
+
+        .login-action:active {
+            transform: scale(.985);
+        }
+
+        .login-action .spinner {
+            display: none;
+            width: 18px;
+            height: 18px;
+            border-radius: 50%;
+            border: 2px solid rgba(255,255,255,.38);
+            border-top-color: #ffffff;
+            animation: spin .75s linear infinite;
+        }
+
+        .login-form.is-submitting .login-action {
+            pointer-events: none;
+            filter: brightness(1.06);
+        }
+
+        .login-form.is-submitting .login-action::before {
+            animation: buttonShine .9s ease infinite;
+        }
+
+        .login-form.is-submitting .spinner {
+            display: inline-block;
+        }
+
+        .login-footnote {
+            margin: 18px 0 0;
+            color: #64748b;
+            text-align: center;
+            font-size: 12px;
+            font-weight: 750;
+        }
+
+        .error-box {
+            margin-top: 16px;
+            padding: 13px 14px;
+            border-radius: 15px;
+            color: #fecaca;
+            background: rgba(127, 29, 29, .34);
+            border: 1px solid rgba(248, 113, 113, .30);
+            font-size: 13px;
+            font-weight: 800;
+        }
+
+        @keyframes loginFadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(18px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes loginCardIn {
+            from {
+                opacity: 0;
+                transform: translateY(22px) scale(.985);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        @keyframes buttonShine {
+            to {
+                transform: translateX(110%);
+            }
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        @media (max-width: 900px) {
+            .login-page {
+                grid-template-columns: 1fr;
+                width: min(520px, calc(100% - 32px));
+                gap: 28px;
+                padding: 34px 0;
+            }
+
+            .login-brand {
+                text-align: center;
+            }
+
+            .login-brand p {
+                margin-left: auto;
+                margin-right: auto;
+            }
+
+            .brand-pills {
+                justify-content: center;
+            }
+
+            .logo-mark {
+                width: 96px;
+                height: 96px;
+                margin-bottom: 18px;
+                border-radius: 26px;
+            }
+
+            .logo-mark img {
+                width: 74px;
+                height: 74px;
+            }
+        }
+
+        @media (max-width: 520px) {
+            .login-card {
+                padding: 26px 20px;
+                border-radius: 24px;
+            }
+
+            .login-card h2 {
+                font-size: 26px;
+            }
+        }
+
+        @media (prefers-reduced-motion: reduce) {
+            *,
+            *::before,
+            *::after {
+                animation-duration: .01ms !important;
+                animation-iteration-count: 1 !important;
+                transition-duration: .01ms !important;
+            }
+        }
+    </style>
 </head>
-<body class="login-body">
-    <div class="login-card">
-        <h1>🕒 ClockIn</h1>
-        <p class="subtitle">Sistema de asistencia y gestión de funcionarios</p>
-
-        <form method="post">
-            {% csrf_token %}
-            <div class="form-group">
-                <label for="id_username">Usuario</label>
-                <input type="text" name="username" id="id_username" required>
+<body>
+    <main class="login-page">
+        <section class="login-brand" aria-label="ClockIn">
+            <div class="logo-mark">
+                <img src="{% static 'img/logo-clockin-horizontal.png' %}" alt="ClockIn">
             </div>
-
-            <div class="form-group">
-                <label for="id_password">Contraseña</label>
-                <input type="password" name="password" id="id_password" required>
+            <h1>ClockIn</h1>
+            <p>Gesti&oacute;n de asistencia, n&oacute;mina y RRHH con control multiempresa seguro.</p>
+            <div class="brand-pills" aria-hidden="true">
+                <span>MultiEmpresa</span>
+                <span>RRHH</span>
+                <span>Asistencia</span>
+                <span>N&oacute;mina</span>
             </div>
+        </section>
 
-            <button type="submit" class="btn-primary">Ingresar</button>
+        <section class="login-card" aria-label="Formulario de acceso">
+            <p class="login-kicker">Acceso seguro</p>
+            <h2>Iniciar sesi&oacute;n</h2>
+            <p class="subtitle">Ingresa tus credenciales para continuar al panel de ClockIn.</p>
 
-            {% if form.errors %}
-                <div class="error-box">
-                    Usuario o contraseña incorrectos.
+            <form method="post" class="login-form" id="loginForm">
+                {% csrf_token %}
+                <div class="form-group">
+                    <label for="id_username">Usuario</label>
+                    <div class="input-shell">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                            <circle cx="12" cy="7" r="4"></circle>
+                        </svg>
+                        <input type="text" name="username" id="id_username" autocomplete="username" required autofocus>
+                    </div>
                 </div>
-            {% endif %}
-        </form>
-    </div>
+
+                <div class="form-group">
+                    <label for="id_password">Contrase&ntilde;a</label>
+                    <div class="input-shell">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                            <rect x="3" y="11" width="18" height="10" rx="2"></rect>
+                            <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                        </svg>
+                        <input type="password" name="password" id="id_password" autocomplete="current-password" required>
+                    </div>
+                </div>
+
+                <button type="submit" class="login-action" id="loginButton">
+                    <span class="spinner" aria-hidden="true"></span>
+                    <span class="button-text">Ingresar al sistema</span>
+                </button>
+
+                {% if form.errors %}
+                    <div class="error-box">
+                        Usuario o contrase&ntilde;a incorrectos.
+                    </div>
+                {% endif %}
+            </form>
+
+            <p class="login-footnote">ClockIn Web RRHH</p>
+        </section>
+    </main>
+
+    <script>
+        const loginForm = document.getElementById("loginForm");
+        const loginButton = document.getElementById("loginButton");
+
+        if (loginForm && loginButton) {
+            loginForm.addEventListener("submit", function () {
+                loginForm.classList.add("is-submitting");
+                loginButton.querySelector(".button-text").textContent = "Validando acceso";
+            });
+        }
+    </script>
 </body>
 </html>

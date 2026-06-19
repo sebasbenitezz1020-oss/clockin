@@ -1,6 +1,11 @@
 from django.urls import path, include
 from .views import (
+    intro_clockin,
     dashboard,
+    panel_global_empresas,
+    empresa_entrar,
+    empresa_activa_salir,
+    empresa_detalle_global,
 
     empresas_lista,
     empresa_nueva,
@@ -53,6 +58,9 @@ from .views import (
     reporte_mensual_pdf,
     historial_lista,
     configuracion_general,
+    suscripcion_panel,
+    suscripcion_registrar_pago,
+    suscripcion_bloqueada,
 
     liquidaciones_lista,
     liquidacion_nueva,
@@ -93,7 +101,12 @@ from .views import (
 )
 
 urlpatterns = [
-    path("", dashboard, name="dashboard"),
+    path("", intro_clockin, name="intro_clockin"),
+    path("dashboard/", dashboard, name="dashboard"),
+    path("panel-global/", panel_global_empresas, name="panel_global_empresas"),
+    path("empresa/<int:pk>/entrar/", empresa_entrar, name="empresa_entrar"),
+    path("empresa-activa/salir/", empresa_activa_salir, name="empresa_activa_salir"),
+    path("empresa/<int:pk>/detalle-global/", empresa_detalle_global, name="empresa_detalle_global"),
 
     path("marcacion-manual/", marcacion_manual, name="marcacion_manual"),
 
@@ -157,6 +170,9 @@ urlpatterns = [
     path("reportes/mensual/pdf/", reporte_mensual_pdf, name="reporte_mensual_pdf"),
     path("historial/", historial_lista, name="historial_lista"),
     path("configuracion/", configuracion_general, name="configuracion_general"),
+    path("suscripcion/", suscripcion_panel, name="suscripcion_panel"),
+    path("suscripcion/registrar-pago/", suscripcion_registrar_pago, name="suscripcion_registrar_pago"),
+    path("suscripcion/bloqueada/", suscripcion_bloqueada, name="suscripcion_bloqueada"),
 
     path("liquidaciones/", liquidaciones_lista, name="liquidaciones_lista"),
     path("liquidaciones/nueva/", liquidacion_nueva, name="liquidacion_nueva"),

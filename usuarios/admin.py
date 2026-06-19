@@ -2,10 +2,34 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
 from .models import PermisoUsuario, Usuario
+from .multiempresa import es_admin_master
+
+
+class MasterOnlyAdminMixin:
+    def has_module_permission(self, request):
+        return es_admin_master(request.user)
+
+    def has_view_permission(self, request, obj=None):
+        return es_admin_master(request.user)
+
+    def has_add_permission(self, request):
+        return es_admin_master(request.user)
+
+    def has_change_permission(self, request, obj=None):
+        return es_admin_master(request.user)
+
+    def has_delete_permission(self, request, obj=None):
+        return es_admin_master(request.user)
+
+    def get_queryset(self, request):
+        queryset = super().get_queryset(request)
+        if es_admin_master(request.user):
+            return queryset
+        return queryset.none()
 
 
 @admin.register(Usuario)
-class UsuarioAdmin(UserAdmin):
+class UsuarioAdmin(MasterOnlyAdminMixin, UserAdmin):
     fieldsets = UserAdmin.fieldsets + (
         ("Información adicional", {
             "fields": ("rol", "telefono", "activo")
@@ -18,7 +42,7 @@ class UsuarioAdmin(UserAdmin):
 
 
 @admin.register(PermisoUsuario)
-class PermisoUsuarioAdmin(admin.ModelAdmin):
+class PermisoUsuarioAdmin(MasterOnlyAdminMixin, admin.ModelAdmin):
     list_display = (
         "usuario",
         "modulo",

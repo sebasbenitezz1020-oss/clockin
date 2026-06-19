@@ -503,14 +503,15 @@
         ========================= */
 
         .page-transition {
-            animation: clockinPageIn .32s ease both;
+            animation: clockinPageIn .42s cubic-bezier(.2,.75,.2,1) both;
+            transform-origin: top center;
         }
 
         @keyframes clockinPageIn {
             from {
                 opacity: 0;
-                transform: translateY(14px) scale(.992);
-                filter: blur(3px);
+                transform: translateY(16px) scale(.992);
+                filter: blur(4px);
             }
             to {
                 opacity: 1;
@@ -520,7 +521,7 @@
         }
 
         body.page-leaving .page-transition {
-            animation: clockinPageOut .18s ease both;
+            animation: clockinPageOut .22s ease both;
         }
 
         @keyframes clockinPageOut {
@@ -530,7 +531,8 @@
             }
             to {
                 opacity: 0;
-                transform: translateY(8px);
+                transform: translateY(10px) scale(.996);
+                filter: blur(2px);
             }
         }
 
@@ -538,34 +540,61 @@
         .clockin-loader {
             position: fixed;
             inset: 0;
-            background: rgba(5, 10, 18, .72);
-            backdrop-filter: blur(8px);
+            background:
+                radial-gradient(circle at 50% 40%, rgba(37,99,235,.16), transparent 34%),
+                rgba(5, 10, 18, .54);
+            backdrop-filter: blur(6px);
             z-index: 99999;
-            display: none;
+            display: flex;
             align-items: center;
             justify-content: center;
+            opacity: 0;
+            visibility: hidden;
+            pointer-events: none;
+            transition: opacity .18s ease, visibility .18s ease;
         }
 
         .clockin-loader.active {
-            display: flex;
+            opacity: 1;
+            visibility: visible;
+            pointer-events: auto;
         }
 
         .clockin-loader-box {
-            width: 210px;
-            padding: 26px;
-            border-radius: 26px;
+            position: relative;
+            width: min(320px, calc(100% - 48px));
+            overflow: hidden;
+            padding: 24px;
+            border-radius: 22px;
             background: linear-gradient(145deg, rgba(17,24,39,.96), rgba(8,13,22,.96));
-            border: 1px solid rgba(255,255,255,.08);
-            box-shadow: 0 24px 70px rgba(0,0,0,.45);
-            text-align: center;
+            border: 1px solid rgba(147,197,253,.16);
+            box-shadow: 0 24px 70px rgba(0,0,0,.42);
+            text-align: left;
+            transform: translateY(12px) scale(.98);
+            transition: transform .22s cubic-bezier(.2,.75,.2,1);
+        }
+
+        .clockin-loader.active .clockin-loader-box {
+            transform: translateY(0) scale(1);
+        }
+
+        .clockin-loader-box::before {
+            content: "";
+            position: absolute;
+            left: 0;
+            right: 0;
+            top: 0;
+            height: 3px;
+            background: linear-gradient(90deg, transparent, var(--brand-primary), #93c5fd, transparent);
+            animation: clockinLoaderBar 1s ease infinite;
         }
 
         .clockin-spinner {
-            width: 52px;
-            height: 52px;
-            margin: 0 auto 16px;
+            width: 34px;
+            height: 34px;
+            margin: 0 0 14px;
             border-radius: 50%;
-            border: 4px solid rgba(255,255,255,.12);
+            border: 3px solid rgba(255,255,255,.12);
             border-top-color: var(--brand-primary);
             animation: clockinSpin .8s linear infinite;
         }
@@ -576,10 +605,19 @@
             }
         }
 
+        @keyframes clockinLoaderBar {
+            0% {
+                transform: translateX(-70%);
+            }
+            100% {
+                transform: translateX(70%);
+            }
+        }
+
         .clockin-loader-text {
             color: #fff;
             font-weight: 900;
-            font-size: 15px;
+            font-size: 16px;
         }
 
         .clockin-loader-sub {
@@ -608,7 +646,7 @@
             box-shadow:
                 0 22px 60px rgba(0,0,0,.35);
         }
-        /* Botones con sensación app */
+        /* Botones con sensacion app */
         button,
         .btn-primary,
         .ficha-btn,
@@ -693,11 +731,104 @@
         }
     </style>
 </head>
-<body class="theme-{% if config_general and config_general.color_primario %}{{ config_general.color_primario }}{% else %}azul{% endif %}">
+<body class="theme-{% if empresa_activa and empresa_activa.tema_visual %}{{ empresa_activa.tema_visual }}{% elif config_general and config_general.color_primario %}{{ config_general.color_primario }}{% else %}azul{% endif %}"
+      {% if empresa_activa and empresa_activa.color_primario %}
+      style="--brand-primary: {{ empresa_activa.color_primario }}; --brand-primary-dark: {% if empresa_activa.color_secundario %}{{ empresa_activa.color_secundario }}{% else %}{{ empresa_activa.color_primario }}{% endif %};"
+      {% endif %}>
+
+<svg width="0" height="0" style="position:absolute; display:none;" aria-hidden="true" focusable="false">
+    <symbol id="ci-dashboard" viewBox="0 0 24 24">
+        <rect x="3" y="3" width="7" height="8" rx="2"></rect>
+        <rect x="14" y="3" width="7" height="5" rx="2"></rect>
+        <rect x="14" y="12" width="7" height="9" rx="2"></rect>
+        <rect x="3" y="15" width="7" height="6" rx="2"></rect>
+    </symbol>
+    <symbol id="ci-building" viewBox="0 0 24 24">
+        <path d="M4 21V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v16"></path>
+        <path d="M16 8h2a2 2 0 0 1 2 2v11"></path>
+        <path d="M8 7h4M8 11h4M8 15h4M3 21h18"></path>
+    </symbol>
+    <symbol id="ci-branch" viewBox="0 0 24 24">
+        <circle cx="6" cy="6" r="3"></circle>
+        <circle cx="18" cy="6" r="3"></circle>
+        <circle cx="12" cy="18" r="3"></circle>
+        <path d="M8.6 8.2 11 15M15.4 8.2 13 15"></path>
+    </symbol>
+    <symbol id="ci-users" viewBox="0 0 24 24">
+        <path d="M16 21v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2"></path>
+        <circle cx="9.5" cy="7" r="4"></circle>
+        <path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"></path>
+    </symbol>
+    <symbol id="ci-clock" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="9"></circle>
+        <path d="M12 7v5l3 2"></path>
+    </symbol>
+    <symbol id="ci-calendar" viewBox="0 0 24 24">
+        <rect x="3" y="5" width="18" height="16" rx="2"></rect>
+        <path d="M16 3v4M8 3v4M3 11h18"></path>
+    </symbol>
+    <symbol id="ci-card" viewBox="0 0 24 24">
+        <rect x="3" y="5" width="18" height="14" rx="2"></rect>
+        <path d="M3 10h18M7 15h4"></path>
+    </symbol>
+    <symbol id="ci-wallet" viewBox="0 0 24 24">
+        <path d="M4 7h14a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h12"></path>
+        <path d="M16 13h4"></path>
+    </symbol>
+    <symbol id="ci-camera" viewBox="0 0 24 24">
+        <path d="M4 8a2 2 0 0 1 2-2h2l2-3h4l2 3h2a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z"></path>
+        <circle cx="12" cy="13" r="4"></circle>
+    </symbol>
+    <symbol id="ci-file" viewBox="0 0 24 24">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8Z"></path>
+        <path d="M14 2v6h6M8 13h8M8 17h6"></path>
+    </symbol>
+    <symbol id="ci-umbrella" viewBox="0 0 24 24">
+        <path d="M3 12a9 9 0 0 1 18 0Z"></path>
+        <path d="M12 12v6a3 3 0 0 0 6 0"></path>
+    </symbol>
+    <symbol id="ci-megaphone" viewBox="0 0 24 24">
+        <path d="m3 11 18-6v14L3 13Z"></path>
+        <path d="M7 14v5a2 2 0 0 0 2 2h1"></path>
+    </symbol>
+    <symbol id="ci-gift" viewBox="0 0 24 24">
+        <rect x="3" y="8" width="18" height="13" rx="2"></rect>
+        <path d="M12 8v13M3 13h18M7.5 8a2.5 2.5 0 1 1 4.5-1.5A2.5 2.5 0 1 1 16.5 8"></path>
+    </symbol>
+    <symbol id="ci-trending" viewBox="0 0 24 24">
+        <path d="M3 17 9 11l4 4 8-8"></path>
+        <path d="M14 7h7v7"></path>
+    </symbol>
+    <symbol id="ci-history" viewBox="0 0 24 24">
+        <path d="M3 12a9 9 0 1 0 3-6.7"></path>
+        <path d="M3 4v6h6M12 7v5l3 2"></path>
+    </symbol>
+    <symbol id="ci-bank" viewBox="0 0 24 24">
+        <path d="m3 9 9-6 9 6Z"></path>
+        <path d="M5 10v8M9 10v8M15 10v8M19 10v8M3 21h18"></path>
+    </symbol>
+    <symbol id="ci-settings" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="3"></circle>
+        <path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6V21a2 2 0 1 1-4 0v-.2a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.9 1.7 1.7 0 0 0-1.6-1H3a2 2 0 1 1 0-4h.2a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9l-.1-.1A2 2 0 1 1 7.2 4l.1.1a1.7 1.7 0 0 0 1.9.3h.1A1.7 1.7 0 0 0 10 2.8V3a2 2 0 1 1 4 0v-.2a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.9v.1a1.7 1.7 0 0 0 1.6 1H21a2 2 0 1 1 0 4h-.2a1.7 1.7 0 0 0-1.4 1.1Z"></path>
+    </symbol>
+    <symbol id="ci-user-cog" viewBox="0 0 24 24">
+        <path d="M15 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"></path>
+        <circle cx="8.5" cy="7" r="4"></circle>
+        <circle cx="18" cy="16" r="2"></circle>
+        <path d="M18 12v2M18 18v2M14.5 14l1.7 1M19.8 17l1.7 1M14.5 18l1.7-1M19.8 15l1.7-1"></path>
+    </symbol>
+    <symbol id="ci-shield" viewBox="0 0 24 24">
+        <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10Z"></path>
+    </symbol>
+    <symbol id="ci-log-out" viewBox="0 0 24 24">
+        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"></path>
+        <path d="M16 17l5-5-5-5M21 12H9"></path>
+    </symbol>
+</svg>
 
 <div class="mobile-topbar">
     <button id="menu-toggle" class="mobile-menu-btn">
-        ☰
+        &#9776;
     </button>
 
     <div class="mobile-brand">
@@ -716,7 +847,9 @@
         <div class="brand">
             <div class="brand-title-wrap">
                 <div class="brand-logo-sidebar">
-                    {% if config_general and config_general.logo_url %}
+                    {% if empresa_activa and empresa_activa.logo %}
+                        <img src="{{ empresa_activa.logo.url }}" alt="{{ empresa_activa.nombre_visible }}">
+                    {% elif config_general and config_general.logo_url %}
                         <img src="{{ config_general.logo_url }}" alt="Logo">
                     {% else %}
                         <img src="{% static 'img/logo-clockin-horizontal.png' %}" alt="ClockIn">
@@ -725,14 +858,18 @@
 
                 <div>
                     <h1 style="margin:0;">
-                        {% if config_general and config_general.nombre_sistema %}
+                        {% if empresa_activa %}
+                            {{ empresa_activa.nombre_visible }}
+                        {% elif config_general and config_general.nombre_sistema %}
                             {{ config_general.nombre_sistema }}
                         {% else %}
                             ClockIn
                         {% endif %}
                     </h1>
                     <p style="margin:4px 0 0;">
-                        {% if config_general and config_general.subtitulo_sistema %}
+                        {% if empresa_activa %}
+                            {{ empresa_activa.get_plan_contratado_display }}
+                        {% elif config_general and config_general.subtitulo_sistema %}
                             {{ config_general.subtitulo_sistema }}
                         {% else %}
                             Sistema Web
@@ -745,108 +882,100 @@
         {% if request.user.is_authenticated %}
         <nav class="menu">
             {% if puede_ver_dashboard %}
-            <a href="{% url 'dashboard' %}">📊 Dashboard</a>
+            <a href="{% url 'dashboard' %}"><span class="sidebar-icon"><svg><use href="#ci-dashboard"></use></svg></span><span class="sidebar-label">Dashboard</span></a>
             {% endif %}
 
             {% if puede_ver_empresas %}
-            <a href="{% url 'empresas_lista' %}">🏢 Empresas</a>
+            <a href="{% url 'empresas_lista' %}"><span class="sidebar-icon"><svg><use href="#ci-building"></use></svg></span><span class="sidebar-label">Empresas</span></a>
             {% endif %}
 
             {% if puede_ver_sucursales %}
-            <a href="{% url 'sucursales_lista' %}">🏬 Sucursales</a>
+            <a href="{% url 'sucursales_lista' %}"><span class="sidebar-icon"><svg><use href="#ci-branch"></use></svg></span><span class="sidebar-label">Sucursales</span></a>
             {% endif %}
 
             {% if puede_ver_funcionarios %}
-            <a href="{% url 'funcionarios_lista' %}">👥 Funcionarios</a>
+            <a href="{% url 'funcionarios_lista' %}"><span class="sidebar-icon"><svg><use href="#ci-users"></use></svg></span><span class="sidebar-label">Funcionarios</span></a>
             {% endif %}
 
             {% if puede_ver_turnos %}
-            <a href="{% url 'turnos_lista' %}">🕓 Turnos</a>
+            <a href="{% url 'turnos_lista' %}"><span class="sidebar-icon"><svg><use href="#ci-clock"></use></svg></span><span class="sidebar-label">Turnos</span></a>
             {% endif %}
 
             {% if puede_ver_asistencia %}
-            <a href="{% url 'asistencia_marcar' %}">⏱️ Asistencia</a>
+            <a href="{% url 'asistencia_marcar' %}"><span class="sidebar-icon"><svg><use href="#ci-clock"></use></svg></span><span class="sidebar-label">Asistencia</span></a>
             {% endif %}
 
             {% if puede_ver_dias_libres %}
-            <a href="{% url 'dias_libres_lista' %}">🗓️ Días Libres</a>
+            <a href="{% url 'dias_libres_lista' %}"><span class="sidebar-icon"><svg><use href="#ci-calendar"></use></svg></span><span class="sidebar-label">D&iacute;as Libres</span></a>
             {% endif %}
 
             {% if puede_ver_deudas %}
-            <a href="{% url 'deudas_lista' %}">💳 Deudas</a>
+            <a href="{% url 'deudas_lista' %}"><span class="sidebar-icon"><svg><use href="#ci-card"></use></svg></span><span class="sidebar-label">Deudas</span></a>
             {% endif %}
 
             {% if puede_ver_nomina %}
-            <a href="{% url 'nomina_lista' %}">💰 Nómina</a>
+            <a href="{% url 'nomina_lista' %}"><span class="sidebar-icon"><svg><use href="#ci-wallet"></use></svg></span><span class="sidebar-label">N&oacute;mina</span></a>
             {% endif %}
 
             {% if puede_ver_biometrico %}
-            <a href="{% url 'biometrico_inicio' %}">📸 Biométrico</a>
+            <a href="{% url 'biometrico_inicio' %}"><span class="sidebar-icon"><svg><use href="#ci-camera"></use></svg></span><span class="sidebar-label">Biom&eacute;trico</span></a>
             {% endif %}
 
             {% if puede_ver_permisos %}
-            <a href="{% url 'permisos_lista' %}">📄 Permisos / Licencias</a>
+            <a href="{% url 'permisos_lista' %}"><span class="sidebar-icon"><svg><use href="#ci-file"></use></svg></span><span class="sidebar-label">Permisos / Licencias</span></a>
             {% endif %}
 
-            <a href="{% url 'banco_horas_lista' %}" class="sidebar-link">
-                <span class="sidebar-icon">⏱️</span>
-                <span>Banco de Horas</span>
-            </a>
+            <a href="{% url 'banco_horas_lista' %}" class="sidebar-link"><span class="sidebar-icon"><svg><use href="#ci-clock"></use></svg></span><span class="sidebar-label">Banco de Horas</span></a>
 
             {% if puede_ver_vacaciones %}
-            <a href="{% url 'vacaciones_lista' %}">🏖️ Vacaciones</a>
+            <a href="{% url 'vacaciones_lista' %}"><span class="sidebar-icon"><svg><use href="#ci-umbrella"></use></svg></span><span class="sidebar-label">Vacaciones</span></a>
             {% endif %}
 
             {% if es_admin_master or puede_ver_comunicaciones %}
-            <a href="{% url 'comunicaciones_lista' %}" class="sidebar-link">
-                <span class="sidebar-icon">📢</span>
-                <span>Comunicaciones</span>
-            </a>
+            <a href="{% url 'comunicaciones_lista' %}" class="sidebar-link"><span class="sidebar-icon"><svg><use href="#ci-megaphone"></use></svg></span><span class="sidebar-label">Comunicaciones</span></a>
             {% endif %}
 
             {% if es_admin_master or perm_aguinaldo %}
-            <a href="{% url 'aguinaldo_lista' %}" class="sidebar-link">
-                <span class="sidebar-icon">🎁</span>
-                <span>Aguinaldo</span>
-            </a>
+            <a href="{% url 'aguinaldo_lista' %}" class="sidebar-link"><span class="sidebar-icon"><svg><use href="#ci-gift"></use></svg></span><span class="sidebar-label">Aguinaldo</span></a>
             {% endif %}
 
             {% if puede_ver_icl %}
-            <a href="{% url 'icl_lista' %}">📈 ICL</a>
+            <a href="{% url 'icl_lista' %}"><span class="sidebar-icon"><svg><use href="#ci-trending"></use></svg></span><span class="sidebar-label">ICL</span></a>
             {% endif %}
 
             {% if puede_ver_reportes %}
-            <a href="{% url 'reportes' %}">📑 Reportes</a>
+            <a href="{% url 'reportes' %}"><span class="sidebar-icon"><svg><use href="#ci-file"></use></svg></span><span class="sidebar-label">Reportes</span></a>
             {% endif %}
 
             {% if puede_ver_historial %}
-            <a href="{% url 'historial_lista' %}">🕘 Historial</a>
+            <a href="{% url 'historial_lista' %}"><span class="sidebar-icon"><svg><use href="#ci-history"></use></svg></span><span class="sidebar-label">Historial</span></a>
             {% endif %}
 
             {% if puede_ver_liquidacion %}
-            <a href="{% url 'liquidaciones_lista' %}">📑 Liquidación</a>
+            <a href="{% url 'liquidaciones_lista' %}"><span class="sidebar-icon"><svg><use href="#ci-file"></use></svg></span><span class="sidebar-label">Liquidaci&oacute;n</span></a>
             {% endif %}
 
-            <a href="{% url 'planilla_bancaria_lista' %}" class="sidebar-link">
-                <span class="sidebar-icon">🏦</span>
-                <span>Planilla Bancaria</span>
-            </a>
+            <a href="{% url 'planilla_bancaria_lista' %}" class="sidebar-link"><span class="sidebar-icon"><svg><use href="#ci-bank"></use></svg></span><span class="sidebar-label">Planilla Bancaria</span></a>
 
             {% if puede_ver_configuracion %}
-            <a href="{% url 'configuracion_general' %}">⚙️ Configuración</a>
+            <a href="{% url 'configuracion_general' %}"><span class="sidebar-icon"><svg><use href="#ci-settings"></use></svg></span><span class="sidebar-label">Configuraci&oacute;n</span></a>
+            {% endif %}
+
+            {% if es_admin_master %}
+            <a href="{% url 'suscripcion_panel' %}"><span class="sidebar-icon"><svg><use href="#ci-card"></use></svg></span><span class="sidebar-label">Suscripci&oacute;n</span></a>
             {% endif %}
 
             {% if puede_ver_usuarios_permisos %}
-            <a href="{% url 'usuarios_lista' %}">👤 Usuarios y Permisos</a>
+            <a href="{% url 'usuarios_lista' %}"><span class="sidebar-icon"><svg><use href="#ci-user-cog"></use></svg></span><span class="sidebar-label">Usuarios y Permisos</span></a>
             {% endif %}
 
             {% if es_admin_total %}
-            <a href="/admin/">🛠️ Admin</a>
+            <a href="/admin/"><span class="sidebar-icon"><svg><use href="#ci-shield"></use></svg></span><span class="sidebar-label">Admin</span></a>
             {% endif %}
 
             <form method="post" action="{% url 'logout' %}">
                 {% csrf_token %}
-                <button type="submit" class="logout-btn">🚪 Cerrar sesión</button>
+                <button type="submit" class="logout-btn"><span class="sidebar-icon"><svg><use href="#ci-log-out"></use></svg></span><span class="sidebar-label">Cerrar sesi&oacute;n</span></button>
             </form>
         </nav>
         {% endif %}
@@ -864,7 +993,9 @@
                     <div class="topbar-breadcrumb">
                         <span class="dot"></span>
                         <span>
-                            {% if config_general and config_general.nombre_sistema %}
+                            {% if empresa_activa %}
+                                {{ empresa_activa.nombre_visible }}
+                            {% elif config_general and config_general.nombre_sistema %}
                                 {{ config_general.nombre_sistema }}
                             {% else %}
                                 ClockIn
@@ -874,11 +1005,16 @@
 
                     <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
                         {% if es_admin_master %}
-                            <span class="topbar-company global">🌐 Vista global</span>
+                            {% if empresa_activa %}
+                                <span class="topbar-company empresa">&#127970; {{ empresa_activa.nombre_visible }}</span>
+                                <a href="{% url 'empresa_activa_salir' %}" class="topbar-company global" style="text-decoration:none;">Cambiar empresa</a>
+                            {% else %}
+                                <span class="topbar-company global">&#127760; Vista global</span>
+                            {% endif %}
                         {% elif empresa_usuario %}
-                            <span class="topbar-company empresa">🏢 {{ empresa_usuario.nombre }}</span>
+                            <span class="topbar-company empresa">&#127970; {{ empresa_usuario.nombre_visible|default:empresa_usuario.nombre }}</span>
                         {% else %}
-                            <span class="topbar-company sin-empresa">⚠ Sin empresa asignada</span>
+                            <span class="topbar-company sin-empresa">&#9888; Sin empresa asignada</span>
                         {% endif %}
 
                         <span class="role-badge">{{ request.user.get_rol_display }}</span>
@@ -888,6 +1024,14 @@
         </header>
 
         <section class="page page-transition">
+            {% if mostrar_alerta_suscripcion and suscripcion_sistema %}
+                <div class="alert-box {% if suscripcion_sistema.bloqueada %}error-box-strong{% else %}warning-box{% endif %}" style="margin-bottom:16px;">
+                    Suscripci&oacute;n: <strong>{{ suscripcion_sistema.estado_visible }}</strong>.
+                    Pr&oacute;ximo pago: {{ suscripcion_sistema.fecha_proximo_pago|date:"d/m/Y" }}.
+                    <a href="{% url 'suscripcion_panel' %}" style="color:inherit; font-weight:900; text-decoration:underline;">Revisar</a>
+                </div>
+            {% endif %}
+
             {% if messages %}
                 <div style="margin-bottom: 16px;">
                     {% for message in messages %}
@@ -932,7 +1076,7 @@
     <div class="clockin-loader-box">
         <div class="clockin-spinner"></div>
         <div class="clockin-loader-text">Cargando ClockIn</div>
-        <div class="clockin-loader-sub">Actualizando información...</div>
+        <div class="clockin-loader-sub">Actualizando informaci&oacute;n...</div>
     </div>
 </div>
 
@@ -994,7 +1138,7 @@ document.addEventListener("DOMContentLoaded", function () {
 document.addEventListener("DOMContentLoaded", function () {
     const loader = document.getElementById("clockinLoader");
 
-    function showLoader(text = "Cargando ClockIn", sub = "Actualizando información...") {
+    function showLoader(text = "Cargando ClockIn", sub = "Actualizando informaci\u00f3n...") {
         if (!loader) return;
 
         const title = loader.querySelector(".clockin-loader-text");
@@ -1022,23 +1166,32 @@ document.addEventListener("DOMContentLoaded", function () {
             if (href.startsWith("javascript:")) return;
             if (link.target === "_blank") return;
             if (link.hasAttribute("download")) return;
+            if (e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+            if (e.button && e.button !== 0) return;
 
             document.body.classList.add("page-leaving");
-            showLoader("Abriendo módulo", "Preparando la información...");
+            link.classList.add("is-processing");
+            showLoader("Abriendo m\u00f3dulo", "Preparando la informaci\u00f3n...");
         });
     });
 
     document.querySelectorAll("form").forEach(function (form) {
         form.addEventListener("submit", function () {
+            const submitter = form.querySelector("button[type='submit'], input[type='submit']");
+            if (submitter) {
+                submitter.classList.add("is-processing");
+                submitter.setAttribute("aria-busy", "true");
+            }
             showLoader("Procesando", "Guardando y actualizando datos...");
         });
     });
 
     document.querySelectorAll("[data-loader-text]").forEach(function (el) {
         el.addEventListener("click", function () {
+            el.classList.add("is-processing");
             showLoader(
                 el.dataset.loaderText || "Procesando",
-                el.dataset.loaderSub || "Actualizando información..."
+                el.dataset.loaderSub || "Actualizando informaci\u00f3n..."
             );
         });
     });
