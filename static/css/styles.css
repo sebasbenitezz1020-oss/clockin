@@ -2938,6 +2938,43 @@ button.is-processing::after,
         object-fit: contain !important;
     }
 
+    .brand-logo-sidebar.clockin-logo-wide {
+        width: 148px !important;
+        max-width: 148px !important;
+        height: 50px !important;
+        max-height: 50px !important;
+        flex: 0 0 148px !important;
+    }
+
+    .brand-logo-sidebar.clockin-logo-wide img {
+        width: 100% !important;
+        max-width: 100% !important;
+        height: 100% !important;
+        max-height: 100% !important;
+        object-fit: contain !important;
+    }
+
+    .brand-logo-sidebar.clockin-logo-icon {
+        width: 112px !important;
+        max-width: 112px !important;
+        height: 112px !important;
+        max-height: 112px !important;
+        flex: 0 0 112px !important;
+        padding: 0 !important;
+        background: transparent !important;
+        border: 0 !important;
+        box-shadow: none !important;
+    }
+
+    .brand-logo-sidebar.clockin-logo-icon img {
+        width: 100% !important;
+        max-width: 100% !important;
+        height: 100% !important;
+        max-height: 100% !important;
+        object-fit: contain !important;
+        filter: drop-shadow(0 10px 22px rgba(37, 99, 235, .22));
+    }
+
     .menu {
         gap: 9px !important;
         padding-bottom: 90px !important;

@@ -1,6 +1,9 @@
 from calendar import monthrange
+from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
+from types import SimpleNamespace
 
+from django.apps import apps
 from django.db.models import Sum
 
 from .models import Liquidacion, Deuda
@@ -52,9 +55,9 @@ def calcular_preaviso_dias(tipo_salida, fecha_ingreso, fecha_salida):
 
     if meses_totales < 12:
         return 30
-    elif meses_totales < 60:
+    if meses_totales < 60:
         return 45
-    elif meses_totales < 120:
+    if meses_totales < 120:
         return 60
     return 90
 
@@ -62,7 +65,7 @@ def calcular_preaviso_dias(tipo_salida, fecha_ingreso, fecha_salida):
 def calcular_vacaciones_causadas_anuales(anios_antiguedad):
     if anios_antiguedad < 5:
         return 12
-    elif anios_antiguedad < 10:
+    if anios_antiguedad < 10:
         return 18
     return 30
 
@@ -92,41 +95,153 @@ def calcular_aguinaldo_proporcional(salario_base, bono_base, fecha_salida):
     return (mensual * meses_equivalentes / Decimal(12)).quantize(DECIMAL_2, rounding=ROUND_HALF_UP)
 
 
+def calcular_promedio_salarial_ultimos_6_meses(funcionario, fecha_salida):
+    if not funcionario or not fecha_salida:
+        return None
+
+    try:
+        NominaMensual = apps.get_model("core", "NominaMensual")
+        nominas = (
+            NominaMensual.objects.filter(
+                funcionario=funcionario,
+                anio__lte=fecha_salida.year,
+            )
+            .exclude(estado_pago=getattr(NominaMensual.EstadosPago, "ANULADO", "anulado"))
+            .order_by("-anio", "-mes")
+        )
+
+        valores = []
+        for nomina in nominas:
+            if nomina.anio == fecha_salida.year and nomina.mes > fecha_salida.month:
+                continue
+
+            salario = d(getattr(nomina, "salario_base", 0))
+            if salario > 0:
+                valores.append(salario)
+
+            if len(valores) == 6:
+                break
+
+        if not valores:
+            return None
+
+        return (sum(valores, d(0)) / Decimal(len(valores))).quantize(DECIMAL_2, rounding=ROUND_HALF_UP)
+    except Exception:
+        return None
+
+
+def calcular_anios_computables_indemnizacion(fecha_ingreso, fecha_salida):
+    detalle = calcular_antiguedad_detalle(fecha_ingreso, fecha_salida)
+    suma_anio = detalle["meses"] > 6 or (detalle["meses"] == 6 and detalle["dias"] > 0)
+    anios_computables = detalle["anios"] + (1 if suma_anio else 0)
+
+    return {
+        "anios_computables": max(anios_computables, 0),
+        "suma_anio_por_fraccion": suma_anio,
+        "antiguedad": detalle,
+    }
+
+
 def calcular_indemnizacion(tipo_salida, fecha_ingreso, fecha_salida, salario_base):
     if tipo_salida != Liquidacion.TiposSalida.DESPIDO_SIN_JUSTA_CAUSA:
-        return {"dias": 0, "monto": d(0), "revision": False, "alerta": ""}
-
-    detalle = calcular_antiguedad_detalle(fecha_ingreso, fecha_salida)
-    anios = detalle["anios"]
-    meses = detalle["meses"]
-
-    salario_diario = (d(salario_base) / Decimal(30)).quantize(DECIMAL_2, rounding=ROUND_HALF_UP)
-
-    if anios >= 10:
-        dias = 30
-        monto = (salario_diario * Decimal(dias)).quantize(DECIMAL_2, rounding=ROUND_HALF_UP)
         return {
-            "dias": dias,
-            "monto": monto,
-            "revision": True,
-            "alerta": "Funcionario con 10 años o más de antigüedad: revisar estabilidad especial antes de confirmar.",
+            "dias": 0,
+            "monto": d(0),
+            "revision": False,
+            "alerta": "",
+            "anios_computables": 0,
+            "suma_anio_por_fraccion": False,
         }
 
-    dias = anios * 15
-    if meses >= 6:
-        dias += 15
-
+    computo = calcular_anios_computables_indemnizacion(fecha_ingreso, fecha_salida)
+    anios_computables = computo["anios_computables"]
+    salario_diario = (d(salario_base) / Decimal(30)).quantize(DECIMAL_2, rounding=ROUND_HALF_UP)
+    dias = anios_computables * 15
     monto = (salario_diario * Decimal(dias)).quantize(DECIMAL_2, rounding=ROUND_HALF_UP)
-    return {"dias": dias, "monto": monto, "revision": False, "alerta": ""}
+
+    return {
+        "dias": dias,
+        "monto": monto,
+        "revision": False,
+        "alerta": "",
+        "anios_computables": anios_computables,
+        "suma_anio_por_fraccion": computo["suma_anio_por_fraccion"],
+    }
 
 
 def calcular_deudas_activas_funcionario(funcionario):
-    total = (
-        Deuda.objects.filter(funcionario=funcionario, activa=True, aplicar_en_nomina=True)
-        .aggregate(total=Sum("saldo_pendiente"))
-        .get("total")
-    )
-    return d(total or 0)
+    try:
+        total = (
+            Deuda.objects.filter(funcionario=funcionario, activa=True, aplicar_en_nomina=True)
+            .aggregate(total=Sum("saldo_pendiente"))
+            .get("total")
+        )
+        return d(total or 0)
+    except Exception:
+        return d(0)
+
+
+def contar_ausencias_recientes_funcionario(funcionario, fecha_salida):
+    if not funcionario or not fecha_salida:
+        return 0
+
+    try:
+        Asistencia = apps.get_model("core", "Asistencia")
+        fecha_inicio_mes = fecha_salida.replace(day=1)
+        asistencias_qs = Asistencia.objects.filter(
+            funcionario=funcionario,
+            fecha__gte=fecha_inicio_mes,
+            fecha__lte=fecha_salida,
+        )
+        fechas_asistidas = set(asistencias_qs.values_list("fecha", flat=True))
+
+        ausencias = 0
+        dia_actual = fecha_inicio_mes
+        while dia_actual <= fecha_salida:
+            if dia_actual.weekday() != 6 and dia_actual not in fechas_asistidas:
+                ausencias += 1
+
+            if dia_actual.day >= monthrange(dia_actual.year, dia_actual.month)[1]:
+                break
+            dia_actual = dia_actual.replace(day=dia_actual.day + 1)
+
+        return ausencias
+    except Exception:
+        return 0
+
+
+def construir_alertas_proteccion_liquidacion(resumen, tipo_salida):
+    alertas = []
+    tipo_display = dict(Liquidacion.TiposSalida.choices).get(tipo_salida, tipo_salida or "-")
+
+    if resumen.get("ausencias_descuento", 0) > 0:
+        alertas.append(
+            f"Hay {resumen['ausencias_descuento']} ausencia(s) reciente(s) o pendiente(s) para revisar antes de confirmar."
+        )
+
+    dias_faltantes = resumen.get("preaviso_dias_faltantes", 0)
+    if dias_faltantes > 0:
+        alertas.append(
+            f"Preaviso pendiente: corresponden {resumen.get('preaviso_dias_corresponde', 0)} dia(s), "
+            f"se avisaron {resumen.get('preaviso_dias_otorgados', 0)} y faltan {dias_faltantes}."
+        )
+
+    if tipo_salida != Liquidacion.TiposSalida.DESPIDO_SIN_JUSTA_CAUSA:
+        alertas.append(f"El tipo de salida '{tipo_display}' no genera indemnizacion.")
+
+    if resumen.get("indemnizacion_suma_anio_por_fraccion"):
+        alertas.append("La fraccion de antiguedad supera 6 meses y suma 1 anio computable adicional.")
+
+    if resumen.get("deudas_monto", d(0)) > 0:
+        alertas.append("Hay deudas activas del funcionario para descontar o conciliar.")
+
+    if resumen.get("otros_descuentos", d(0)) > 0:
+        alertas.append("Hay otros descuentos cargados manualmente en esta liquidacion.")
+
+    if resumen.get("vacaciones_causadas_pendientes_dias", 0) > 0:
+        alertas.append("Hay vacaciones pendientes incluidas en la liquidacion.")
+
+    return alertas
 
 
 def calcular_liquidacion_funcionario(
@@ -140,29 +255,28 @@ def calcular_liquidacion_funcionario(
     descontar_preaviso=False,
     otros_descuentos=0,
 ):
-    salario_base = d(funcionario.salario_base)
-    bono_base = d(funcionario.bono)
+    salario_base = d(getattr(funcionario, "salario_base", 0))
+    bono_base = d(getattr(funcionario, "bono", 0))
     salario_mensual = salario_base + bono_base
-    salario_diario = (salario_mensual / Decimal(30)).quantize(DECIMAL_2, rounding=ROUND_HALF_UP)
+    salario_diario_base = (salario_base / Decimal(30)).quantize(DECIMAL_2, rounding=ROUND_HALF_UP)
 
-    antig = calcular_antiguedad_detalle(funcionario.fecha_ingreso, fecha_salida)
-    preaviso_dias_corresponde = calcular_preaviso_dias(tipo_salida, funcionario.fecha_ingreso, fecha_salida)
+    fecha_ingreso = getattr(funcionario, "fecha_ingreso", None)
+    antig = calcular_antiguedad_detalle(fecha_ingreso, fecha_salida)
+    preaviso_dias_corresponde = calcular_preaviso_dias(tipo_salida, fecha_ingreso, fecha_salida)
 
-    if dias_trabajados_pendientes is None:
-        dias_trabajados_pendientes = fecha_salida.day
+    dias_trabajados_pendientes = fecha_salida.day if fecha_salida else 0
 
     if vacaciones_causadas_pendientes_dias is None:
         vacaciones_causadas_pendientes_dias = 0
 
-    dias_trabajados_pendientes = int(dias_trabajados_pendientes or 0)
     vacaciones_causadas_pendientes_dias = int(vacaciones_causadas_pendientes_dias or 0)
     preaviso_dias_otorgados = int(preaviso_dias_otorgados or 0)
 
-    salario_pendiente_monto = (salario_diario * Decimal(dias_trabajados_pendientes)).quantize(DECIMAL_2)
-    vacaciones_causadas_monto = (salario_diario * Decimal(vacaciones_causadas_pendientes_dias)).quantize(DECIMAL_2)
+    salario_pendiente_monto = (salario_diario_base * Decimal(dias_trabajados_pendientes)).quantize(DECIMAL_2)
+    vacaciones_causadas_monto = (salario_diario_base * Decimal(vacaciones_causadas_pendientes_dias)).quantize(DECIMAL_2)
 
-    vacaciones_proporcionales_dias = calcular_vacaciones_proporcionales_dias(funcionario.fecha_ingreso, fecha_salida)
-    vacaciones_proporcionales_monto = (salario_diario * Decimal(vacaciones_proporcionales_dias)).quantize(DECIMAL_2)
+    vacaciones_proporcionales_dias = calcular_vacaciones_proporcionales_dias(fecha_ingreso, fecha_salida)
+    vacaciones_proporcionales_monto = (salario_diario_base * Decimal(vacaciones_proporcionales_dias)).quantize(DECIMAL_2)
 
     aguinaldo_proporcional_monto = calcular_aguinaldo_proporcional(salario_base, bono_base, fecha_salida)
 
@@ -171,20 +285,22 @@ def calcular_liquidacion_funcionario(
 
     if tipo_salida == Liquidacion.TiposSalida.RENUNCIA:
         if descontar_preaviso and not preaviso_cumplido and dias_faltantes_preaviso > 0:
-            preaviso_monto = (salario_diario * Decimal(dias_faltantes_preaviso)).quantize(DECIMAL_2)
-
+            preaviso_monto = (salario_diario_base * Decimal(dias_faltantes_preaviso)).quantize(DECIMAL_2)
     elif tipo_salida == Liquidacion.TiposSalida.DESPIDO_SIN_JUSTA_CAUSA:
         if not preaviso_cumplido and dias_faltantes_preaviso > 0:
-            preaviso_monto = (salario_diario * Decimal(dias_faltantes_preaviso)).quantize(DECIMAL_2)
+            preaviso_monto = (salario_diario_base * Decimal(dias_faltantes_preaviso)).quantize(DECIMAL_2)
 
-    indemnizacion = calcular_indemnizacion(tipo_salida, funcionario.fecha_ingreso, fecha_salida, salario_base)
+    salario_indemnizacion = calcular_promedio_salarial_ultimos_6_meses(funcionario, fecha_salida) or salario_base
+    indemnizacion = calcular_indemnizacion(tipo_salida, fecha_ingreso, fecha_salida, salario_indemnizacion)
 
     ips_monto = d(0)
-    if funcionario.ips:
+    if getattr(funcionario, "ips", False):
         ips_monto = (salario_pendiente_monto * Decimal("0.09")).quantize(DECIMAL_2)
 
     deudas_monto = calcular_deudas_activas_funcionario(funcionario)
     otros_descuentos = d(otros_descuentos)
+    ausencias_descuento = contar_ausencias_recientes_funcionario(funcionario, fecha_salida)
+    descuento_ausencias = d(0)
 
     total_haberes = (
         salario_pendiente_monto
@@ -212,14 +328,18 @@ def calcular_liquidacion_funcionario(
         requiere_revision_juridica = True
         alerta_revision = "Caso cargado como abandono: verificar respaldo documental y causal antes de confirmar."
 
-    return {
+    resumen = {
         "salario_base_snapshot": salario_base,
         "bono_base_snapshot": bono_base,
+        "salario_indemnizacion_base": salario_indemnizacion,
+        "salario_diario_base": salario_diario_base,
         "antiguedad_anios": antig["anios"],
         "antiguedad_meses": antig["meses"],
         "antiguedad_dias": antig["dias"],
         "dias_trabajados_pendientes": dias_trabajados_pendientes,
         "salario_pendiente_monto": salario_pendiente_monto,
+        "ausencias_descuento": ausencias_descuento,
+        "descuento_ausencias": descuento_ausencias,
         "vacaciones_causadas_pendientes_dias": vacaciones_causadas_pendientes_dias,
         "vacaciones_causadas_monto": vacaciones_causadas_monto,
         "vacaciones_proporcionales_dias": vacaciones_proporcionales_dias,
@@ -227,11 +347,14 @@ def calcular_liquidacion_funcionario(
         "aguinaldo_proporcional_monto": aguinaldo_proporcional_monto,
         "preaviso_dias_corresponde": preaviso_dias_corresponde,
         "preaviso_dias_otorgados": preaviso_dias_otorgados,
+        "preaviso_dias_faltantes": dias_faltantes_preaviso,
         "preaviso_cumplido": preaviso_cumplido,
         "descontar_preaviso": descontar_preaviso,
         "preaviso_monto": preaviso_monto,
         "indemnizacion_dias": indemnizacion["dias"],
         "indemnizacion_monto": indemnizacion["monto"],
+        "indemnizacion_anios_computables": indemnizacion["anios_computables"],
+        "indemnizacion_suma_anio_por_fraccion": indemnizacion["suma_anio_por_fraccion"],
         "ips_monto": ips_monto,
         "deudas_monto": deudas_monto,
         "otros_descuentos": otros_descuentos,
@@ -240,4 +363,62 @@ def calcular_liquidacion_funcionario(
         "total_liquidacion": total_liquidacion,
         "requiere_revision_juridica": requiere_revision_juridica,
         "alerta_revision": alerta_revision,
+    }
+
+    resumen["alertas_proteccion"] = construir_alertas_proteccion_liquidacion(resumen, tipo_salida)
+    if not resumen["alerta_revision"] and resumen["alertas_proteccion"]:
+        resumen["alerta_revision"] = resumen["alertas_proteccion"][0][:255]
+
+    return resumen
+
+
+def verificar_casos_liquidacion_manual():
+    funcionario_4_8 = SimpleNamespace(
+        salario_base=Decimal("3600000"),
+        bono=Decimal("0"),
+        fecha_ingreso=date(2021, 1, 15),
+        ips=False,
+    )
+    fecha_salida = date(2025, 9, 15)
+
+    funcionario_6_exactos = SimpleNamespace(
+        salario_base=Decimal("3600000"),
+        bono=Decimal("0"),
+        fecha_ingreso=date(2025, 1, 15),
+        ips=False,
+    )
+
+    funcionario_mas_6 = SimpleNamespace(
+        salario_base=Decimal("3600000"),
+        bono=Decimal("0"),
+        fecha_ingreso=date(2025, 1, 15),
+        ips=False,
+    )
+
+    return {
+        "renuncia_4_anios_8_meses": calcular_liquidacion_funcionario(
+            funcionario_4_8,
+            Liquidacion.TiposSalida.RENUNCIA,
+            fecha_salida,
+        ),
+        "despido_sin_justa_causa_4_anios_8_meses": calcular_liquidacion_funcionario(
+            funcionario_4_8,
+            Liquidacion.TiposSalida.DESPIDO_SIN_JUSTA_CAUSA,
+            fecha_salida,
+        ),
+        "despido_con_justa_causa": calcular_liquidacion_funcionario(
+            funcionario_4_8,
+            Liquidacion.TiposSalida.DESPIDO_JUSTA_CAUSA,
+            fecha_salida,
+        ),
+        "fraccion_6_meses_exactos": calcular_liquidacion_funcionario(
+            funcionario_6_exactos,
+            Liquidacion.TiposSalida.DESPIDO_SIN_JUSTA_CAUSA,
+            date(2025, 7, 15),
+        ),
+        "fraccion_mayor_a_6_meses": calcular_liquidacion_funcionario(
+            funcionario_mas_6,
+            Liquidacion.TiposSalida.DESPIDO_SIN_JUSTA_CAUSA,
+            date(2025, 7, 16),
+        ),
     }

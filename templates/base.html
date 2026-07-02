@@ -15,12 +15,12 @@
     </title>
 
     <!-- Favicons / App icons -->
-    <link rel="icon" type="image/x-icon" href="{% static 'img/favicon.ico' %}">
-    <link rel="icon" type="image/png" sizes="32x32" href="{% static 'img/favicon-32x32.png' %}">
-    <link rel="icon" type="image/png" sizes="16x16" href="{% static 'img/favicon-16x16.png' %}">
-    <link rel="apple-touch-icon" sizes="180x180" href="{% static 'img/apple-touch-icon.png' %}">
-    <link rel="manifest" href="{% static 'manifest/site.webmanifest' %}">
-    <meta name="theme-color" content="#0f1722">
+    <link rel="icon" type="image/x-icon" href="{% static 'img/clockin/favicons/favicon.ico' %}">
+    <link rel="icon" type="image/png" sizes="32x32" href="{% static 'img/clockin/favicons/favicon-32x32.png' %}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{% static 'img/clockin/favicons/favicon-16x16.png' %}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{% static 'img/clockin/favicons/apple-touch-icon.png' %}">
+    <link rel="manifest" href="{% static 'img/clockin/site.webmanifest' %}">
+    <meta name="theme-color" content="#0B7BFF">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="ClockIn">
@@ -141,6 +141,32 @@
             width: 100%;
             height: 100%;
             object-fit: cover;
+        }
+
+        .brand-logo-sidebar.clockin-logo-wide {
+            width: 148px;
+            height: 50px;
+            border-radius: 16px;
+            padding: 7px 10px;
+        }
+
+        .brand-logo-sidebar.clockin-logo-wide img {
+            object-fit: contain;
+        }
+
+        .brand-logo-sidebar.clockin-logo-icon {
+            width: 132px;
+            height: 132px;
+            border-radius: 0;
+            padding: 0;
+            background: transparent;
+            border: 0;
+            box-shadow: none;
+        }
+
+        .brand-logo-sidebar.clockin-logo-icon img {
+            object-fit: contain;
+            filter: drop-shadow(0 10px 22px rgba(37, 99, 235, .22));
         }
 
         .brand-title-wrap {
@@ -815,6 +841,42 @@
                 object-fit: contain !important;
             }
 
+            .brand-logo-sidebar.clockin-logo-wide {
+                width: 148px !important;
+                max-width: 148px !important;
+                height: 50px !important;
+                max-height: 50px !important;
+                flex: 0 0 148px !important;
+            }
+
+            .brand-logo-sidebar.clockin-logo-wide img {
+                width: 100% !important;
+                max-width: 100% !important;
+                height: 100% !important;
+                max-height: 100% !important;
+                object-fit: contain !important;
+            }
+
+            .brand-logo-sidebar.clockin-logo-icon {
+                width: 112px !important;
+                max-width: 112px !important;
+                height: 112px !important;
+                max-height: 112px !important;
+                flex: 0 0 112px !important;
+                padding: 0 !important;
+                background: transparent !important;
+                border: 0 !important;
+                box-shadow: none !important;
+            }
+
+            .brand-logo-sidebar.clockin-logo-icon img {
+                width: 100% !important;
+                max-width: 100% !important;
+                height: 100% !important;
+                max-height: 100% !important;
+                object-fit: contain !important;
+            }
+
             .brand h1 {
                 font-size: 20px !important;
                 line-height: 1.15 !important;
@@ -983,13 +1045,13 @@
     <aside class="sidebar" id="sidebar">
         <div class="brand">
             <div class="brand-title-wrap">
-                <div class="brand-logo-sidebar">
+                <div class="brand-logo-sidebar {% if not empresa_activa and not config_general.logo_url %}clockin-logo-icon{% endif %}">
                     {% if empresa_activa and empresa_activa.logo %}
                         <img src="{{ empresa_activa.logo.url }}" alt="{{ empresa_activa.nombre_visible }}">
                     {% elif config_general and config_general.logo_url %}
                         <img src="{{ config_general.logo_url }}" alt="Logo">
                     {% else %}
-                        <img src="{% static 'img/logo-clockin-horizontal.png' %}" alt="ClockIn">
+                        <img src="{% static 'img/clockin/logo-sidebar.png' %}" alt="ClockIn">
                     {% endif %}
                 </div>
 

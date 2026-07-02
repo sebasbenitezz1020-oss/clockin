@@ -1,11 +1,9 @@
 {
   "name": "ClockIn",
   "short_name": "ClockIn",
-  "description": "Sistema Web RRHH",
   "start_url": "/",
+  "description": "Sistema Web RRHH",
   "display": "standalone",
-  "background_color": "#050A12",
-  "theme_color": "#0B7BFF",
   "icons": [
     {
       "src": "/static/img/clockin/pwa/android-chrome-192x192.png",
@@ -17,5 +15,7 @@
       "sizes": "512x512",
       "type": "image/png"
     }
-  ]
+  ],
+  "theme_color": "#0B7BFF",
+  "background_color": "#050A12"
 }

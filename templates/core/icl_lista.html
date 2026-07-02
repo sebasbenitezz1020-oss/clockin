@@ -356,6 +356,11 @@
         <div class="alert-box success-box mb-20">
             ICL actual de: <strong>{{ empresa_usuario.nombre }}</strong>
         </div>
+        {% if not icl_activo_empresa %}
+            <div class="alert-box warning-box mb-20">
+                ICL desactivado para esta empresa. Los bonos no serán afectados por atrasos o ausencias.
+            </div>
+        {% endif %}
     {% endif %}
 
     <div class="icl-stats">
@@ -476,7 +481,11 @@
 
                         <td class="text-right">
                             <span class="money">{{ item.bono_base|guaranies }}</span>
-                            <span class="money-sub">Pagable según ICL: {{ item.bono_pagable_icl|guaranies }}</span>
+                            {% if item.icl_activo %}
+                                <span class="money-sub">Pagable según ICL: {{ item.bono_pagable_icl|guaranies }}</span>
+                            {% else %}
+                                <span class="money-sub">ICL desactivado: bono íntegro {{ item.bono_pagable_icl|guaranies }}</span>
+                            {% endif %}
                         </td>
 
                         <td class="text-right">

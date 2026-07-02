@@ -442,6 +442,10 @@
                         <strong>{{ liquidacion.preaviso_dias_otorgados }} día(s)</strong>
                     </div>
                     <div class="liqdet-line">
+                        <span>Dias faltantes de preaviso</span>
+                        <strong>{{ preaviso_dias_faltantes }} dia(s)</strong>
+                    </div>
+                    <div class="liqdet-line">
                         <span>Preaviso cumplido</span>
                         <strong>{% if liquidacion.preaviso_cumplido %}Sí{% else %}No{% endif %}</strong>
                     </div>
@@ -476,6 +480,17 @@
             {% if liquidacion.requiere_revision_juridica %}
             <div class="liqdet-alert">
                 {{ liquidacion.alerta_revision }}
+            </div>
+            {% endif %}
+
+            {% if alertas_proteccion %}
+            <div class="liqdet-alert">
+                <strong>Alertas de proteccion para la empresa</strong>
+                <ul>
+                    {% for alerta in alertas_proteccion %}
+                    <li>{{ alerta }}</li>
+                    {% endfor %}
+                </ul>
             </div>
             {% endif %}
         </div>

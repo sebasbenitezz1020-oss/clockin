@@ -923,6 +923,9 @@
                                     {% else %}
                                         <span class="badge-soft-danger">{{ item.icl }}%</span>
                                     {% endif %}
+                                    {% if not item.icl_activo %}
+                                        <small class="d-block">Sin impacto económico</small>
+                                    {% endif %}
                                 </td>
                                 <td><a href="{% url 'funcionario_detalle' item.funcionario.id %}" class="quick-btn gray">Ficha</a></td>
                             </tr>
@@ -1034,6 +1037,9 @@
                                     <span class="badge-soft-warning">{{ item.icl }}%</span>
                                 {% else %}
                                     <span class="badge-soft-danger">{{ item.icl }}%</span>
+                                {% endif %}
+                                {% if not item.icl_activo %}
+                                    <small class="d-block">Sin impacto económico</small>
                                 {% endif %}
                             </td>
                             <td>{{ item.salario_bruto }}</td>

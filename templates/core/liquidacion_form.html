@@ -508,6 +508,10 @@
                         <div class="liq-line"><span>Total haberes</span><strong id="pvTotalHaberes">—</strong></div>
                     </div>
 
+                    <div class="liq-explain" id="pvIndemnizacionExplicacion">
+                        Aqui se explicara automaticamente si corresponde indemnizacion.
+                    </div>
+
                     <div class="liq-block">
                         <h4>Descuentos</h4>
                         <div class="liq-line"><span>IPS</span><strong id="pvIps">—</strong></div>
@@ -522,6 +526,11 @@
                     </div>
 
                     <div class="liq-alert" id="pvAlerta"></div>
+
+                    <div class="liq-alert-list" id="alertasProteccion">
+                        <strong>Alertas de proteccion para la empresa</strong>
+                        <ul id="alertasProteccionLista"></ul>
+                    </div>
 
                     <div class="liq-previas" id="liquidacionesPrevias">
                         <div class="liq-block">
@@ -557,10 +566,13 @@
     const badgePreview = document.getElementById("badgePreview");
     const pvAlerta = document.getElementById("pvAlerta");
     const pvPreavisoExplicacion = document.getElementById("pvPreavisoExplicacion");
+    const pvIndemnizacionExplicacion = document.getElementById("pvIndemnizacionExplicacion");
 
     const funcionarioProfile = document.getElementById("funcionarioProfile");
     const alertasFuncionario = document.getElementById("alertasFuncionario");
     const alertasLista = document.getElementById("alertasLista");
+    const alertasProteccion = document.getElementById("alertasProteccion");
+    const alertasProteccionLista = document.getElementById("alertasProteccionLista");
     const liquidacionesPrevias = document.getElementById("liquidacionesPrevias");
     const previasLista = document.getElementById("previasLista");
 
@@ -613,6 +625,18 @@
         return "El sistema explica automáticamente cómo se aplicó el preaviso.";
     }
 
+    function explicarIndemnizacion(data) {
+        if (data.tipo_salida === "renuncia") {
+            return "Renuncia: la indemnizacion corresponde 0. Se calcula salario pendiente hasta el dia de salida inclusive.";
+        }
+
+        if (data.tipo_salida === "despido_sin_justa_causa") {
+            return `Despido sin justa causa: ${data.indemnizacion_anios_computables || 0} anio(s) computable(s) x 15 salario(s) diario(s).`;
+        }
+
+        return "Este tipo de salida no genera indemnizacion. El salario pendiente se calcula igualmente.";
+    }
+
     function aplicarDatosAutomaticos(data) {
         if (data.auto) {
             if (diasTrab) diasTrab.value = data.auto.dias_trabajados_pendientes || 0;
@@ -648,6 +672,22 @@
         }
     }
 
+    function pintarAlertasProteccion(data) {
+        alertasProteccionLista.innerHTML = "";
+
+        if (data.alertas_proteccion && data.alertas_proteccion.length > 0) {
+            alertasProteccion.style.display = "block";
+
+            data.alertas_proteccion.forEach(function (txt) {
+                const li = document.createElement("li");
+                li.textContent = txt;
+                alertasProteccionLista.appendChild(li);
+            });
+        } else {
+            alertasProteccion.style.display = "none";
+        }
+    }
+
     function pintarPrevias(data) {
         previasLista.innerHTML = "";
 
@@ -672,6 +712,7 @@
             badgePreview.textContent = "Esperando datos";
             badgePreview.classList.remove("warn");
             pvAlerta.style.display = "none";
+            if (alertasProteccion) alertasProteccion.style.display = "none";
             return;
         }
 
@@ -702,6 +743,7 @@
             aplicarDatosAutomaticos(data);
             pintarPerfil(data);
             pintarAlertas(data);
+            pintarAlertasProteccion(data);
             pintarPrevias(data);
 
             previewEmpty.style.display = "none";
@@ -716,7 +758,7 @@
             const diasBase = calcularPreavisoBasePorAntiguedad(anios, mesesTotales);
             const diasAplicables = Number(data.preaviso_dias_corresponde || 0);
             const diasOtorgados = Number(data.preaviso_dias_otorgados || 0);
-            const diasFaltantes = Math.max(diasAplicables - diasOtorgados, 0);
+            const diasFaltantes = Number(data.preaviso_dias_faltantes || Math.max(diasAplicables - diasOtorgados, 0));
 
             setText("pvAntiguedad", `${anios} año(s), ${meses} mes(es), ${dias} día(s)`);
             setText("pvPreavisoDiasBase", `${diasBase} día(s)`);
@@ -740,6 +782,9 @@
             setText("pvVacProp", `${data.vacaciones_proporcionales_dias} día(s) · ${money(data.vacaciones_proporcionales_monto)}`);
             setText("pvAguinaldo", money(data.aguinaldo_proporcional_monto));
             setText("pvIndemnizacion", `${data.indemnizacion_dias} día(s) · ${money(data.indemnizacion_monto)}`);
+            if (pvIndemnizacionExplicacion) {
+                pvIndemnizacionExplicacion.textContent = explicarIndemnizacion(data);
+            }
             setText("pvTotalHaberes", money(data.total_haberes));
 
             setText("pvIps", money(data.ips_monto));

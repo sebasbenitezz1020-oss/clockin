@@ -53,6 +53,9 @@
         }
 
         .login-brand {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
             animation: loginFadeUp .7s ease both;
         }
 
@@ -60,32 +63,24 @@
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            width: 112px;
-            height: 112px;
-            margin-bottom: 24px;
-            border-radius: 30px;
-            background:
-                radial-gradient(circle at 35% 22%, rgba(96, 165, 250, .24), transparent 52%),
-                rgba(255,255,255,.065);
-            border: 1px solid rgba(147, 197, 253, .24);
-            box-shadow:
-                0 24px 70px rgba(37, 99, 235, .24),
-                0 0 0 1px rgba(255,255,255,.04) inset;
+            width: 680px;
+            max-width: 100%;
+            height: 282px;
+            margin-bottom: 18px;
+            border-radius: 0;
+            background: transparent;
+            border: 0;
+            box-shadow: none;
         }
 
         .logo-mark img {
-            width: 86px;
-            height: 86px;
+            width: 640px;
+            max-width: 100%;
+            height: 256px;
             object-fit: contain;
-            filter: drop-shadow(0 14px 26px rgba(0,0,0,.34));
-        }
-
-        .login-brand h1 {
-            margin: 0;
-            font-size: clamp(44px, 7vw, 78px);
-            line-height: .96;
-            font-weight: 950;
-            letter-spacing: 0;
+            filter:
+                drop-shadow(0 20px 42px rgba(37, 99, 235, .28))
+                drop-shadow(0 12px 26px rgba(0,0,0,.34));
         }
 
         .login-brand p {
@@ -350,6 +345,7 @@
 
             .login-brand {
                 text-align: center;
+                align-items: center;
             }
 
             .login-brand p {
@@ -362,15 +358,15 @@
             }
 
             .logo-mark {
-                width: 96px;
-                height: 96px;
-                margin-bottom: 18px;
-                border-radius: 26px;
+                width: 450px;
+                height: 188px;
+                margin-bottom: 12px;
+                border-radius: 0;
             }
 
             .logo-mark img {
-                width: 74px;
-                height: 74px;
+                width: 420px;
+                height: 168px;
             }
         }
 
@@ -400,9 +396,8 @@
     <main class="login-page">
         <section class="login-brand" aria-label="ClockIn">
             <div class="logo-mark">
-                <img src="{% static 'img/logo-clockin-horizontal.png' %}" alt="ClockIn">
+                <img src="{% static 'img/clockin/logo-login.png' %}" alt="ClockIn">
             </div>
-            <h1>ClockIn</h1>
             <p>Gesti&oacute;n de asistencia, n&oacute;mina y RRHH con control multiempresa seguro.</p>
             <div class="brand-pills" aria-hidden="true">
                 <span>MultiEmpresa</span>

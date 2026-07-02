@@ -28,6 +28,7 @@ class Empresa(models.Model):
     color_secundario = models.CharField(max_length=20, blank=True, default="")
     tema_visual = models.CharField(max_length=20, blank=True, default="")
     texto_legal_pdf = models.TextField(blank=True, default="")
+    icl_activo = models.BooleanField(default=True)
     activo = models.BooleanField(default=True)
     estado = models.CharField(max_length=20, choices=Estados.choices, default=Estados.ACTIVA)
     plan_contratado = models.CharField(max_length=30, choices=Planes.choices, default=Planes.PROFESIONAL)

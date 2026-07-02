@@ -574,6 +574,22 @@
             </div>
             <div class="number">{{ total_salario_neto|guaranies }}</div>
         </div>
+
+        <div class="dash-money-card">
+            <div class="top">
+                <div class="title">Funcionarios con IPS</div>
+                <div class="icon">IPS</div>
+            </div>
+            <div class="number">{{ funcionarios_con_ips|millares }}</div>
+        </div>
+
+        <div class="dash-money-card">
+            <div class="top">
+                <div class="title">Aporte patronal IPS</div>
+                <div class="icon">%</div>
+            </div>
+            <div class="number">{{ aporte_patronal_ips_estimado|guaranies }}</div>
+        </div>
         {% endif %}
 
         {% if perm_deudas %}

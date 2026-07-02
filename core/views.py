@@ -68,7 +68,10 @@ from .forms import (
     PagoSuscripcionSistemaForm,
 )
 
-from .liquidacion_utils import calcular_liquidacion_funcionario
+from .liquidacion_utils import (
+    calcular_liquidacion_funcionario,
+    construir_alertas_proteccion_liquidacion,
+)
 from .models import (
     Asistencia,
     ConfiguracionGeneral,
@@ -112,7 +115,7 @@ def _bloquear_si_no_admin_master(request):
     admin_master = es_admin_master(request.user)
 
     if not admin_master:
-        messages.error(request, "Este mÃ³dulo solo estÃ¡ disponible para administraciÃ³n global.")
+        messages.error(request, "Este módulo solo está disponible para administración global.")
         return redirect("dashboard")
 
     return None
@@ -188,33 +191,33 @@ def marcacion_manual(request):
 
             if tipo == "entrada":
                 if asistencia.llego_tarde:
-                    asistencia.observacion = f"ðŸ“ Entrada manual. LlegÃ³ con {asistencia.minutos_atraso} minuto(s) de atraso."
+                    asistencia.observacion = f"Entrada manual. Llegó con {asistencia.minutos_atraso} minuto(s) de atraso."
                 else:
-                    asistencia.observacion = "ðŸ“ Entrada manual registrada en horario."
+                    asistencia.observacion = "Entrada manual registrada en horario."
 
             elif tipo == "salida_almuerzo":
-                asistencia.observacion = "ðŸ“ Salida a almuerzo manual registrada."
+                asistencia.observacion = "Salida a almuerzo manual registrada."
 
             elif tipo == "regreso_almuerzo":
-                asistencia.observacion = "ðŸ“ Regreso de almuerzo manual registrado."
+                asistencia.observacion = "Regreso de almuerzo manual registrado."
 
             else:
-                asistencia.observacion = "ðŸ“ Salida final manual registrada."
+                asistencia.observacion = "Salida final manual registrada."
 
             asistencia.save()
 
             registrar_historial(
                 request,
                 "Asistencia",
-                "MarcaciÃ³n manual",
-                f"MarcaciÃ³n manual de {tipo} para {funcionario.nombre_completo}. "
+                "Marcación manual",
+                f"Marcación manual de {tipo} para {funcionario.nombre_completo}. "
                 f"Hora registrada: {fecha_hora_manual.strftime('%d/%m/%Y %H:%M:%S')}. "
                 f"Operador: {request.user}. Motivo: {motivo}"
             )
 
             messages.success(
                 request,
-                f"MarcaciÃ³n manual registrada correctamente para {funcionario.nombre_completo}."
+                f"Marcación manual registrada correctamente para {funcionario.nombre_completo}."
             )
             return redirect("asistencia_marcar")
     else:
@@ -272,8 +275,8 @@ def construir_encabezado_empresa_pdf(empresa, titulo):
     texto_empresa = f"""
     <b>{nombre}</b><br/>
     RUC: {ruc or "-"}<br/>
-    DirecciÃ³n: {direccion or "-"}<br/>
-    TelÃ©fono: {telefono or "-"}<br/>
+    Dirección: {direccion or "-"}<br/>
+    Teléfono: {telefono or "-"}<br/>
     Email: {email or "-"}
     """
 
@@ -335,7 +338,7 @@ def agregar_texto_legal_empresa_pdf(elementos, empresa):
     )
 
     elementos.append(Spacer(1, 8))
-    elementos.append(Paragraph(f"<b>ObservaciÃ³n legal / empresarial:</b><br/>{texto}", legal_style))
+    elementos.append(Paragraph(f"<b>Observación legal / empresarial:</b><br/>{texto}", legal_style))
 
 def generar_codigo_documento(tipo_documento):
     anio = timezone.localdate().year
@@ -449,7 +452,7 @@ def agregar_firma_qr_documento_pdf(
 
     bloque_qr = [
         qr_img,
-        Paragraph(f"<b>CÃ³digo:</b> {documento.codigo}", codigo_style),
+        Paragraph(f"<b>Código:</b> {documento.codigo}", codigo_style),
         Paragraph(f"Hash: {documento.hash_documento[:18]}...", codigo_style),
         Paragraph("Escanee el QR para verificar este documento.", codigo_style),
     ]
@@ -514,7 +517,7 @@ def obtener_fecha_operativa_asistencia(funcionario, ahora=None):
     if turno.hora_salida > turno.hora_entrada:
         return hoy
 
-    # Turno nocturno: sale al dÃ­a siguiente
+    # Turno nocturno: sale al día siguiente
     ayer = hoy - timezone.timedelta(days=1)
 
     asistencia_ayer = Asistencia.objects.filter(
@@ -594,12 +597,27 @@ def calcular_icl_funcionario_mes(funcionario, mes, anio):
     }
 
 
+def icl_activo_para_funcionario(funcionario):
+    empresa = getattr(getattr(funcionario, "sucursal_rel", None), "empresa", None)
+    if empresa is None:
+        return True
+    return bool(getattr(empresa, "icl_activo", True))
+
+
+def calcular_bono_pagable_por_icl(bono_base, icl, icl_activo=True):
+    bono_base = Decimal(bono_base or 0).quantize(Decimal("0.01"))
+    if not icl_activo:
+        return bono_base
+    return (bono_base * Decimal(icl or 0) / Decimal("100")).quantize(Decimal("0.01"))
+
+
 def generar_nomina_funcionario(funcionario, mes, anio):
     resumen_icl = calcular_icl_funcionario_mes(funcionario, mes, anio)
+    icl_activo = icl_activo_para_funcionario(funcionario)
 
     salario_base = Decimal(funcionario.salario_base or 0).quantize(Decimal("0.01"))
     bono_base = Decimal(funcionario.bono or 0).quantize(Decimal("0.01"))
-    bono_icl = (bono_base * Decimal(resumen_icl["icl"]) / Decimal("100")).quantize(Decimal("0.01"))
+    bono_icl = calcular_bono_pagable_por_icl(bono_base, resumen_icl["icl"], icl_activo)
     salario_bruto = (salario_base + bono_icl).quantize(Decimal("0.01"))
     descuento_ips = funcionario.descuento_ips
     descuento_deudas = funcionario.descuento_deudas_mes
@@ -685,6 +703,10 @@ def dashboard(request):
     total_salario_bruto = Decimal("0.00")
     total_salario_neto = Decimal("0.00")
     total_deudas_funcionarios = Decimal("0.00")
+    funcionarios_con_ips = 0
+    aporte_patronal_ips_estimado = Decimal("0.00")
+    salario_minimo_ips = Decimal("2899048.00")
+    porcentaje_patronal_ips = Decimal("0.255")
 
     if perm_funcionarios:
         total_funcionarios = funcionarios_qs.count()
@@ -718,6 +740,11 @@ def dashboard(request):
         for funcionario in funcionarios_qs:
             total_salario_bruto += funcionario.salario_bruto
             total_salario_neto += funcionario.salario_neto_estimado
+            if funcionario.ips:
+                funcionarios_con_ips += 1
+
+        aporte_patronal_por_funcionario = (salario_minimo_ips * porcentaje_patronal_ips).quantize(Decimal("0.01"))
+        aporte_patronal_ips_estimado = (aporte_patronal_por_funcionario * Decimal(funcionarios_con_ips)).quantize(Decimal("0.01"))
 
     if perm_deudas:
         total_deudas_funcionarios = deudas_qs.aggregate(
@@ -741,6 +768,8 @@ def dashboard(request):
         "funcionarios_recientes": funcionarios_recientes,
         "total_salario_bruto": total_salario_bruto,
         "total_salario_neto": total_salario_neto,
+        "funcionarios_con_ips": funcionarios_con_ips,
+        "aporte_patronal_ips_estimado": aporte_patronal_ips_estimado,
         "total_deudas_funcionarios": total_deudas_funcionarios,
 
         "perm_funcionarios": perm_funcionarios,
@@ -910,7 +939,7 @@ def empresa_nueva(request):
                 request,
                 "Empresas",
                 "Crear",
-                f"Se creÃ³ la empresa {empresa.nombre}."
+                f"Se creó la empresa {empresa.nombre}."
             )
             messages.success(request, "Empresa creada correctamente.")
             return redirect("empresas_lista")
@@ -943,7 +972,7 @@ def empresa_editar(request, pk):
                 request,
                 "Empresas",
                 "Editar",
-                f"Se editÃ³ la empresa {empresa.nombre}."
+                f"Se editó la empresa {empresa.nombre}."
             )
             messages.success(request, "Empresa actualizada correctamente.")
             return redirect("empresas_lista")
@@ -1061,7 +1090,7 @@ def sucursal_nueva(request):
                 request,
                 "Sucursales",
                 "Crear",
-                f"Se creÃ³ la sucursal {sucursal.nombre} de {sucursal.empresa.nombre}."
+                f"Se creó la sucursal {sucursal.nombre} de {sucursal.empresa.nombre}."
             )
             messages.success(request, "Sucursal creada correctamente.")
             return redirect("sucursales_lista")
@@ -1118,7 +1147,7 @@ def sucursal_editar(request, pk):
                 request,
                 "Sucursales",
                 "Editar",
-                f"Se editÃ³ la sucursal {sucursal_editada.nombre} de {sucursal_editada.empresa.nombre}."
+                f"Se editó la sucursal {sucursal_editada.nombre} de {sucursal_editada.empresa.nombre}."
             )
             messages.success(request, "Sucursal actualizada correctamente.")
             return redirect("sucursales_lista")
@@ -1276,7 +1305,7 @@ def deuda_nueva(request):
                 request,
                 "Deudas",
                 "Crear",
-                f"Se creÃ³ deuda para {deuda.funcionario.nombre_completo} por {deuda.saldo_pendiente}."
+                f"Se creó deuda para {deuda.funcionario.nombre_completo} por {deuda.saldo_pendiente}."
             )
             messages.success(request, "Deuda creada correctamente.")
             return redirect("deudas_lista")
@@ -1335,7 +1364,7 @@ def deuda_editar(request, pk):
                 request,
                 "Deudas",
                 "Editar",
-                f"Se editÃ³ deuda de {deuda_editada.funcionario.nombre_completo}."
+                f"Se editó deuda de {deuda_editada.funcionario.nombre_completo}."
             )
             messages.success(request, "Deuda actualizada correctamente.")
             return redirect("deudas_lista")
@@ -1580,7 +1609,7 @@ def funcionario_documento_agregar(request, pk):
                 request,
                 "Funcionarios",
                 "Documento digital",
-                f"Se agregÃ³ documento {documento.titulo} a {funcionario.nombre_completo}."
+                f"Se agregó documento {documento.titulo} a {funcionario.nombre_completo}."
             )
 
             messages.success(request, "Documento agregado correctamente.")
@@ -1613,7 +1642,7 @@ def funcionario_historial_laboral_agregar(request, pk):
                 request,
                 "Funcionarios",
                 "Historial laboral",
-                f"Se agregÃ³ historial laboral a {funcionario.nombre_completo}: {item.titulo}."
+                f"Se agregó historial laboral a {funcionario.nombre_completo}: {item.titulo}."
             )
 
             messages.success(request, "Historial laboral agregado correctamente.")
@@ -1646,7 +1675,7 @@ def funcionario_conducta_agregar(request, pk):
                 request,
                 "Funcionarios",
                 "Historial de conducta",
-                f"Se agregÃ³ {item.get_tipo_display()} a {funcionario.nombre_completo}: {item.titulo}."
+                f"Se agregó {item.get_tipo_display()} a {funcionario.nombre_completo}: {item.titulo}."
             )
 
             messages.success(request, "Historial de conducta agregado correctamente.")
@@ -1683,7 +1712,7 @@ def funcionario_historial_salarial_agregar(request, pk):
                 request,
                 "Funcionarios",
                 "Historial salarial",
-                f"Se actualizÃ³ historial salarial de {funcionario.nombre_completo}."
+                f"Se actualizó historial salarial de {funcionario.nombre_completo}."
             )
 
             messages.success(request, "Historial salarial agregado y salario actualizado correctamente.")
@@ -1732,7 +1761,7 @@ def funcionario_nuevo(request):
                 request,
                 "Funcionarios",
                 "Crear",
-                f"Se creÃ³ el funcionario {funcionario.nombre_completo} (CI: {funcionario.cedula})."
+                f"Se creó el funcionario {funcionario.nombre_completo} (CI: {funcionario.cedula})."
             )
             messages.success(request, "Funcionario creado correctamente.")
             return redirect("funcionarios_lista")
@@ -1814,7 +1843,7 @@ def funcionario_editar(request, pk):
                 request,
                 "Funcionarios",
                 "Editar",
-                f"Se editÃ³ el funcionario {funcionario_editado.nombre_completo} (CI: {funcionario_editado.cedula})."
+                f"Se editó el funcionario {funcionario_editado.nombre_completo} (CI: {funcionario_editado.cedula})."
             )
             messages.success(request, "Funcionario actualizado correctamente.")
             return redirect("funcionarios_lista")
@@ -1945,7 +1974,7 @@ def turno_nuevo(request):
                 request,
                 "Turnos",
                 "Crear",
-                f"Se creÃ³ el turno {turno.nombre} para la empresa {turno.empresa.nombre if turno.empresa else 'Sin empresa'}."
+                f"Se creó el turno {turno.nombre} para la empresa {turno.empresa.nombre if turno.empresa else 'Sin empresa'}."
             )
             messages.success(request, "Turno creado correctamente.")
             return redirect("turnos_lista")
@@ -2012,7 +2041,7 @@ def turno_editar(request, pk):
                 request,
                 "Turnos",
                 "Editar",
-                f"Se editÃ³ el turno {turno_editado.nombre}."
+                f"Se editó el turno {turno_editado.nombre}."
             )
             messages.success(request, "Turno actualizado correctamente.")
             return redirect("turnos_lista")
@@ -2057,7 +2086,7 @@ def turno_toggle_activo(request, pk):
         request,
         "Turnos",
         "Cambio de estado",
-        f"Se cambiÃ³ el estado del turno {turno.nombre} a {'Activo' if turno.activo else 'Inactivo'}."
+        f"Se cambió el estado del turno {turno.nombre} a {'Activo' if turno.activo else 'Inactivo'}."
     )
     messages.success(request, "Estado del turno actualizado correctamente.")
     return redirect("turnos_lista")
@@ -2100,7 +2129,7 @@ def asistencia_marcar(request):
                     activo=True
                 )
             except Funcionario.DoesNotExist:
-                messages.error(request, "No se encontrÃ³ un funcionario activo con esa cÃ©dula.")
+                messages.error(request, "No se encontró un funcionario activo con esa cédula.")
                 funcionario = None
 
             if funcionario and not admin_master:
@@ -2112,7 +2141,7 @@ def asistencia_marcar(request):
                 if funcionario_tiene_dia_libre(funcionario, hoy):
                     messages.info(
                         request,
-                        f"{funcionario.nombre_completo} tiene dÃ­a libre hoy. No corresponde asistencia."
+                        f"{funcionario.nombre_completo} tiene día libre hoy. No corresponde asistencia."
                     )
                     resultado = {
                         "tipo": "dia_libre",
@@ -2141,7 +2170,7 @@ def asistencia_marcar(request):
                             asistencia.calcular_atraso()
 
                             if asistencia.llego_tarde:
-                                asistencia.observacion = f"LlegÃ³ con {asistencia.minutos_atraso} minuto(s) de atraso."
+                                asistencia.observacion = f"Llegó con {asistencia.minutos_atraso} minuto(s) de atraso."
                             else:
                                 asistencia.observacion = "Entrada registrada en horario."
 
@@ -2151,7 +2180,7 @@ def asistencia_marcar(request):
                                 request,
                                 "Asistencia",
                                 "Entrada",
-                                f"Se registrÃ³ entrada de {funcionario.nombre_completo} a las {ahora.strftime('%H:%M:%S')}."
+                                f"Se registró entrada de {funcionario.nombre_completo} a las {ahora.strftime('%H:%M:%S')}."
                             )
 
                             resultado = {
@@ -2173,7 +2202,7 @@ def asistencia_marcar(request):
                                 request,
                                 "Asistencia",
                                 "Salida a almuerzo",
-                                f"Se registrÃ³ salida a almuerzo de {funcionario.nombre_completo} a las {ahora.strftime('%H:%M:%S')}."
+                                f"Se registró salida a almuerzo de {funcionario.nombre_completo} a las {ahora.strftime('%H:%M:%S')}."
                             )
 
                             resultado = {
@@ -2198,7 +2227,7 @@ def asistencia_marcar(request):
                                 request,
                                 "Asistencia",
                                 "Regreso de almuerzo",
-                                f"Se registrÃ³ regreso de almuerzo de {funcionario.nombre_completo} a las {ahora.strftime('%H:%M:%S')}."
+                                f"Se registró regreso de almuerzo de {funcionario.nombre_completo} a las {ahora.strftime('%H:%M:%S')}."
                             )
 
                             resultado = {
@@ -2223,7 +2252,7 @@ def asistencia_marcar(request):
                                 request,
                                 "Asistencia",
                                 "Salida final",
-                                f"Se registrÃ³ salida final de {funcionario.nombre_completo} a las {ahora.strftime('%H:%M:%S')}."
+                                f"Se registró salida final de {funcionario.nombre_completo} a las {ahora.strftime('%H:%M:%S')}."
                             )
 
                             resultado = {
@@ -2237,7 +2266,7 @@ def asistencia_marcar(request):
                             messages.success(request, "Salida final registrada correctamente.")
 
                         else:
-                            messages.warning(request, "El funcionario ya completÃ³ todas sus marcaciones del dÃ­a.")
+                            messages.warning(request, "El funcionario ya completó todas sus marcaciones del día.")
     else:
         form = MarcacionForm()
 
@@ -2358,7 +2387,7 @@ def permiso_nuevo(request):
                 request,
                 "Permisos/Licencias",
                 "Crear",
-                f"Se creÃ³ {permiso_obj.get_tipo_display()} para {permiso_obj.funcionario.nombre_completo} del {permiso_obj.fecha_desde} al {permiso_obj.fecha_hasta}."
+                f"Se creó {permiso_obj.get_tipo_display()} para {permiso_obj.funcionario.nombre_completo} del {permiso_obj.fecha_desde} al {permiso_obj.fecha_hasta}."
             )
             messages.success(request, "Permiso/licencia creado correctamente.")
             return redirect("permisos_lista")
@@ -2421,7 +2450,7 @@ def permiso_editar(request, pk):
                 request,
                 "Permisos/Licencias",
                 "Editar",
-                f"Se editÃ³ {permiso_editado.get_tipo_display()} de {permiso_editado.funcionario.nombre_completo}. Estado actual: {permiso_editado.get_estado_display()}."
+                f"Se editó {permiso_editado.get_tipo_display()} de {permiso_editado.funcionario.nombre_completo}. Estado actual: {permiso_editado.get_estado_display()}."
             )
             messages.success(request, "Permiso/licencia actualizado correctamente.")
             return redirect("permisos_lista")
@@ -2536,9 +2565,9 @@ def vacacion_nueva(request):
                 request,
                 "Vacaciones",
                 "Crear",
-                f"Se creÃ³ vacaciÃ³n para {vacacion.funcionario.nombre_completo} del {vacacion.fecha_desde} al {vacacion.fecha_hasta} por {vacacion.dias_solicitados} dÃ­a(s)."
+                f"Se creó vacación para {vacacion.funcionario.nombre_completo} del {vacacion.fecha_desde} al {vacacion.fecha_hasta} por {vacacion.dias_solicitados} día(s)."
             )
-            messages.success(request, "VacaciÃ³n registrada correctamente.")
+            messages.success(request, "Vacación registrada correctamente.")
             return redirect("vacaciones_lista")
     else:
         form = VacacionForm()
@@ -2551,8 +2580,8 @@ def vacacion_nueva(request):
 
     return render(request, "core/vacacion_form.html", {
         "form": form,
-        "titulo_form": "Nueva vacaciÃ³n",
-        "boton_texto": "Guardar vacaciÃ³n",
+        "titulo_form": "Nueva vacación",
+        "boton_texto": "Guardar vacación",
         "funcionarios_json": [
     {
         "id": f.id,
@@ -2606,9 +2635,9 @@ def vacacion_editar(request, pk):
                 request,
                 "Vacaciones",
                 "Editar",
-                f"Se editÃ³ vacaciÃ³n de {vacacion_editada.funcionario.nombre_completo}. Estado actual: {vacacion_editada.get_estado_display()}."
+                f"Se editó vacación de {vacacion_editada.funcionario.nombre_completo}. Estado actual: {vacacion_editada.get_estado_display()}."
             )
-            messages.success(request, "VacaciÃ³n actualizada correctamente.")
+            messages.success(request, "Vacación actualizada correctamente.")
             return redirect("vacaciones_lista")
     else:
         form = VacacionForm(instance=vacacion)
@@ -2621,7 +2650,7 @@ def vacacion_editar(request, pk):
 
     return render(request, "core/vacacion_form.html", {
         "form": form,
-        "titulo_form": "Editar vacaciÃ³n",
+        "titulo_form": "Editar vacación",
         "boton_texto": "Guardar cambios",
         "vacacion": vacacion,
         "funcionarios_json": [
@@ -2654,7 +2683,7 @@ def vacacion_notificacion_pdf(request, pk):
 
     if not admin_master:
         if not vacacion.funcionario.sucursal_rel or vacacion.funcionario.sucursal_rel.empresa != empresa_usuario:
-            messages.error(request, "No puedes generar notificaciÃ³n de otra empresa.")
+            messages.error(request, "No puedes generar notificación de otra empresa.")
             return redirect("vacaciones_lista")
 
     funcionario = vacacion.funcionario
@@ -2699,19 +2728,19 @@ def vacacion_notificacion_pdf(request, pk):
     fecha_emision = vacacion.fecha_notificacion or (vacacion.fecha_desde - timezone.timedelta(days=15))
 
     empresa_pdf = obtener_empresa_documento(funcionario=funcionario)
-    elementos += construir_encabezado_empresa_pdf(empresa_pdf, "NOTIFICACIÃ“N DE VACACIONES")
+    elementos += construir_encabezado_empresa_pdf(empresa_pdf, "NOTIFICACIÓN DE VACACIONES")
     elementos.append(Spacer(1, 10))
 
     datos = [
         ["Empresa", empresa_nombre],
         ["Sucursal", sucursal_nombre],
-        ["Fecha de emisiÃ³n", fecha_emision.strftime("%d/%m/%Y")],
+        ["Fecha de emisión", fecha_emision.strftime("%d/%m/%Y")],
         ["Funcionario", funcionario.nombre_completo],
-        ["CÃ©dula", funcionario.cedula],
+        ["Cédula", funcionario.cedula],
         ["Cargo", funcionario.cargo or "-"],
         ["Fecha desde", vacacion.fecha_desde.strftime("%d/%m/%Y")],
         ["Fecha hasta", vacacion.fecha_hasta.strftime("%d/%m/%Y")],
-        ["DÃ­as otorgados", str(vacacion.dias_solicitados)],
+        ["Días otorgados", str(vacacion.dias_solicitados)],
     ]
 
     tabla = Table(datos, colWidths=[55 * mm, 105 * mm])
@@ -2730,13 +2759,13 @@ def vacacion_notificacion_pdf(request, pk):
 
     texto = f"""
     Por medio de la presente, se comunica formalmente al trabajador <b>{funcionario.nombre_completo}</b>,
-    con C.I. NÂ° <b>{funcionario.cedula}</b>, que harÃ¡ uso de sus vacaciones anuales remuneradas
-    desde el dÃ­a <b>{vacacion.fecha_desde.strftime("%d/%m/%Y")}</b> hasta el dÃ­a
+    con C.I. N° <b>{funcionario.cedula}</b>, que hará uso de sus vacaciones anuales remuneradas
+    desde el día <b>{vacacion.fecha_desde.strftime("%d/%m/%Y")}</b> hasta el día
     <b>{vacacion.fecha_hasta.strftime("%d/%m/%Y")}</b>, por un total de
-    <b>{vacacion.dias_solicitados}</b> dÃ­a(s).
+    <b>{vacacion.dias_solicitados}</b> día(s).
     <br/><br/>
-    Esta comunicaciÃ³n se realiza por escrito con la anticipaciÃ³n correspondiente, conforme a la normativa laboral vigente.
-    Las vacaciones deberÃ¡n iniciar en dÃ­a lunes o en el siguiente dÃ­a hÃ¡bil si aquel fuese feriado.
+    Esta comunicación se realiza por escrito con la anticipación correspondiente, conforme a la normativa laboral vigente.
+    Las vacaciones deberán iniciar en día lunes o en el siguiente día hábil si aquel fuese feriado.
     """
 
     elementos.append(Paragraph(texto, styles["TextoVacaciones"]))
@@ -2746,7 +2775,7 @@ def vacacion_notificacion_pdf(request, pk):
         ["_______________________________", "_______________________________"],
         ["Firma del empleador / RRHH", "Firma del funcionario"],
         ["", ""],
-        ["Fecha de recepciÃ³n: ____/____/______", "AclaraciÃ³n: ____________________"],
+        ["Fecha de recepción: ____/____/______", "Aclaración: ____________________"],
     ], colWidths=[80 * mm, 80 * mm])
 
     firmas.setStyle(TableStyle([
@@ -2765,7 +2794,7 @@ def vacacion_notificacion_pdf(request, pk):
         tipo_documento="VACACIONES",
         documento_id=vacacion.id,
         funcionario=funcionario,
-        titulo="NotificaciÃ³n de Vacaciones",
+        titulo="Notificación de Vacaciones",
     )
 
     agregar_texto_legal_empresa_pdf(elementos, empresa_pdf)
@@ -2778,8 +2807,8 @@ def vacacion_notificacion_pdf(request, pk):
     registrar_historial(
         request,
         "Vacaciones",
-        "NotificaciÃ³n PDF",
-        f"Se generÃ³ notificaciÃ³n de vacaciones para {funcionario.nombre_completo} del {vacacion.fecha_desde} al {vacacion.fecha_hasta}."
+        "Notificación PDF",
+        f"Se generó notificación de vacaciones para {funcionario.nombre_completo} del {vacacion.fecha_desde} al {vacacion.fecha_hasta}."
     )
 
     response = HttpResponse(content_type="application/pdf")
@@ -2821,7 +2850,7 @@ def calcular_alertas_vacaciones(funcionario):
     if dias_para_vencer <= 45:
         return {
             "tipo": "proxima",
-            "texto": f"Vacaciones prÃ³ximas a vencer en {dias_para_vencer} dÃ­a(s)",
+            "texto": f"Vacaciones próximas a vencer en {dias_para_vencer} día(s)",
             "vencimiento": vencimiento,
         }
 
@@ -2860,6 +2889,7 @@ def icl_lista(request):
     resultados = []
 
     for funcionario in funcionarios:
+        icl_activo = icl_activo_para_funcionario(funcionario)
         asistencias = Asistencia.objects.filter(
             funcionario=funcionario,
             fecha__year=anio,
@@ -2894,7 +2924,7 @@ def icl_lista(request):
         icl = max(0, min(100, icl))
 
         bono_base = Decimal(funcionario.bono or 0).quantize(Decimal("0.01"))
-        bono_pagable_icl = (bono_base * Decimal(icl) / Decimal("100")).quantize(Decimal("0.01"))
+        bono_pagable_icl = calcular_bono_pagable_por_icl(bono_base, icl, icl_activo)
         salario_base = Decimal(funcionario.salario_base or 0).quantize(Decimal("0.01"))
         salario_bruto_mes = (salario_base + bono_pagable_icl).quantize(Decimal("0.01"))
         deudas_mes = funcionario.descuento_deudas_mes
@@ -2913,6 +2943,7 @@ def icl_lista(request):
             "ausencias_no_justificadas": ausencias_no_justificadas,
             "dias_libres_mes": dias_libres_mes,
             "icl": icl,
+            "icl_activo": icl_activo,
             "bono_base": bono_base,
             "bono_pagable_icl": bono_pagable_icl,
             "salario_base_mes": salario_base,
@@ -2949,6 +2980,7 @@ def icl_lista(request):
         "total_dias_laborales_estimados": total_dias_laborales_estimados,
         "empresa_usuario": empresa_usuario,
         "es_admin_master": admin_master,
+        "icl_activo_empresa": True if admin_master or not empresa_usuario else empresa_usuario.icl_activo,
     })
 
 
@@ -3132,7 +3164,7 @@ def reportes(request):
 
     for item in vacaciones_dia:
         permisos_licencias_dia.append({
-            "tipo": "VacaciÃ³n",
+            "tipo": "Vacación",
             "funcionario": item.funcionario,
             "obj": item,
         })
@@ -3213,6 +3245,15 @@ def reportes(request):
 
         icl = 100 - (atrasos_count * 2) - (ausencias_no_justificadas * 5)
         icl = max(0, min(100, icl))
+        icl_activo = icl_activo_para_funcionario(funcionario)
+        salario_base_mes = Decimal(funcionario.salario_base or 0).quantize(Decimal("0.01"))
+        bono_base_mes = Decimal(funcionario.bono or 0).quantize(Decimal("0.01"))
+        bono_mes = calcular_bono_pagable_por_icl(bono_base_mes, icl, icl_activo)
+        salario_bruto_mes = (salario_base_mes + bono_mes).quantize(Decimal("0.01"))
+        salario_neto_mes = salario_bruto_mes - funcionario.descuento_ips - funcionario.descuento_deudas_mes
+        if salario_neto_mes < 0:
+            salario_neto_mes = Decimal("0.00")
+        salario_neto_mes = salario_neto_mes.quantize(Decimal("0.01"))
 
         resultados_mensuales.append({
             "funcionario": funcionario,
@@ -3223,9 +3264,10 @@ def reportes(request):
             "vacaciones_aprobadas": vacaciones_aprobadas,
             "dias_libres_mes": dias_libres_mes,
             "icl": icl,
-            "salario_bruto": funcionario.salario_bruto,
+            "icl_activo": icl_activo,
+            "salario_bruto": salario_bruto_mes,
             "deudas_mes": funcionario.descuento_deudas_mes,
-            "salario_neto": funcionario.salario_neto_estimado,
+            "salario_neto": salario_neto_mes,
         })
 
     meses = [
@@ -3342,7 +3384,7 @@ def historial_lista(request):
         return permiso
 
     if not es_admin_master(request.user):
-        messages.error(request, "El historial general solo estÃ¡ disponible para el administrador master.")
+        messages.error(request, "El historial general solo está disponible para el administrador master.")
         return redirect("dashboard")
 
     q = request.GET.get("q", "").strip()
@@ -3504,7 +3546,7 @@ def aguinaldo_generar(request):
         request,
         "Aguinaldo",
         "Generar/Recalcular",
-        f"Se generÃ³ o recalculÃ³ el aguinaldo del aÃ±o {anio} para {cantidad} funcionario(s)."
+        f"Se generó o recalculó el aguinaldo del año {anio} para {cantidad} funcionario(s)."
     )
 
     messages.success(request, f"Aguinaldo {anio} generado correctamente para {cantidad} funcionario(s).")
@@ -3533,11 +3575,11 @@ def aguinaldo_toggle_pagado(request, pk):
     if aguinaldo.estado == AguinaldoAnual.Estados.PAGADO:
         aguinaldo.estado = AguinaldoAnual.Estados.PENDIENTE
         aguinaldo.fecha_pago = None
-        accion = "revirtiÃ³ a pendiente"
+        accion = "revirtió a pendiente"
     else:
         aguinaldo.estado = AguinaldoAnual.Estados.PAGADO
         aguinaldo.fecha_pago = timezone.localdate()
-        accion = "marcÃ³ como pagado"
+        accion = "marcó como pagado"
 
     aguinaldo.save()
 
@@ -3545,7 +3587,7 @@ def aguinaldo_toggle_pagado(request, pk):
         request,
         "Aguinaldo",
         "Cambio de estado",
-        f"Se {accion} el aguinaldo de {aguinaldo.funcionario.nombre_completo} del aÃ±o {aguinaldo.anio}."
+        f"Se {accion} el aguinaldo de {aguinaldo.funcionario.nombre_completo} del año {aguinaldo.anio}."
     )
 
     messages.success(request, "Estado de aguinaldo actualizado correctamente.")
@@ -3619,11 +3661,11 @@ def aguinaldo_pdf(request, pk):
 
     datos = [
         ["Funcionario", funcionario.nombre_completo],
-        ["CÃ©dula", funcionario.cedula],
+        ["Cédula", funcionario.cedula],
         ["Empresa", funcionario.empresa_mostrar],
         ["Sucursal", funcionario.sucursal_mostrar],
         ["Cargo", funcionario.cargo or "-"],
-        ["AÃ±o", str(aguinaldo.anio)],
+        ["Año", str(aguinaldo.anio)],
         ["Meses computados", str(aguinaldo.meses_computados)],
         ["Estado", aguinaldo.get_estado_display()],
         ["Fecha de pago", aguinaldo.fecha_pago.strftime("%d/%m/%Y") if aguinaldo.fecha_pago else "-"],
@@ -3645,7 +3687,7 @@ def aguinaldo_pdf(request, pk):
 
     tabla_calc = Table([
         ["Concepto", "Monto"],
-        ["Total remuneraciones computables del aÃ±o", _gs(aguinaldo.total_remuneraciones)],
+        ["Total remuneraciones computables del año", _gs(aguinaldo.total_remuneraciones)],
         ["AGUINALDO A COBRAR", _gs(aguinaldo.monto_aguinaldo)],
     ], colWidths=[115 * mm, 45 * mm])
 
@@ -3665,8 +3707,8 @@ def aguinaldo_pdf(request, pk):
     elementos.append(Spacer(1, 14))
 
     texto = """
-    Se deja constancia de que el presente cÃ¡lculo corresponde al aguinaldo anual, calculado sobre la base
-    de las remuneraciones computables registradas en el sistema para el aÃ±o indicado. El aguinaldo no constituye
+    Se deja constancia de que el presente cálculo corresponde al aguinaldo anual, calculado sobre la base
+    de las remuneraciones computables registradas en el sistema para el año indicado. El aguinaldo no constituye
     salario mensual ordinario y se documenta de forma separada para fines administrativos y laborales.
     """
     elementos.append(Paragraph(texto, styles["TextoAguinaldo"]))
@@ -3676,7 +3718,7 @@ def aguinaldo_pdf(request, pk):
         ["_______________________________", "_______________________________"],
         ["Firma responsable / RRHH", "Firma funcionario"],
         ["", ""],
-        ["AclaraciÃ³n: ____________________", "AclaraciÃ³n: ____________________"],
+        ["Aclaración: ____________________", "Aclaración: ____________________"],
     ], colWidths=[80 * mm, 80 * mm])
 
     firmas.setStyle(TableStyle([
@@ -3809,7 +3851,7 @@ def planilla_bancaria_nueva(request):
                 request,
                 "Planilla Bancaria",
                 "Generar",
-                f"Se generÃ³ planilla bancaria {planilla.banco} {planilla.mes:02d}/{planilla.anio}."
+                f"Se generó planilla bancaria {planilla.banco} {planilla.mes:02d}/{planilla.anio}."
             )
 
             messages.success(request, "Planilla bancaria generada correctamente.")
@@ -3913,7 +3955,7 @@ def planilla_bancaria_exportar(request, pk):
         request,
         "Planilla Bancaria",
         "Exportar CSV",
-        f"Se exportÃ³ CSV de planilla bancaria {planilla.banco}."
+        f"Se exportó CSV de planilla bancaria {planilla.banco}."
     )
 
     return response
@@ -3969,7 +4011,7 @@ def recalcular_banco_horas_funcionario(funcionario, user=None):
         segundos = asistencia.horas_trabajadas_segundos or 0
 
         # Si no hay horas reales trabajadas, no se toca el banco.
-        # Las ausencias impactan en sueldo/nÃ³mina, no en banco de horas.
+        # Las ausencias impactan en sueldo/nómina, no en banco de horas.
         if segundos <= 0:
             continue
 
@@ -3988,7 +4030,7 @@ def recalcular_banco_horas_funcionario(funcionario, user=None):
                 funcionario=funcionario,
                 tipo=BancoHorasMovimiento.Tipos.GENERADO,
                 minutos=minutos_finales,
-                observacion=f"Horas extras generadas automÃ¡ticamente ({asistencia.fecha:%d/%m/%Y})",
+                observacion=f"Horas extras generadas automáticamente ({asistencia.fecha:%d/%m/%Y})",
                 origen="asistencia",
                 user=user,
                 fecha=asistencia.fecha,
@@ -3998,7 +4040,7 @@ def recalcular_banco_horas_funcionario(funcionario, user=None):
                 funcionario=funcionario,
                 tipo=BancoHorasMovimiento.Tipos.DESCUENTO,
                 minutos=-minutos_finales,
-                observacion=f"Descuento automÃ¡tico por jornada incompleta ({asistencia.fecha:%d/%m/%Y})",
+                observacion=f"Descuento automático por jornada incompleta ({asistencia.fecha:%d/%m/%Y})",
                 origen="asistencia",
                 user=user,
                 fecha=asistencia.fecha,
@@ -4097,7 +4139,7 @@ def banco_horas_recalcular(request, funcionario_id):
         request,
         "Banco de Horas",
         "Recalcular",
-        f"Se recalculÃ³ banco de horas de {funcionario.nombre_completo}."
+        f"Se recalculó banco de horas de {funcionario.nombre_completo}."
     )
 
     messages.success(request, "Banco de horas recalculado correctamente.")
@@ -4147,7 +4189,7 @@ def banco_horas_otorgar(request):
                 request,
                 "Banco de Horas",
                 "Otorgar horas",
-                f"Se otorgÃ³ {horas} hora(s) libres a {funcionario.nombre_completo}."
+                f"Se otorgó {horas} hora(s) libres a {funcionario.nombre_completo}."
             )
 
             messages.success(request, "Horas descontadas correctamente del banco.")
@@ -4230,7 +4272,7 @@ def nomina_lista(request):
                 funcionarios = funcionarios.none()
 
         if cierre_nomina:
-            messages.error(request, "Esta nÃ³mina ya estÃ¡ cerrada. Debes reabrirla antes de recalcular.")
+            messages.error(request, "Esta nómina ya está cerrada. Debes reabrirla antes de recalcular.")
             return redirect(f"/nomina/?mes={mes}&anio={anio}")        
 
         funcionarios = funcionarios.order_by("apellido", "nombre")
@@ -4240,11 +4282,11 @@ def nomina_lista(request):
 
         registrar_historial(
             request,
-            "NÃ³mina",
+            "Nómina",
             "Generar/Recalcular",
-            f"Se generÃ³ o recalculÃ³ la nÃ³mina del perÃ­odo {mes:02d}/{anio}."
+            f"Se generó o recalculó la nómina del período {mes:02d}/{anio}."
         )
-        messages.success(request, f"NÃ³mina de {mes:02d}/{anio} generada correctamente.")
+        messages.success(request, f"Nómina de {mes:02d}/{anio} generada correctamente.")
         return redirect(f"/nomina/?mes={mes}&anio={anio}")
 
     nominas = NominaMensual.objects.select_related(
@@ -4353,27 +4395,27 @@ def nomina_toggle_pagado(request, pk):
 
     if not admin_master:
         if not nomina.funcionario.sucursal_rel or nomina.funcionario.sucursal_rel.empresa != empresa_usuario:
-            messages.error(request, "No puedes cambiar nÃ³minas de otra empresa.")
+            messages.error(request, "No puedes cambiar nóminas de otra empresa.")
             return redirect(f"/nomina/?mes={nomina.mes}&anio={nomina.anio}")
 
     if nomina.estado_pago == NominaMensual.EstadosPago.PAGADO:
         nomina.estado_pago = NominaMensual.EstadosPago.PENDIENTE
         nomina.fecha_pago = None
-        accion = "revirtiÃ³ a pendiente"
+        accion = "revirtió a pendiente"
     else:
         nomina.estado_pago = NominaMensual.EstadosPago.PAGADO
         nomina.fecha_pago = timezone.localdate()
-        accion = "marcÃ³ como pagada"
+        accion = "marcó como pagada"
 
     nomina.save()
 
     registrar_historial(
         request,
-        "NÃ³mina",
+        "Nómina",
         "Cambio de estado",
-        f"Se {accion} la nÃ³mina de {nomina.funcionario.nombre_completo} del perÃ­odo {nomina.mes:02d}/{nomina.anio}."
+        f"Se {accion} la nómina de {nomina.funcionario.nombre_completo} del período {nomina.mes:02d}/{nomina.anio}."
     )
-    messages.success(request, "Estado de nÃ³mina actualizado correctamente.")
+    messages.success(request, "Estado de nómina actualizado correctamente.")
     return redirect(f"/nomina/?mes={nomina.mes}&anio={nomina.anio}")
 
 def _gs(valor):
@@ -4402,7 +4444,7 @@ def nomina_cerrar_periodo(request):
             "cerrado": True,
             "cerrado_por": request.user,
             "cerrado_en": timezone.now(),
-            "observacion": "Cierre manual de nÃ³mina.",
+            "observacion": "Cierre manual de nómina.",
         }
     )
 
@@ -4414,12 +4456,12 @@ def nomina_cerrar_periodo(request):
 
     registrar_historial(
         request,
-        "NÃ³mina",
-        "Cerrar perÃ­odo",
-        f"Se cerrÃ³ la nÃ³mina del perÃ­odo {mes:02d}/{anio}."
+        "Nómina",
+        "Cerrar período",
+        f"Se cerró la nómina del período {mes:02d}/{anio}."
     )
 
-    messages.success(request, f"NÃ³mina {mes:02d}/{anio} cerrada correctamente.")
+    messages.success(request, f"Nómina {mes:02d}/{anio} cerrada correctamente.")
     return redirect(f"/nomina/?mes={mes}&anio={anio}")
 
 
@@ -4451,14 +4493,14 @@ def nomina_reabrir_periodo(request):
 
         registrar_historial(
             request,
-            "NÃ³mina",
-            "Reabrir perÃ­odo",
-            f"Se reabriÃ³ la nÃ³mina del perÃ­odo {mes:02d}/{anio}."
+            "Nómina",
+            "Reabrir período",
+            f"Se reabrió la nómina del período {mes:02d}/{anio}."
         )
 
-        messages.success(request, f"NÃ³mina {mes:02d}/{anio} reabierta correctamente.")
+        messages.success(request, f"Nómina {mes:02d}/{anio} reabierta correctamente.")
     else:
-        messages.warning(request, "No existe un cierre activo para este perÃ­odo.")
+        messages.warning(request, "No existe un cierre activo para este período.")
 
     return redirect(f"/nomina/?mes={mes}&anio={anio}")
 
@@ -4492,11 +4534,12 @@ def nomina_extracto_pdf(request, pk):
     )
 
     if not _nomina_permitida(request, nomina):
-        messages.error(request, "No puedes exportar nÃ³minas de otra empresa.")
+        messages.error(request, "No puedes exportar nóminas de otra empresa.")
         return redirect("nomina_lista")
 
     funcionario = nomina.funcionario
     config = ConfiguracionGeneral.obtener()
+    icl_activo_nomina = icl_activo_para_funcionario(funcionario)
 
     buffer = BytesIO()
     doc = SimpleDocTemplate(
@@ -4524,16 +4567,16 @@ def nomina_extracto_pdf(request, pk):
 
     empresa_pdf = obtener_empresa_documento(funcionario=nomina.funcionario)
 
-    elementos += construir_encabezado_empresa_pdf(empresa_pdf, "EXTRACTO DE NÃ“MINA")
+    elementos += construir_encabezado_empresa_pdf(empresa_pdf, "EXTRACTO DE NÓMINA")
     elementos.append(Spacer(1, 8))
 
     datos = [
         ["Funcionario", funcionario.nombre_completo],
-        ["CÃ©dula", funcionario.cedula],
+        ["Cédula", funcionario.cedula],
         ["Empresa", funcionario.empresa_mostrar],
         ["Sucursal", funcionario.sucursal_mostrar],
         ["Cargo", funcionario.cargo or "-"],
-        ["PerÃ­odo", f"{nomina.mes:02d}/{nomina.anio}"],
+        ["Período", f"{nomina.mes:02d}/{nomina.anio}"],
         ["Estado", nomina.get_estado_pago_display()],
         ["Fecha de pago", nomina.fecha_pago.strftime("%d/%m/%Y") if nomina.fecha_pago else "-"],
         ["Modalidad de cobro", nomina.modalidad_cobro or "-"],
@@ -4559,7 +4602,7 @@ def nomina_extracto_pdf(request, pk):
         ["Concepto", "Monto"],
         ["Salario base", _gs(nomina.salario_base)],
         ["Bono base configurado", _gs(nomina.bono_base)],
-        ["Bono pagado segÃºn ICL", _gs(nomina.bono_icl)],
+        ["Bono pagado según ICL" if icl_activo_nomina else "Bono íntegro sin impacto ICL", _gs(nomina.bono_icl)],
         ["Salario bruto", _gs(nomina.salario_bruto)],
         ["IPS", f"- {_gs(nomina.descuento_ips)}"],
         ["Deudas", f"- {_gs(nomina.descuento_deudas)}"],
@@ -4599,7 +4642,7 @@ def nomina_extracto_pdf(request, pk):
         tipo_documento="NOMINA",
         documento_id=nomina.id,
         funcionario=funcionario,
-        titulo="Extracto de NÃ³mina",
+        titulo="Extracto de Nómina",
     )
 
     agregar_texto_legal_empresa_pdf(elementos, empresa_pdf)
@@ -4636,7 +4679,7 @@ def nomina_sucursal_pdf(request):
     sucursal = get_object_or_404(Sucursal.objects.select_related("empresa"), pk=sucursal_id)
 
     if not admin_master and sucursal.empresa != empresa_usuario:
-        messages.error(request, "No puedes exportar nÃ³minas de otra empresa.")
+        messages.error(request, "No puedes exportar nóminas de otra empresa.")
         return redirect("nomina_lista")
 
     nominas = NominaMensual.objects.select_related(
@@ -4654,6 +4697,7 @@ def nomina_sucursal_pdf(request):
     total_deudas = nominas.aggregate(total=Sum("descuento_deudas"))["total"] or Decimal("0.00")
     total_neto = nominas.aggregate(total=Sum("salario_neto"))["total"] or Decimal("0.00")
     total_bono = nominas.aggregate(total=Sum("bono_icl"))["total"] or Decimal("0.00")
+    icl_activo_sucursal = bool(getattr(sucursal.empresa, "icl_activo", True))
 
     config = ConfiguracionGeneral.obtener()
 
@@ -4682,16 +4726,16 @@ def nomina_sucursal_pdf(request):
     elementos = []
 
     elementos.append(Paragraph(config.nombre_sistema or "ClockIn", styles["TituloSucursal"]))
-    elementos.append(Paragraph("EXTRACTO GENERAL DE NÃ“MINA POR SUCURSAL", styles["TituloSucursal"]))
+    elementos.append(Paragraph("EXTRACTO GENERAL DE NÓMINA POR SUCURSAL", styles["TituloSucursal"]))
     elementos.append(Spacer(1, 8))
 
     resumen = Table([
         ["Empresa", sucursal.empresa.nombre],
         ["Sucursal", sucursal.nombre],
-        ["PerÃ­odo", f"{mes:02d}/{anio}"],
+        ["Período", f"{mes:02d}/{anio}"],
         ["Cantidad de funcionarios", str(nominas.count())],
         ["Total bruto", _gs(total_bruto)],
-        ["Total bono ICL", _gs(total_bono)],
+        ["Total bono ICL" if icl_activo_sucursal else "Total bono íntegro", _gs(total_bono)],
         ["Total IPS", _gs(total_ips)],
         ["Total deudas", _gs(total_deudas)],
         ["Total neto general", _gs(total_neto)],
@@ -4805,18 +4849,18 @@ def configuracion_general(request):
                 request,
                 "Configuraciones",
                 "Editar",
-                f"ConfiguraciÃ³n PRO Plus actualizada. "
+                f"Configuración PRO Plus actualizada. "
                 f"Salario base: {config.salario_base_default}, "
-                f"LÃ­mite deuda: {config.porcentaje_limite_deuda_default}%, "
+                f"Límite deuda: {config.porcentaje_limite_deuda_default}%, "
                 f"Tolerancia: {config.tolerancia_minutos_default} min, "
-                f"Lectura biomÃ©trica: {config.biometrico_segundos_lectura}s, "
+                f"Lectura biométrica: {config.biometrico_segundos_lectura}s, "
                 f"Tema: {config.color_primario}."
             )
 
-            messages.success(request, "ConfiguraciÃ³n PRO Plus actualizada correctamente.")
+            messages.success(request, "Configuración PRO Plus actualizada correctamente.")
             return redirect("configuracion_general")
 
-        messages.error(request, "No se pudo guardar la configuraciÃ³n. Revisa los campos marcados.")
+        messages.error(request, "No se pudo guardar la configuración. Revisa los campos marcados.")
 
     else:
         form = ConfiguracionGeneralForm(instance=config)
@@ -4929,7 +4973,7 @@ def suscripcion_bloqueada(request):
 
 from decimal import Decimal, ROUND_HALF_UP
 
-def calcular_liquidacion_funcionario(
+def calcular_liquidacion_funcionario_legacy(
     funcionario,
     tipo_salida,
     fecha_salida,
@@ -4992,7 +5036,7 @@ def calcular_liquidacion_funcionario(
         dias_trabajados_pendientes = 0
 
     # Salario pendiente del mes trabajado
-    # Ejemplo: salario 2.899.048 / 30 * 5 dÃ­as = 483.175
+    # Ejemplo: salario 2.899.048 / 30 * 5 días = 483.175
     dias_trabajados_pendientes = int(dias_trabajados_pendientes or 0)
 
     salario_diario = salario_base / Decimal("30")
@@ -5143,7 +5187,7 @@ def calcular_liquidacion_funcionario(
 
     if tipo_normalizado in ["despido_justa_causa", "despido_por_justa_causa", "periodo_prueba", "abandono"]:
         requiere_revision_juridica = True
-        alerta_revision = "Este tipo de salida requiere revisiÃ³n jurÃ­dica antes de confirmar la liquidaciÃ³n."
+        alerta_revision = "Este tipo de salida requiere revisión jurídica antes de confirmar la liquidación."
 
     return {
         "antiguedad_anios": antiguedad_anios,
@@ -5267,7 +5311,7 @@ def _liq_alertas_funcionario(funcionario):
     try:
         saldo_vac = funcionario.saldo_vacaciones
         if saldo_vac and saldo_vac > 0:
-            alertas.append(f"Tiene {saldo_vac} dÃ­a(s) de vacaciones pendientes.")
+            alertas.append(f"Tiene {saldo_vac} día(s) de vacaciones pendientes.")
     except Exception:
         pass
 
@@ -5284,6 +5328,29 @@ def _liq_alertas_funcionario(funcionario):
         pass
 
     return alertas
+
+
+def _liq_alertas_proteccion_guardadas(liquidacion):
+    resumen = {
+        "ausencias_descuento": liquidacion.ausencias_descuento,
+        "preaviso_dias_corresponde": liquidacion.preaviso_dias_corresponde,
+        "preaviso_dias_otorgados": liquidacion.preaviso_dias_otorgados,
+        "preaviso_dias_faltantes": max(
+            int(liquidacion.preaviso_dias_corresponde or 0) - int(liquidacion.preaviso_dias_otorgados or 0),
+            0,
+        ),
+        "deudas_monto": liquidacion.deudas_monto,
+        "otros_descuentos": liquidacion.otros_descuentos,
+        "vacaciones_causadas_pendientes_dias": liquidacion.vacaciones_causadas_pendientes_dias,
+        "indemnizacion_suma_anio_por_fraccion": (
+            liquidacion.tipo_salida == Liquidacion.TiposSalida.DESPIDO_SIN_JUSTA_CAUSA
+            and (
+                liquidacion.antiguedad_meses > 6
+                or (liquidacion.antiguedad_meses == 6 and liquidacion.antiguedad_dias > 0)
+            )
+        ),
+    }
+    return construir_alertas_proteccion_liquidacion(resumen, liquidacion.tipo_salida)
 
 
 @login_required
@@ -5351,10 +5418,10 @@ def liquidacion_nueva(request):
                 request,
                 "Liquidaciones",
                 "Crear",
-                f"Se creÃ³ liquidaciÃ³n para {liquidacion.funcionario.nombre_completo} - {liquidacion.get_tipo_salida_display()}."
+                f"Se creó liquidación para {liquidacion.funcionario.nombre_completo} - {liquidacion.get_tipo_salida_display()}."
             )
 
-            messages.success(request, "LiquidaciÃ³n generada correctamente.")
+            messages.success(request, "Liquidación generada correctamente.")
             return redirect("liquidacion_detalle", pk=liquidacion.pk)
 
     else:
@@ -5369,7 +5436,7 @@ def liquidacion_nueva(request):
     return render(request, "core/liquidacion_form.html", {
         "form": form,
         "resumen": resumen,
-        "titulo_form": "Nueva liquidaciÃ³n",
+        "titulo_form": "Nueva liquidación",
     })
 
 
@@ -5407,12 +5474,12 @@ def liquidacion_preview(request):
 
     if not admin_master:
         if not funcionario.sucursal_rel or funcionario.sucursal_rel.empresa != empresa_usuario:
-            return JsonResponse({"ok": False, "error": "No puedes calcular liquidaciÃ³n para otra empresa."}, status=403)
+            return JsonResponse({"ok": False, "error": "No puedes calcular liquidación para otra empresa."}, status=403)
 
     try:
         fecha_salida_obj = datetime.strptime(fecha_salida, "%Y-%m-%d").date()
     except ValueError:
-        return JsonResponse({"ok": False, "error": "Fecha de salida invÃ¡lida."})
+        return JsonResponse({"ok": False, "error": "Fecha de salida inválida."})
 
     try:
         dias_auto = _liq_dias_salario_auto(fecha_salida_obj)
@@ -5431,7 +5498,7 @@ def liquidacion_preview(request):
         preaviso_dias_otorgados = int(preaviso_dias_otorgados or 0)
         otros_descuentos = Decimal(str(otros_descuentos or 0))
     except (ValueError, InvalidOperation):
-        return JsonResponse({"ok": False, "error": "Hay valores numÃ©ricos invÃ¡lidos."})
+        return JsonResponse({"ok": False, "error": "Hay valores numéricos inválidos."})
 
     resumen = calcular_liquidacion_funcionario(
         funcionario=funcionario,
@@ -5501,10 +5568,15 @@ def liquidacion_preview(request):
         "aguinaldo_proporcional_monto": str(resumen["aguinaldo_proporcional_monto"]),
         "preaviso_dias_corresponde": resumen["preaviso_dias_corresponde"],
         "preaviso_dias_otorgados": resumen["preaviso_dias_otorgados"],
+        "preaviso_dias_faltantes": resumen["preaviso_dias_faltantes"],
         "preaviso_cumplido": resumen["preaviso_cumplido"],
         "preaviso_monto": str(resumen["preaviso_monto"]),
         "indemnizacion_dias": resumen["indemnizacion_dias"],
         "indemnizacion_monto": str(resumen["indemnizacion_monto"]),
+        "indemnizacion_anios_computables": resumen["indemnizacion_anios_computables"],
+        "indemnizacion_suma_anio_por_fraccion": resumen["indemnizacion_suma_anio_por_fraccion"],
+        "salario_indemnizacion_base": str(resumen["salario_indemnizacion_base"]),
+        "salario_diario_base": str(resumen["salario_diario_base"]),
         "ips_monto": str(resumen["ips_monto"]),
         "deudas_monto": str(resumen["deudas_monto"]),
         "otros_descuentos": str(resumen["otros_descuentos"]),
@@ -5513,6 +5585,7 @@ def liquidacion_preview(request):
         "total_liquidacion": str(resumen["total_liquidacion"]),
         "requiere_revision_juridica": resumen["requiere_revision_juridica"],
         "alerta_revision": resumen["alerta_revision"],
+        "alertas_proteccion": resumen["alertas_proteccion"],
     })
 
 
@@ -5535,8 +5608,15 @@ def liquidacion_detalle(request, pk):
             messages.error(request, "No puedes ver liquidaciones de otra empresa.")
             return redirect("liquidaciones_lista")
 
+    alertas_proteccion = _liq_alertas_proteccion_guardadas(liquidacion)
+
     return render(request, "core/liquidacion_detalle.html", {
         "liquidacion": liquidacion,
+        "alertas_proteccion": alertas_proteccion,
+        "preaviso_dias_faltantes": max(
+            int(liquidacion.preaviso_dias_corresponde or 0) - int(liquidacion.preaviso_dias_otorgados or 0),
+            0,
+        ),
     })
 
 
@@ -5560,7 +5640,7 @@ def liquidacion_confirmar(request, pk):
             return redirect("liquidaciones_lista")
 
     if liquidacion.estado == Liquidacion.Estados.ANULADA:
-        messages.error(request, "No puedes confirmar una liquidaciÃ³n anulada.")
+        messages.error(request, "No puedes confirmar una liquidación anulada.")
         return redirect("liquidacion_detalle", pk=pk)
 
     liquidacion.estado = Liquidacion.Estados.CONFIRMADA
@@ -5570,10 +5650,10 @@ def liquidacion_confirmar(request, pk):
         request,
         "Liquidaciones",
         "Confirmar",
-        f"Se confirmÃ³ la liquidaciÃ³n de {liquidacion.funcionario.nombre_completo}."
+        f"Se confirmó la liquidación de {liquidacion.funcionario.nombre_completo}."
     )
 
-    messages.success(request, "LiquidaciÃ³n confirmada correctamente.")
+    messages.success(request, "Liquidación confirmada correctamente.")
     return redirect("liquidacion_detalle", pk=pk)
 
 
@@ -5597,7 +5677,7 @@ def liquidacion_marcar_pagada(request, pk):
             return redirect("liquidaciones_lista")
 
     if liquidacion.estado == Liquidacion.Estados.ANULADA:
-        messages.error(request, "No puedes marcar como pagada una liquidaciÃ³n anulada.")
+        messages.error(request, "No puedes marcar como pagada una liquidación anulada.")
         return redirect("liquidacion_detalle", pk=pk)
 
     liquidacion.estado = Liquidacion.Estados.PAGADA
@@ -5607,10 +5687,10 @@ def liquidacion_marcar_pagada(request, pk):
         request,
         "Liquidaciones",
         "Pagar",
-        f"Se marcÃ³ como pagada la liquidaciÃ³n de {liquidacion.funcionario.nombre_completo}."
+        f"Se marcó como pagada la liquidación de {liquidacion.funcionario.nombre_completo}."
     )
 
-    messages.success(request, "LiquidaciÃ³n marcada como pagada.")
+    messages.success(request, "Liquidación marcada como pagada.")
     return redirect("liquidacion_detalle", pk=pk)
 
 
@@ -5634,7 +5714,7 @@ def liquidacion_anular(request, pk):
             return redirect("liquidaciones_lista")
 
     if liquidacion.estado == Liquidacion.Estados.PAGADA:
-        messages.error(request, "No puedes anular una liquidaciÃ³n ya pagada.")
+        messages.error(request, "No puedes anular una liquidación ya pagada.")
         return redirect("liquidacion_detalle", pk=pk)
 
     liquidacion.estado = Liquidacion.Estados.ANULADA
@@ -5644,10 +5724,10 @@ def liquidacion_anular(request, pk):
         request,
         "Liquidaciones",
         "Anular",
-        f"Se anulÃ³ la liquidaciÃ³n de {liquidacion.funcionario.nombre_completo}."
+        f"Se anuló la liquidación de {liquidacion.funcionario.nombre_completo}."
     )
 
-    messages.success(request, "LiquidaciÃ³n anulada correctamente.")
+    messages.success(request, "Liquidación anulada correctamente.")
     return redirect("liquidacion_detalle", pk=pk)
 
 
@@ -5676,6 +5756,11 @@ def liquidacion_pdf(request, pk):
 
     funcionario = liquidacion.funcionario
     config = ConfiguracionGeneral.obtener()
+    alertas_proteccion = _liq_alertas_proteccion_guardadas(liquidacion)
+    preaviso_dias_faltantes = max(
+        int(liquidacion.preaviso_dias_corresponde or 0) - int(liquidacion.preaviso_dias_otorgados or 0),
+        0,
+    )
 
     buffer = BytesIO()
 
@@ -5750,12 +5835,12 @@ def liquidacion_pdf(request, pk):
 
     elementos += construir_encabezado_empresa_pdf(
         empresa_pdf,
-        "LIQUIDACIÃ“N LABORAL"
+        "LIQUIDACIÓN LABORAL"
     )
 
     elementos.append(
         Paragraph(
-            "LIQUIDACIÃ“N FINAL",
+            "LIQUIDACIÓN FINAL",
             styles["TituloClockIn"]
         )
     )
@@ -5764,12 +5849,12 @@ def liquidacion_pdf(request, pk):
 
     datos_superiores = [
         ["Funcionario", funcionario.nombre_completo],
-        ["CÃ©dula", funcionario.cedula],
+        ["Cédula", funcionario.cedula],
         ["Tipo de salida", liquidacion.get_tipo_salida_display()],
         ["Estado", liquidacion.get_estado_display()],
         ["Fecha de salida", liquidacion.fecha_salida.strftime("%d/%m/%Y") if liquidacion.fecha_salida else "-"],
-        ["Fecha de cÃ¡lculo", liquidacion.fecha_calculo.strftime("%d/%m/%Y") if liquidacion.fecha_calculo else "-"],
-        ["AntigÃ¼edad", f"{liquidacion.antiguedad_anios} aÃ±o(s), {liquidacion.antiguedad_meses} mes(es), {liquidacion.antiguedad_dias} dÃ­a(s)"],
+        ["Fecha de cálculo", liquidacion.fecha_calculo.strftime("%d/%m/%Y") if liquidacion.fecha_calculo else "-"],
+        ["Antigüedad", f"{liquidacion.antiguedad_anios} año(s), {liquidacion.antiguedad_meses} mes(es), {liquidacion.antiguedad_dias} día(s)"],
     ]
 
     tabla_datos = Table(
@@ -5803,14 +5888,15 @@ def liquidacion_pdf(request, pk):
 
     tabla_haberes = Table([
         ["Concepto", "Detalle", "Monto"],
-        ["Salario pendiente bruto", f"{liquidacion.dias_trabajados_pendientes} dÃ­a(s)", f"Gs. {(liquidacion.salario_pendiente_monto + liquidacion.descuento_ausencias):,.0f}".replace(",", ".")],
-        ["Ausencias descontadas", f"{liquidacion.ausencias_descuento} dÃ­a(s)", f"- Gs. {liquidacion.descuento_ausencias:,.0f}".replace(",", ".")],
+        ["Salario pendiente bruto", f"{liquidacion.dias_trabajados_pendientes} día(s)", f"Gs. {(liquidacion.salario_pendiente_monto + liquidacion.descuento_ausencias):,.0f}".replace(",", ".")],
+        ["Ausencias descontadas", f"{liquidacion.ausencias_descuento} día(s)", f"- Gs. {liquidacion.descuento_ausencias:,.0f}".replace(",", ".")],
         ["Salario pendiente neto", "-", f"Gs. {liquidacion.salario_pendiente_monto:,.0f}".replace(",", ".")],
-        ["Vacaciones causadas pendientes", f"{liquidacion.vacaciones_causadas_pendientes_dias} dÃ­a(s)", f"Gs. {liquidacion.vacaciones_causadas_monto:,.0f}".replace(",", ".")],
-        ["Vacaciones proporcionales", f"{liquidacion.vacaciones_proporcionales_dias} dÃ­a(s)", f"Gs. {liquidacion.vacaciones_proporcionales_monto:,.0f}".replace(",", ".")],
+        ["Vacaciones causadas pendientes", f"{liquidacion.vacaciones_causadas_pendientes_dias} día(s)", f"Gs. {liquidacion.vacaciones_causadas_monto:,.0f}".replace(",", ".")],
+        ["Vacaciones proporcionales", f"{liquidacion.vacaciones_proporcionales_dias} día(s)", f"Gs. {liquidacion.vacaciones_proporcionales_monto:,.0f}".replace(",", ".")],
         ["Aguinaldo proporcional", "-", f"Gs. {liquidacion.aguinaldo_proporcional_monto:,.0f}".replace(",", ".")],
-        ["Preaviso", f"{liquidacion.preaviso_dias_corresponde} dÃ­a(s) corresponde / {liquidacion.preaviso_dias_otorgados} dÃ­a(s) otorgado(s)", f"Gs. {liquidacion.preaviso_monto:,.0f}".replace(",", ".")],
-        ["IndemnizaciÃ³n", f"{liquidacion.indemnizacion_dias} dÃ­a(s)", f"Gs. {liquidacion.indemnizacion_monto:,.0f}".replace(",", ".")],
+        ["Preaviso", f"{liquidacion.preaviso_dias_corresponde} día(s) corresponde / {liquidacion.preaviso_dias_otorgados} día(s) otorgado(s)", f"Gs. {liquidacion.preaviso_monto:,.0f}".replace(",", ".")],
+        ["Indemnización", f"{liquidacion.indemnizacion_dias} día(s)", f"Gs. {liquidacion.indemnizacion_monto:,.0f}".replace(",", ".")],
+        ["Preaviso pendiente", f"{preaviso_dias_faltantes} dia(s) faltante(s)", "-"],
         ["TOTAL HABERES", "", f"Gs. {liquidacion.total_haberes:,.0f}".replace(",", ".")],
     ], colWidths=[70 * mm, 65 * mm, 25 * mm])
 
@@ -5876,7 +5962,7 @@ def liquidacion_pdf(request, pk):
     )
 
     tabla_total = Table([
-        ["TOTAL LIQUIDACIÃ“N", f"Gs. {liquidacion.total_liquidacion:,.0f}".replace(",", ".")]
+        ["TOTAL LIQUIDACIÓN", f"Gs. {liquidacion.total_liquidacion:,.0f}".replace(",", ".")]
     ], colWidths=[135 * mm, 25 * mm])
 
     tabla_total.setStyle(TableStyle([
@@ -5898,7 +5984,7 @@ def liquidacion_pdf(request, pk):
     if liquidacion.motivo_observacion:
         elementos.append(
             Paragraph(
-                "4. OBSERVACIÃ“N",
+                "4. OBSERVACIÓN",
                 styles["SeccionClockIn"]
             )
         )
@@ -5915,7 +6001,7 @@ def liquidacion_pdf(request, pk):
     if liquidacion.requiere_revision_juridica and liquidacion.alerta_revision:
         elementos.append(
             Paragraph(
-                "5. ALERTA DE REVISIÃ“N",
+                "5. ALERTA DE REVISIÓN",
                 styles["SeccionClockIn"]
             )
         )
@@ -5929,13 +6015,31 @@ def liquidacion_pdf(request, pk):
 
         elementos.append(Spacer(1, 12))
 
+    if alertas_proteccion:
+        elementos.append(
+            Paragraph(
+                "ALERTAS DE PROTECCION PARA LA EMPRESA",
+                styles["SeccionClockIn"]
+            )
+        )
+
+        for alerta in alertas_proteccion:
+            elementos.append(
+                Paragraph(
+                    f"- {alerta}",
+                    styles["TextoClockIn"]
+                )
+            )
+
+        elementos.append(Spacer(1, 12))
+
     elementos.append(Spacer(1, 22))
 
     firmas = Table([
         ["_______________________________", "_______________________________"],
         ["Firma del empleador / responsable", "Firma del funcionario"],
         ["", ""],
-        ["AclaraciÃ³n: ____________________", "AclaraciÃ³n: ____________________"],
+        ["Aclaración: ____________________", "Aclaración: ____________________"],
     ], colWidths=[80 * mm, 80 * mm])
 
     firmas.setStyle(TableStyle([
@@ -5956,7 +6060,7 @@ def liquidacion_pdf(request, pk):
         tipo_documento="LIQUIDACION",
         documento_id=liquidacion.id,
         funcionario=funcionario,
-        titulo="LiquidaciÃ³n Laboral",
+        titulo="Liquidación Laboral",
     )
 
     agregar_texto_legal_empresa_pdf(
@@ -5991,30 +6095,30 @@ def generar_texto_comunicacion_laboral(comunicacion):
     textos = {
         ComunicacionLaboral.Tipos.AMONESTACION: f"""
 Por medio de la presente, la empresa <b>{empresa_nombre}</b> comunica formalmente al trabajador
-<b>{funcionario.nombre_completo}</b>, con C.I. NÂ° <b>{funcionario.cedula}</b>, que se deja constancia
-de una <b>amonestaciÃ³n disciplinaria</b> vinculada a los siguientes hechos:
+<b>{funcionario.nombre_completo}</b>, con C.I. N° <b>{funcionario.cedula}</b>, que se deja constancia
+de una <b>amonestación disciplinaria</b> vinculada a los siguientes hechos:
 <br/><br/>
 <b>{detalle}</b>
 <br/><br/>
-La presente comunicaciÃ³n se realiza a los efectos de documentar la situaciÃ³n ocurrida, advertir al trabajador
+La presente comunicación se realiza a los efectos de documentar la situación ocurrida, advertir al trabajador
 sobre la necesidad de cumplir estrictamente con sus obligaciones laborales, reglamentos internos, horarios,
 instrucciones de trabajo y normas de conducta aplicables.
 <br/><br/>
-Se deja constancia de que la reiteraciÃ³n de hechos similares podrÃ¡ dar lugar a nuevas medidas disciplinarias,
+Se deja constancia de que la reiteración de hechos similares podrá dar lugar a nuevas medidas disciplinarias,
 conforme a la gravedad del caso, los antecedentes existentes y la normativa laboral vigente.
 """,
 
         ComunicacionLaboral.Tipos.PREAVISO: f"""
 Por medio de la presente, la empresa <b>{empresa_nombre}</b> comunica formalmente al trabajador
-<b>{funcionario.nombre_completo}</b>, con C.I. NÂ° <b>{funcionario.cedula}</b>, el otorgamiento de
+<b>{funcionario.nombre_completo}</b>, con C.I. N° <b>{funcionario.cedula}</b>, el otorgamiento de
 <b>preaviso</b> conforme a la normativa laboral vigente.
 <br/><br/>
-La presente comunicaciÃ³n se emite en fecha <b>{fecha_emision}</b>, tomando como referencia
+La presente comunicación se emite en fecha <b>{fecha_emision}</b>, tomando como referencia
 <b>{fecha_ref}</b>.
 <br/><br/>
-El plazo de preaviso deberÃ¡ ser determinado conforme a la antigÃ¼edad del trabajador y a las disposiciones
-aplicables del CÃ³digo del Trabajo. Se deja constancia de que este documento tiene por finalidad comunicar
-formalmente la decisiÃ³n empresarial y preservar respaldo documental suficiente.
+El plazo de preaviso deberá ser determinado conforme a la antigüedad del trabajador y a las disposiciones
+aplicables del Código del Trabajo. Se deja constancia de que este documento tiene por finalidad comunicar
+formalmente la decisión empresarial y preservar respaldo documental suficiente.
 <br/><br/>
 Detalle adicional:
 <br/>
@@ -6023,95 +6127,95 @@ Detalle adicional:
 
         ComunicacionLaboral.Tipos.ABANDONO: f"""
 Por medio de la presente, la empresa <b>{empresa_nombre}</b> comunica formalmente al trabajador
-<b>{funcionario.nombre_completo}</b>, con C.I. NÂ° <b>{funcionario.cedula}</b>, que se ha registrado una
-situaciÃ³n compatible con <b>abandono de trabajo</b> o inasistencia injustificada, segÃºn los antecedentes
+<b>{funcionario.nombre_completo}</b>, con C.I. N° <b>{funcionario.cedula}</b>, que se ha registrado una
+situación compatible con <b>abandono de trabajo</b> o inasistencia injustificada, según los antecedentes
 obrantes en la empresa.
 <br/><br/>
 Hechos registrados:
 <br/>
 <b>{detalle}</b>
 <br/><br/>
-Se intima al trabajador a justificar de manera inmediata y documentada su ausencia o interrupciÃ³n de tareas.
-La falta de justificaciÃ³n suficiente podrÃ¡ ser considerada para la adopciÃ³n de las medidas laborales que
-correspondan conforme al CÃ³digo del Trabajo y demÃ¡s normas aplicables.
+Se intima al trabajador a justificar de manera inmediata y documentada su ausencia o interrupción de tareas.
+La falta de justificación suficiente podrá ser considerada para la adopción de las medidas laborales que
+correspondan conforme al Código del Trabajo y demás normas aplicables.
 <br/><br/>
-La presente comunicaciÃ³n se emite a efectos de dejar constancia formal y permitir el ejercicio del derecho
+La presente comunicación se emite a efectos de dejar constancia formal y permitir el ejercicio del derecho
 a formular aclaraciones o descargos.
 """,
 
         ComunicacionLaboral.Tipos.PERMISO: f"""
 Por medio de la presente, la empresa <b>{empresa_nombre}</b> comunica al trabajador
-<b>{funcionario.nombre_completo}</b>, con C.I. NÂ° <b>{funcionario.cedula}</b>, la recepciÃ³n, autorizaciÃ³n,
+<b>{funcionario.nombre_completo}</b>, con C.I. N° <b>{funcionario.cedula}</b>, la recepción, autorización,
 rechazo o registro administrativo de un <b>permiso laboral</b>, conforme a los datos consignados por RRHH.
 <br/><br/>
 Detalle del permiso:
 <br/>
 <b>{detalle}</b>
 <br/><br/>
-El trabajador deberÃ¡ cumplir con las condiciones, fechas, horarios y documentaciÃ³n respaldatoria indicadas
-por la empresa. En caso de no presentar los justificativos correspondientes, la situaciÃ³n podrÃ¡ ser tratada
+El trabajador deberá cumplir con las condiciones, fechas, horarios y documentación respaldatoria indicadas
+por la empresa. En caso de no presentar los justificativos correspondientes, la situación podrá ser tratada
 como ausencia injustificada.
 """,
 
         ComunicacionLaboral.Tipos.AUSENCIA: f"""
 Por medio de la presente, la empresa <b>{empresa_nombre}</b> comunica formalmente al trabajador
-<b>{funcionario.nombre_completo}</b>, con C.I. NÂ° <b>{funcionario.cedula}</b>, que se ha registrado una
-<b>ausencia injustificada</b> o una falta de comunicaciÃ³n previa respecto a su inasistencia.
+<b>{funcionario.nombre_completo}</b>, con C.I. N° <b>{funcionario.cedula}</b>, que se ha registrado una
+<b>ausencia injustificada</b> o una falta de comunicación previa respecto a su inasistencia.
 <br/><br/>
 Detalle registrado:
 <br/>
 <b>{detalle}</b>
 <br/><br/>
-Se solicita al trabajador presentar la justificaciÃ³n correspondiente en el plazo mÃ¡s breve posible. La falta
-de justificaciÃ³n documentada podrÃ¡ generar constancia disciplinaria y ser considerada como antecedente
+Se solicita al trabajador presentar la justificación correspondiente en el plazo más breve posible. La falta
+de justificación documentada podrá generar constancia disciplinaria y ser considerada como antecedente
 laboral, conforme a la normativa vigente y a los reglamentos internos aplicables.
 """,
 
         ComunicacionLaboral.Tipos.SUSPENSION: f"""
 Por medio de la presente, la empresa <b>{empresa_nombre}</b> comunica al trabajador
-<b>{funcionario.nombre_completo}</b>, con C.I. NÂ° <b>{funcionario.cedula}</b>, la aplicaciÃ³n o inicio del
-procedimiento relacionado con una <b>suspensiÃ³n disciplinaria</b>, segÃºn los hechos detallados.
+<b>{funcionario.nombre_completo}</b>, con C.I. N° <b>{funcionario.cedula}</b>, la aplicación o inicio del
+procedimiento relacionado con una <b>suspensión disciplinaria</b>, según los hechos detallados.
 <br/><br/>
 Hechos:
 <br/>
 <b>{detalle}</b>
 <br/><br/>
-La medida deberÃ¡ ser proporcional a la falta imputada, respetar el derecho de defensa del trabajador y
-documentarse debidamente. En caso de corresponder, el trabajador podrÃ¡ presentar su descargo o explicaciÃ³n
+La medida deberá ser proporcional a la falta imputada, respetar el derecho de defensa del trabajador y
+documentarse debidamente. En caso de corresponder, el trabajador podrá presentar su descargo o explicación
 ante RRHH dentro del plazo otorgado por la empresa.
 """,
 
         ComunicacionLaboral.Tipos.CITACION_DESCARGO: f"""
 Por medio de la presente, la empresa <b>{empresa_nombre}</b> cita formalmente al trabajador
-<b>{funcionario.nombre_completo}</b>, con C.I. NÂ° <b>{funcionario.cedula}</b>, a presentar su
+<b>{funcionario.nombre_completo}</b>, con C.I. N° <b>{funcionario.cedula}</b>, a presentar su
 <b>descargo</b> respecto a los hechos comunicados.
 <br/><br/>
 Hechos objeto de descargo:
 <br/>
 <b>{detalle}</b>
 <br/><br/>
-La finalidad de esta comunicaciÃ³n es garantizar que el trabajador pueda exponer su versiÃ³n, presentar
-documentos o aclaraciones, y ejercer su derecho de defensa antes de que la empresa adopte una decisiÃ³n
+La finalidad de esta comunicación es garantizar que el trabajador pueda exponer su versión, presentar
+documentos o aclaraciones, y ejercer su derecho de defensa antes de que la empresa adopte una decisión
 disciplinaria o administrativa definitiva.
 """,
 
         ComunicacionLaboral.Tipos.CAMBIO_CARGO_SECTOR: f"""
 Por medio de la presente, la empresa <b>{empresa_nombre}</b> comunica al trabajador
-<b>{funcionario.nombre_completo}</b>, con C.I. NÂ° <b>{funcionario.cedula}</b>, una modificaciÃ³n,
-reasignaciÃ³n o cambio administrativo relacionado con su cargo, sector, sucursal, funciones u organizaciÃ³n
+<b>{funcionario.nombre_completo}</b>, con C.I. N° <b>{funcionario.cedula}</b>, una modificación,
+reasignación o cambio administrativo relacionado con su cargo, sector, sucursal, funciones u organización
 interna del trabajo.
 <br/><br/>
 Detalle:
 <br/>
 <b>{detalle}</b>
 <br/><br/>
-La presente comunicaciÃ³n se emite para dejar constancia formal de la medida administrativa, sin perjuicio
+La presente comunicación se emite para dejar constancia formal de la medida administrativa, sin perjuicio
 de los derechos laborales que correspondan al trabajador conforme a la normativa vigente.
 """,
 
         ComunicacionLaboral.Tipos.MEMORANDUM: f"""
-Por medio de la presente, la empresa <b>{empresa_nombre}</b> emite memorÃ¡ndum interno dirigido al trabajador
-<b>{funcionario.nombre_completo}</b>, con C.I. NÂ° <b>{funcionario.cedula}</b>.
+Por medio de la presente, la empresa <b>{empresa_nombre}</b> emite memorándum interno dirigido al trabajador
+<b>{funcionario.nombre_completo}</b>, con C.I. N° <b>{funcionario.cedula}</b>.
 <br/><br/>
 Asunto:
 <br/>
@@ -6121,7 +6225,7 @@ Detalle:
 <br/>
 <b>{detalle}</b>
 <br/><br/>
-Se deja constancia de la presente comunicaciÃ³n para fines administrativos, organizativos y documentales.
+Se deja constancia de la presente comunicación para fines administrativos, organizativos y documentales.
 """,
     }
 
@@ -6223,10 +6327,10 @@ def comunicacion_nueva(request):
                 request,
                 "Comunicaciones",
                 "Crear",
-                f"Se creÃ³ comunicaciÃ³n {comunicacion.get_tipo_display()} para {comunicacion.funcionario.nombre_completo}."
+                f"Se creó comunicación {comunicacion.get_tipo_display()} para {comunicacion.funcionario.nombre_completo}."
             )
 
-            messages.success(request, "ComunicaciÃ³n creada correctamente.")
+            messages.success(request, "Comunicación creada correctamente.")
             return redirect("comunicacion_detalle", pk=comunicacion.pk)
     else:
         form = ComunicacionLaboralForm(initial={"fecha_emision": timezone.localdate()})
@@ -6239,8 +6343,8 @@ def comunicacion_nueva(request):
 
     return render(request, "core/comunicacion_form.html", {
         "form": form,
-        "titulo_form": "Nueva comunicaciÃ³n",
-        "boton_texto": "Guardar comunicaciÃ³n",
+        "titulo_form": "Nueva comunicación",
+        "boton_texto": "Guardar comunicación",
     })
 
 
@@ -6292,10 +6396,10 @@ def comunicacion_editar(request, pk):
                 request,
                 "Comunicaciones",
                 "Editar",
-                f"Se editÃ³ comunicaciÃ³n de {comunicacion.funcionario.nombre_completo}."
+                f"Se editó comunicación de {comunicacion.funcionario.nombre_completo}."
             )
 
-            messages.success(request, "ComunicaciÃ³n actualizada correctamente.")
+            messages.success(request, "Comunicación actualizada correctamente.")
             return redirect("comunicacion_detalle", pk=comunicacion.pk)
     else:
         form = ComunicacionLaboralForm(instance=comunicacion)
@@ -6308,7 +6412,7 @@ def comunicacion_editar(request, pk):
 
     return render(request, "core/comunicacion_form.html", {
         "form": form,
-        "titulo_form": "Editar comunicaciÃ³n",
+        "titulo_form": "Editar comunicación",
         "boton_texto": "Guardar cambios",
         "comunicacion": comunicacion,
     })
@@ -6405,7 +6509,7 @@ def comunicacion_pdf(request, pk):
 
     elementos += construir_encabezado_empresa_pdf(
         empresa_pdf,
-        "COMUNICACIÃ“N LABORAL"
+        "COMUNICACIÓN LABORAL"
     )
 
     elementos.append(
@@ -6419,12 +6523,12 @@ def comunicacion_pdf(request, pk):
 
     datos = [
         ["Funcionario", funcionario.nombre_completo],
-        ["CÃ©dula", funcionario.cedula],
+        ["Cédula", funcionario.cedula],
         ["Cargo", funcionario.cargo or "-"],
         ["Sector", funcionario.sector or "-"],
         ["Sucursal", funcionario.sucursal_mostrar],
-        ["Tipo de comunicaciÃ³n", comunicacion.get_tipo_display()],
-        ["Fecha de emisiÃ³n", comunicacion.fecha_emision.strftime("%d/%m/%Y")],
+        ["Tipo de comunicación", comunicacion.get_tipo_display()],
+        ["Fecha de emisión", comunicacion.fecha_emision.strftime("%d/%m/%Y")],
         ["Fecha de referencia", comunicacion.fecha_referencia.strftime("%d/%m/%Y") if comunicacion.fecha_referencia else "-"],
         ["Estado", comunicacion.get_estado_display()],
     ]
@@ -6464,7 +6568,7 @@ def comunicacion_pdf(request, pk):
         ["_______________________________", "_______________________________"],
         ["Firma del empleador / RRHH", "Firma del funcionario"],
         ["", ""],
-        ["AclaraciÃ³n: ____________________", "AclaraciÃ³n: ____________________"],
+        ["Aclaración: ____________________", "Aclaración: ____________________"],
         ["Fecha: ____/____/______", "Fecha: ____/____/______"],
     ], colWidths=[80 * mm, 80 * mm])
 
@@ -6501,7 +6605,7 @@ def comunicacion_pdf(request, pk):
         request,
         "Comunicaciones",
         "PDF",
-        f"Se generÃ³ PDF de comunicaciÃ³n para {funcionario.nombre_completo}."
+        f"Se generó PDF de comunicación para {funcionario.nombre_completo}."
     )
 
     response = HttpResponse(content_type="application/pdf")
@@ -6608,8 +6712,8 @@ def dias_libres_lista(request):
             planilla.save()
 
             # Compatibilidad con el sistema viejo de DiaLibre:
-            # La tabla DiaLibre solo permite 1 dÃ­a libre activo por funcionario.
-            # Por eso tomamos el PRIMER dÃ­a vacÃ­o como dÃ­a libre principal.
+            # La tabla DiaLibre solo permite 1 día libre activo por funcionario.
+            # Por eso tomamos el PRIMER día vacío como día libre principal.
             dias_libres_detectados = []
 
             for campo, numero_dia in mapa_dias.items():
@@ -6634,7 +6738,7 @@ def dias_libres_lista(request):
                     dia_libre_obj.dia_semana = dia_libre_principal
                     dia_libre_obj.fecha_inicio = timezone.localdate()
                     dia_libre_obj.activo = True
-                    dia_libre_obj.observacion = "Generado automÃ¡ticamente desde planilla semanal."
+                    dia_libre_obj.observacion = "Generado automáticamente desde planilla semanal."
                     dia_libre_obj.save()
 
                     dias_libres_activos.exclude(pk=dia_libre_obj.pk).delete()
@@ -6647,16 +6751,16 @@ def dias_libres_lista(request):
                         dia_semana=dia_libre_principal,
                         fecha_inicio=timezone.localdate(),
                         activo=True,
-                        observacion="Generado automÃ¡ticamente desde planilla semanal."
+                        observacion="Generado automáticamente desde planilla semanal."
                     )
             else:
                 dias_libres_activos.delete()
 
         registrar_historial(
             request,
-            "DÃ­as Libres",
+            "Días Libres",
             "Planilla semanal",
-            f"Se actualizÃ³ la planilla semanal de turnos. Sector: {sector or 'Todos'}."
+            f"Se actualizó la planilla semanal de turnos. Sector: {sector or 'Todos'}."
         )
 
         messages.success(request, "Planilla semanal actualizada correctamente.")
@@ -6772,7 +6876,7 @@ def dia_libre_nuevo(request):
 
             if not admin_master:
                 if dia_libre.empresa != empresa_usuario:
-                    messages.error(request, "No puedes crear dÃ­as libres para otra empresa.")
+                    messages.error(request, "No puedes crear días libres para otra empresa.")
                     return redirect("dias_libres_lista")
 
             dia_libre.save()
@@ -6780,11 +6884,11 @@ def dia_libre_nuevo(request):
 
             registrar_historial(
                 request,
-                "DÃ­as Libres",
+                "Días Libres",
                 "Crear",
-                f"Se asignÃ³ dÃ­a libre {dia_libre.get_dia_semana_display()} a {dia_libre.funcionario.nombre_completo}."
+                f"Se asignó día libre {dia_libre.get_dia_semana_display()} a {dia_libre.funcionario.nombre_completo}."
             )
-            messages.success(request, "DÃ­a libre asignado correctamente.")
+            messages.success(request, "Día libre asignado correctamente.")
             return redirect("dias_libres_lista")
     else:
         form = DiaLibreForm()
@@ -6803,8 +6907,8 @@ def dia_libre_nuevo(request):
 
     return render(request, "core/dia_libre_form.html", {
         "form": form,
-        "titulo_form": "Nuevo dÃ­a libre",
-        "boton_texto": "Guardar dÃ­a libre",
+        "titulo_form": "Nuevo día libre",
+        "boton_texto": "Guardar día libre",
     })
 
 
@@ -6821,7 +6925,7 @@ def dia_libre_editar(request, pk):
 
     if not admin_master:
         if dia_libre.empresa != empresa_usuario:
-            messages.error(request, "No puedes editar dÃ­as libres de otra empresa.")
+            messages.error(request, "No puedes editar días libres de otra empresa.")
             return redirect("dias_libres_lista")
 
     if request.method == "POST":
@@ -6843,7 +6947,7 @@ def dia_libre_editar(request, pk):
 
             if not admin_master:
                 if dia_libre_editado.empresa != empresa_usuario:
-                    messages.error(request, "No puedes mover dÃ­as libres a otra empresa.")
+                    messages.error(request, "No puedes mover días libres a otra empresa.")
                     return redirect("dias_libres_lista")
 
             dia_libre_editado.save()
@@ -6851,11 +6955,11 @@ def dia_libre_editar(request, pk):
 
             registrar_historial(
                 request,
-                "DÃ­as Libres",
+                "Días Libres",
                 "Editar",
-                f"Se editÃ³ dÃ­a libre de {dia_libre_editado.funcionario.nombre_completo}."
+                f"Se editó día libre de {dia_libre_editado.funcionario.nombre_completo}."
             )
-            messages.success(request, "DÃ­a libre actualizado correctamente.")
+            messages.success(request, "Día libre actualizado correctamente.")
             return redirect("dias_libres_lista")
     else:
         form = DiaLibreForm(instance=dia_libre)
@@ -6873,8 +6977,8 @@ def dia_libre_editar(request, pk):
 
     return render(request, "core/dia_libre_form.html", {
         "form": form,
-        "titulo_form": "Editar dÃ­a libre",
-        "boton_texto": "Actualizar dÃ­a libre",
+        "titulo_form": "Editar día libre",
+        "boton_texto": "Actualizar día libre",
     })
 
 
@@ -6899,12 +7003,12 @@ def dia_libre_toggle_activo(request, pk):
 
     registrar_historial(
         request,
-        "DÃ­as Libres",
+        "Días Libres",
         "Estado",
-        f"Se cambiÃ³ estado de dÃ­a libre de {dia_libre.funcionario.nombre_completo} a {'Activo' if dia_libre.activo else 'Inactivo'}."
+        f"Se cambió estado de día libre de {dia_libre.funcionario.nombre_completo} a {'Activo' if dia_libre.activo else 'Inactivo'}."
     )
 
-    messages.success(request, "Estado del dÃ­a libre actualizado correctamente.")
+    messages.success(request, "Estado del día libre actualizado correctamente.")
     return redirect("dias_libres_lista")
 
 @login_required
@@ -6935,15 +7039,15 @@ def asistencia_eliminar(request, pk):
         motivo = request.POST.get("motivo", "").strip()
 
         if not motivo:
-            messages.error(request, "Debes indicar el motivo de eliminaciÃ³n.")
+            messages.error(request, "Debes indicar el motivo de eliminación.")
             return redirect("asistencia_marcar")
 
         registrar_historial(
             request,
             "Asistencia",
             "Eliminar",
-            f"Se eliminÃ³ asistencia de {funcionario.nombre_completo} "
-            f"del dÃ­a {fecha.strftime('%d/%m/%Y')}. Motivo: {motivo}"
+            f"Se eliminó asistencia de {funcionario.nombre_completo} "
+            f"del día {fecha.strftime('%d/%m/%Y')}. Motivo: {motivo}"
         )
 
         asistencia.delete()
@@ -7088,7 +7192,7 @@ def reporte_mensual_pdf(request):
 
     data = [[
         "Funcionario", "CI", "Sucursal", "Cargo", "Asistencias", "Atrasos",
-        "DÃ­as libres", "Ausencias", "Permisos", "Vacaciones", "ICL"
+        "Días libres", "Ausencias", "Permisos", "Vacaciones", "ICL"
     ]]
 
     dias_mes = monthrange(anio, mes)[1]
@@ -7129,6 +7233,7 @@ def reporte_mensual_pdf(request):
 
         icl = 100 - (atrasos_count * 2) - (ausencias_no_justificadas * 5)
         icl = max(0, min(100, icl))
+        icl_activo = icl_activo_para_funcionario(funcionario)
 
         data.append([
             funcionario.nombre_completo,
@@ -7141,7 +7246,7 @@ def reporte_mensual_pdf(request):
             ausencias,
             permisos_aprobados,
             vacaciones_aprobadas,
-            f"{icl}%",
+            f"{icl}%" if icl_activo else f"{icl}% (sin impacto)",
         ])
 
     tabla = Table(data, colWidths=[45*mm, 21*mm, 34*mm, 32*mm, 22*mm, 20*mm, 22*mm, 22*mm, 22*mm, 24*mm, 18*mm])

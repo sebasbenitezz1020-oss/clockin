@@ -207,7 +207,11 @@
                                 <div class="payroll-money-stack">
                                     <strong>{{ nomina.salario_bruto|guaranies }}</strong>
                                     <span>Base: {{ nomina.salario_base|guaranies }}</span>
-                                    <span>Bono ICL: {{ nomina.bono_icl|guaranies }}</span>
+                                    {% if nomina.funcionario.sucursal_rel.empresa.icl_activo %}
+                                        <span>Bono ICL: {{ nomina.bono_icl|guaranies }}</span>
+                                    {% else %}
+                                        <span>Bono íntegro: {{ nomina.bono_icl|guaranies }}</span>
+                                    {% endif %}
                                     <span>Bono config.: {{ nomina.bono_base|guaranies }}</span>
                                 </div>
                             </td>
