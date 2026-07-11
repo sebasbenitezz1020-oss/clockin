@@ -63,6 +63,17 @@ body {
     font-weight: 700;
 }
 
+.sidebar .menu {
+    gap: 10px !important;
+}
+
+.sidebar .menu a,
+.sidebar .logout-btn {
+    min-height: 48px !important;
+    padding: 11px 12px !important;
+    border-radius: 14px !important;
+}
+
 .menu a:hover,
 .logout-btn:hover {
     background: #202632;
@@ -1039,14 +1050,42 @@ a {
     color: #bfdbfe;
 }
 
-.sidebar-icon svg {
+.sidebar .menu a .sidebar-icon,
+.sidebar .logout-btn .sidebar-icon {
+    width: 28px !important;
+    min-width: 28px !important;
+    max-width: 28px !important;
+    height: 28px !important;
+    min-height: 28px !important;
+    max-height: 28px !important;
+    flex: 0 0 28px !important;
+    overflow: hidden !important;
+}
+
+.sidebar-icon svg,
+.sidebar .menu a .sidebar-icon svg,
+.sidebar .logout-btn .sidebar-icon svg {
     width: 17px;
+    min-width: 17px !important;
+    max-width: 17px !important;
     height: 17px;
+    min-height: 17px !important;
+    max-height: 17px !important;
+    display: block !important;
     stroke: currentColor;
     stroke-width: 2;
     stroke-linecap: round;
     stroke-linejoin: round;
     fill: none;
+    overflow: visible;
+}
+
+.sidebar .menu a,
+.sidebar .logout-btn {
+    min-height: 48px;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 12px !important;
 }
 
 .sidebar-label {
@@ -3067,4 +3106,48 @@ button.is-processing::after,
     width: 100% !important;
     height: 100% !important;
     object-fit: contain !important;
+}
+
+/* Sidebar hard guard: prevents oversized SVG/use icons in production caches. */
+.layout .sidebar .menu a,
+.layout .sidebar .logout-btn {
+    min-height: 48px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 12px !important;
+}
+
+.layout .sidebar .sidebar-icon {
+    width: 28px !important;
+    min-width: 28px !important;
+    max-width: 28px !important;
+    height: 28px !important;
+    min-height: 28px !important;
+    max-height: 28px !important;
+    flex: 0 0 28px !important;
+    overflow: hidden !important;
+}
+
+.layout .sidebar .sidebar-icon svg,
+.layout .sidebar .sidebar-icon svg use {
+    width: 17px !important;
+    min-width: 17px !important;
+    max-width: 17px !important;
+    height: 17px !important;
+    min-height: 17px !important;
+    max-height: 17px !important;
+}
+
+.layout .sidebar .sidebar-icon svg {
+    display: block !important;
+    stroke: currentColor !important;
+    fill: none !important;
+}
+
+.layout .sidebar .sidebar-label {
+    min-width: 0 !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+    white-space: nowrap !important;
 }

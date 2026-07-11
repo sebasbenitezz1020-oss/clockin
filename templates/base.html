@@ -155,8 +155,8 @@
         }
 
         .brand-logo-sidebar.clockin-logo-icon {
-            width: 132px;
-            height: 132px;
+            width: 104px;
+            height: 104px;
             border-radius: 0;
             padding: 0;
             background: transparent;
@@ -194,6 +194,48 @@
         .menu a {
             transition: .18s ease;
             border: 1px solid transparent;
+        }
+
+        .sidebar .menu a,
+        .sidebar .logout-btn {
+            min-height: 48px;
+            align-items: center !important;
+            justify-content: flex-start !important;
+            gap: 12px !important;
+        }
+
+        .sidebar .sidebar-icon,
+        .sidebar .menu a .sidebar-icon,
+        .sidebar .logout-btn .sidebar-icon {
+            width: 28px !important;
+            min-width: 28px !important;
+            max-width: 28px !important;
+            height: 28px !important;
+            min-height: 28px !important;
+            max-height: 28px !important;
+            flex: 0 0 28px !important;
+            overflow: hidden !important;
+        }
+
+        .sidebar .sidebar-icon svg,
+        .sidebar .menu a .sidebar-icon svg,
+        .sidebar .logout-btn .sidebar-icon svg {
+            display: block !important;
+            width: 17px !important;
+            min-width: 17px !important;
+            max-width: 17px !important;
+            height: 17px !important;
+            min-height: 17px !important;
+            max-height: 17px !important;
+            stroke: currentColor !important;
+            fill: none !important;
+        }
+
+        .sidebar .sidebar-label {
+            min-width: 0 !important;
+            overflow: hidden !important;
+            text-overflow: ellipsis !important;
+            white-space: nowrap !important;
         }
 
         .menu a:hover {
