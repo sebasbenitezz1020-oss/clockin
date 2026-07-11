@@ -1,0 +1,51 @@
+{% extends "portal_funcionario/base_portal.html" %}
+{% load number_filters %}
+
+{% block title %}Mis deudas | ClockIn{% endblock %}
+
+{% block content %}
+<section class="portal-hero">
+    <div>
+        <h1>Mis deudas</h1>
+        <p>Consulta de deudas y descuentos registrados. Esta pantalla es solo lectura.</p>
+    </div>
+</section>
+
+<section class="grid stats">
+    <article class="card stat">
+        <span>Saldo pendiente total</span>
+        <strong>{{ saldo_total|guaranies }}</strong>
+    </article>
+</section>
+
+<section class="card" style="margin-top:14px;">
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Concepto</th>
+                    <th>Importe inicial</th>
+                    <th>Cuota</th>
+                    <th>Saldo</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for deuda in deudas %}
+                <tr>
+                    <td>{{ deuda.fecha|date:"d/m/Y" }}</td>
+                    <td>{{ deuda.get_tipo_display }}{% if deuda.descripcion %} · {{ deuda.descripcion }}{% endif %}</td>
+                    <td>{{ deuda.monto_total|guaranies }}</td>
+                    <td>{{ deuda.cuota_mensual|guaranies }}</td>
+                    <td>{{ deuda.saldo_pendiente|guaranies }}</td>
+                    <td>{% if deuda.activa %}<span class="badge warn">Activa</span>{% else %}<span class="badge ok">Cerrada</span>{% endif %}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="6">No tienes deudas registradas.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

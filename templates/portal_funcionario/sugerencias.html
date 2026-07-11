@@ -1,0 +1,43 @@
+{% extends "portal_funcionario/base_portal.html" %}
+
+{% block title %}Buzón de sugerencias | ClockIn{% endblock %}
+
+{% block content %}
+<section class="portal-hero">
+    <div>
+        <h1>Buzón de sugerencias</h1>
+        <p>Envía sugerencias internas y revisa las respuestas del equipo administrativo.</p>
+    </div>
+    <div class="portal-actions">
+        {% if modo_admin_portal %}
+            <a class="portal-link" href="{% url 'portal_admin_sugerencia_crear' portal_funcionario.id %}">Nueva sugerencia</a>
+        {% else %}
+            <a class="portal-link" href="{% url 'portal_sugerencia_crear' %}">Nueva sugerencia</a>
+        {% endif %}
+    </div>
+</section>
+
+<section class="card">
+    {% for sugerencia in sugerencias %}
+        <div class="line">
+            <span>
+                {{ sugerencia.creado_en|date:"d/m/Y" }} · {{ sugerencia.get_categoria_display }}
+                <span class="badge">{{ sugerencia.get_estado_display }}</span>
+            </span>
+            <strong>{{ sugerencia.asunto }}</strong>
+        </div>
+        <p class="muted">{{ sugerencia.mensaje|linebreaksbr }}</p>
+        {% if sugerencia.adjunto %}
+            <p><a class="portal-link" href="{{ sugerencia.adjunto.url }}" target="_blank">Abrir adjunto</a></p>
+        {% endif %}
+        {% if sugerencia.respuesta_operador %}
+            <div class="message">
+                <strong>Respuesta</strong><br>
+                {{ sugerencia.respuesta_operador|linebreaksbr }}
+            </div>
+        {% endif %}
+    {% empty %}
+        <div class="empty">Aún no hay sugerencias registradas.</div>
+    {% endfor %}
+</section>
+{% endblock %}

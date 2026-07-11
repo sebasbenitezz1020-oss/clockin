@@ -1,0 +1,104 @@
+{% extends "portal_funcionario/base_portal.html" %}
+
+{% block title %}Bandeja del portal | ClockIn{% endblock %}
+
+{% block content %}
+<section class="portal-hero">
+    <div>
+        <h1>Bandeja del portal</h1>
+        <p>Gestión de solicitudes documentales y correcciones de marcación.</p>
+    </div>
+</section>
+
+<section class="grid two">
+    <article class="card">
+        <h2>Permisos pendientes</h2>
+        {% for permiso in permisos %}
+            <div class="line">
+                <span>
+                    {{ permiso.funcionario.nombre_completo }} · {{ permiso.fecha_desde|date:"d/m/Y" }} - {{ permiso.fecha_hasta|date:"d/m/Y" }}<br>
+                    <small class="muted">{{ permiso.get_tipo_display }}</small>
+                </span>
+                <strong>
+                    <span class="badge">{{ permiso.get_estado_display }}</span>
+                    <a class="portal-link" href="{% url 'portal_permiso_gestionar' permiso.id %}">Gestionar</a>
+                </strong>
+            </div>
+        {% empty %}
+            <div class="empty">No hay permisos pendientes.</div>
+        {% endfor %}
+    </article>
+
+    <article class="card">
+        <h2>Vacaciones pendientes</h2>
+        {% for vacacion in vacaciones %}
+            <div class="line">
+                <span>
+                    {{ vacacion.funcionario.nombre_completo }} · {{ vacacion.fecha_desde|date:"d/m/Y" }} - {{ vacacion.fecha_hasta|date:"d/m/Y" }}<br>
+                    <small class="muted">{{ vacacion.dias_solicitados }} día(s)</small>
+                </span>
+                <strong>
+                    <span class="badge">{{ vacacion.get_estado_display }}</span>
+                    <a class="portal-link" href="{% url 'portal_vacacion_gestionar' vacacion.id %}">Gestionar</a>
+                </strong>
+            </div>
+        {% empty %}
+            <div class="empty">No hay vacaciones pendientes.</div>
+        {% endfor %}
+    </article>
+
+    <article class="card">
+        <h2>Solicitudes documentales</h2>
+        {% for solicitud in solicitudes_documentos %}
+            <div class="line">
+                <span>
+                    {{ solicitud.funcionario.nombre_completo }} · {{ solicitud.get_tipo_display }}<br>
+                    <small class="muted">{{ solicitud.creado_en|date:"d/m/Y H:i" }}</small>
+                </span>
+                <strong>
+                    <span class="badge">{{ solicitud.get_estado_display }}</span>
+                    <a class="portal-link" href="{% url 'portal_solicitud_documento_gestionar' solicitud.id %}">Gestionar</a>
+                </strong>
+            </div>
+        {% empty %}
+            <div class="empty">No hay solicitudes documentales.</div>
+        {% endfor %}
+    </article>
+
+    <article class="card">
+        <h2>Correcciones de marcación</h2>
+        {% for solicitud in solicitudes_marcacion %}
+            <div class="line">
+                <span>
+                    {{ solicitud.funcionario.nombre_completo }} · {{ solicitud.fecha|date:"d/m/Y" }} · {{ solicitud.get_tipo_display }}<br>
+                    <small class="muted">{{ solicitud.creado_en|date:"d/m/Y H:i" }}</small>
+                </span>
+                <strong>
+                    <span class="badge">{{ solicitud.get_estado_display }}</span>
+                    <a class="portal-link" href="{% url 'portal_solicitud_marcacion_gestionar' solicitud.id %}">Gestionar</a>
+                </strong>
+            </div>
+        {% empty %}
+            <div class="empty">No hay correcciones pendientes.</div>
+        {% endfor %}
+    </article>
+
+    <article class="card">
+        <h2>Sugerencias</h2>
+        {% for sugerencia in sugerencias %}
+            <div class="line">
+                <span>
+                    {{ sugerencia.funcionario.nombre_completo }} · {{ sugerencia.get_categoria_display }}<br>
+                    <small class="muted">{{ sugerencia.creado_en|date:"d/m/Y H:i" }}</small>
+                </span>
+                <strong>
+                    <span class="badge">{{ sugerencia.get_estado_display }}</span>
+                    <a class="portal-link" href="{% url 'portal_sugerencia_gestionar' sugerencia.id %}">Gestionar</a>
+                </strong>
+            </div>
+        {% empty %}
+            <div class="empty">No hay sugerencias registradas.</div>
+        {% endfor %}
+    </article>
+</section>
+{% endblock %}

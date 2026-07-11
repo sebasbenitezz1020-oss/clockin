@@ -25,6 +25,19 @@ from django.utils import timezone
 from .models import Asistencia
 
 
+def _label_funcionario_buscable(funcionario):
+    partes = [funcionario.nombre_completo]
+    if funcionario.cedula:
+        partes.append(f"CI {funcionario.cedula}")
+    if funcionario.cargo:
+        partes.append(funcionario.cargo)
+    if funcionario.sector:
+        partes.append(funcionario.sector)
+    if funcionario.sucursal_rel:
+        partes.append(funcionario.sucursal_rel.nombre)
+    return " · ".join(partes)
+
+
 class MarcacionManualForm(forms.Form):
     funcionario = forms.ModelChoiceField(
         queryset=Funcionario.objects.filter(activo=True),
@@ -762,7 +775,10 @@ class VacacionForm(forms.ModelForm):
             "observacion",
         ]
         widgets = {
-            "funcionario": forms.Select(attrs={"class": "form-control"}),
+            "funcionario": forms.Select(attrs={
+                "class": "form-control js-live-employee-select",
+                "data-live-placeholder": "Buscar por nombre, cédula, cargo o sucursal",
+            }),
             "dias_solicitados": forms.NumberInput(attrs={"class": "form-control", "min": "1"}),
             "estado": forms.Select(attrs={"class": "form-control"}),
             "observacion": forms.Textarea(attrs={"class": "form-control", "rows": 4}),
@@ -770,7 +786,8 @@ class VacacionForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["funcionario"].queryset = Funcionario.objects.filter(activo=True).order_by("apellido", "nombre")
+        self.fields["funcionario"].queryset = Funcionario.objects.filter(activo=True).select_related("sucursal_rel").order_by("apellido", "nombre")
+        self.fields["funcionario"].label_from_instance = _label_funcionario_buscable
 
     def clean(self):
         cleaned_data = super().clean()
@@ -835,7 +852,10 @@ class LiquidacionForm(forms.ModelForm):
             "motivo_observacion",
         ]
         widgets = {
-            "funcionario": forms.Select(attrs={"class": "form-control"}),
+            "funcionario": forms.Select(attrs={
+                "class": "form-control js-live-employee-select",
+                "data-live-placeholder": "Buscar por nombre, cédula, cargo o sucursal",
+            }),
             "tipo_salida": forms.Select(attrs={"class": "form-control"}),
             "dias_trabajados_pendientes": forms.NumberInput(attrs={
                 "class": "form-control",
@@ -877,8 +897,9 @@ class LiquidacionForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["funcionario"].queryset = Funcionario.objects.filter(activo=True).order_by("apellido", "nombre")
+        self.fields["funcionario"].queryset = Funcionario.objects.filter(activo=True).select_related("sucursal_rel").order_by("apellido", "nombre")
         self.fields["funcionario"].empty_label = "Seleccionar funcionario"
+        self.fields["funcionario"].label_from_instance = _label_funcionario_buscable
         self.fields["tipo_salida"].choices = [("", "Seleccionar tipo de salida")] + list(Liquidacion.TiposSalida.choices)
 
     def clean(self):
@@ -987,7 +1008,10 @@ class ComunicacionLaboralForm(forms.ModelForm):
         ]
 
         widgets = {
-            "funcionario": forms.Select(attrs={"class": "form-control"}),
+            "funcionario": forms.Select(attrs={
+                "class": "form-control js-live-employee-select",
+                "data-live-placeholder": "Buscar por nombre, cédula, cargo o sucursal",
+            }),
             "tipo": forms.Select(attrs={"class": "form-control"}),
             "titulo": forms.TextInput(attrs={
                 "class": "form-control",
@@ -1022,9 +1046,10 @@ class ComunicacionLaboralForm(forms.ModelForm):
 
         self.fields["funcionario"].queryset = Funcionario.objects.filter(
             activo=True
-        ).order_by("apellido", "nombre")
+        ).select_related("sucursal_rel").order_by("apellido", "nombre")
 
         self.fields["funcionario"].empty_label = "Seleccionar funcionario"
+        self.fields["funcionario"].label_from_instance = _label_funcionario_buscable
         self.fields["tipo"].choices = [("", "Seleccionar tipo de comunicación")] + list(ComunicacionLaboral.Tipos.choices)
 
 class PlanillaBancariaForm(forms.ModelForm):

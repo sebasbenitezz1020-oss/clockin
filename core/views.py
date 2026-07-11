@@ -652,6 +652,9 @@ def generar_nomina_funcionario(funcionario, mes, anio):
 
 @login_required
 def dashboard(request):
+    if getattr(request.user, "rol", "") == "funcionario":
+        return redirect("portal_dashboard")
+
     if es_admin_master(request.user) and not obtener_empresa_activa(request):
         return redirect("panel_global_empresas")
 
@@ -670,6 +673,17 @@ def dashboard(request):
     perm_banco_horas = tiene_permiso(request.user, "banco_horas", "puede_ver")
 
     empresa_usuario = obtener_empresa_activa(request)
+    sucursales_dashboard = Sucursal.objects.none()
+    sucursal_seleccionada = None
+    sucursal_id = request.GET.get("sucursal", "").strip()
+
+    if empresa_usuario:
+        sucursales_dashboard = Sucursal.objects.filter(
+            empresa=empresa_usuario,
+            activo=True,
+        ).order_by("nombre")
+        if sucursal_id:
+            sucursal_seleccionada = sucursales_dashboard.filter(pk=sucursal_id).first()
 
     funcionarios_qs = Funcionario.objects.filter(activo=True)
     asistencias_hoy_qs = Asistencia.objects.select_related(
@@ -685,6 +699,10 @@ def dashboard(request):
         funcionarios_qs = funcionarios_qs.filter(sucursal_rel__empresa=empresa_usuario)
         asistencias_hoy_qs = asistencias_hoy_qs.filter(funcionario__sucursal_rel__empresa=empresa_usuario)
         deudas_qs = deudas_qs.filter(funcionario__sucursal_rel__empresa=empresa_usuario)
+        if sucursal_seleccionada:
+            funcionarios_qs = funcionarios_qs.filter(sucursal_rel=sucursal_seleccionada)
+            asistencias_hoy_qs = asistencias_hoy_qs.filter(funcionario__sucursal_rel=sucursal_seleccionada)
+            deudas_qs = deudas_qs.filter(funcionario__sucursal_rel=sucursal_seleccionada)
     else:
         funcionarios_qs = funcionarios_qs.none()
         asistencias_hoy_qs = asistencias_hoy_qs.none()
@@ -707,6 +725,12 @@ def dashboard(request):
     aporte_patronal_ips_estimado = Decimal("0.00")
     salario_minimo_ips = Decimal("2899048.00")
     porcentaje_patronal_ips = Decimal("0.255")
+    tasa_asistencia = 0
+    tasa_puntualidad = 0
+    tasa_ips = 0
+    deuda_promedio = Decimal("0.00")
+    estados_jornada_dashboard = []
+    sucursales_metricas = []
 
     if perm_funcionarios:
         total_funcionarios = funcionarios_qs.count()
@@ -751,10 +775,46 @@ def dashboard(request):
             total=Sum("saldo_pendiente")
         )["total"] or Decimal("0.00")
 
+    if total_funcionarios:
+        tasa_asistencia = round((presentes_hoy / total_funcionarios) * 100)
+        puntuales_hoy = max(presentes_hoy - llegadas_tarde_hoy, 0)
+        tasa_puntualidad = round((puntuales_hoy / total_funcionarios) * 100)
+        tasa_ips = round((funcionarios_con_ips / total_funcionarios) * 100) if perm_nomina else 0
+        deuda_promedio = (total_deudas_funcionarios / Decimal(total_funcionarios)).quantize(Decimal("0.01")) if perm_deudas else Decimal("0.00")
+
+    if perm_asistencia:
+        estados_jornada_dashboard = [
+            {"label": "Trabajando", "value": trabajando_hoy, "percent": round((trabajando_hoy / total_funcionarios) * 100) if total_funcionarios else 0, "class": "ok"},
+            {"label": "En almuerzo", "value": en_almuerzo_hoy, "percent": round((en_almuerzo_hoy / total_funcionarios) * 100) if total_funcionarios else 0, "class": "warn"},
+            {"label": "Finalizados", "value": finalizados_hoy, "percent": round((finalizados_hoy / total_funcionarios) * 100) if total_funcionarios else 0, "class": "info"},
+            {"label": "Pendientes", "value": pendientes_hoy, "percent": round((pendientes_hoy / total_funcionarios) * 100) if total_funcionarios else 0, "class": "danger"},
+        ]
+
+    if empresa_usuario and perm_funcionarios:
+        sucursales_para_metricas = [sucursal_seleccionada] if sucursal_seleccionada else list(sucursales_dashboard)
+        for sucursal in sucursales_para_metricas:
+            if not sucursal:
+                continue
+            total_sucursal = funcionarios_qs.filter(sucursal_rel=sucursal).count()
+            presentes_sucursal = asistencias_hoy_qs.filter(funcionario__sucursal_rel=sucursal, hora_entrada__isnull=False).count() if perm_asistencia else 0
+            tarde_sucursal = asistencias_hoy_qs.filter(funcionario__sucursal_rel=sucursal, llego_tarde=True).count() if perm_asistencia else 0
+            pendientes_sucursal = max(total_sucursal - presentes_sucursal, 0)
+            sucursales_metricas.append({
+                "nombre": sucursal.nombre,
+                "total": total_sucursal,
+                "presentes": presentes_sucursal,
+                "tarde": tarde_sucursal,
+                "pendientes": pendientes_sucursal,
+                "percent": round((presentes_sucursal / total_sucursal) * 100) if total_sucursal else 0,
+            })
+
     context = {
         "titulo": "Dashboard ClockIn",
         "hoy": hoy,
         "empresa_usuario": empresa_usuario,
+        "sucursales_dashboard": sucursales_dashboard,
+        "sucursal_seleccionada": sucursal_seleccionada,
+        "sucursal_seleccionada_id": str(sucursal_seleccionada.id) if sucursal_seleccionada else "",
 
         "total_funcionarios": total_funcionarios,
         "presentes_hoy": presentes_hoy,
@@ -771,6 +831,12 @@ def dashboard(request):
         "funcionarios_con_ips": funcionarios_con_ips,
         "aporte_patronal_ips_estimado": aporte_patronal_ips_estimado,
         "total_deudas_funcionarios": total_deudas_funcionarios,
+        "tasa_asistencia": tasa_asistencia,
+        "tasa_puntualidad": tasa_puntualidad,
+        "tasa_ips": tasa_ips,
+        "deuda_promedio": deuda_promedio,
+        "estados_jornada_dashboard": estados_jornada_dashboard,
+        "sucursales_metricas": sucursales_metricas,
 
         "perm_funcionarios": perm_funcionarios,
         "perm_asistencia": perm_asistencia,

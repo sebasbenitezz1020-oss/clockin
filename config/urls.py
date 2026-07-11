@@ -8,6 +8,7 @@ urlpatterns = [
     path("", include("core.urls")),
     path("accounts/", include("django.contrib.auth.urls")),
     path("biometrico/", include("biometrico.urls")),
+    path("portal/", include("portal_funcionario.urls")),
 ]
 
 if settings.DEBUG:

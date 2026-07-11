@@ -208,6 +208,42 @@
             color: #fff !important;
             box-shadow: 0 10px 24px var(--brand-shadow);
         }
+
+        .module-back-wrap {
+            display: flex;
+            justify-content: flex-start;
+            margin: 0 0 14px;
+        }
+
+        .module-back-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 9px;
+            border: 1px solid rgba(255,255,255,.08);
+            border-radius: 999px;
+            background: rgba(15, 23, 34, .82);
+            color: #dbeafe;
+            padding: 10px 14px;
+            font-size: 13px;
+            font-weight: 900;
+            cursor: pointer;
+            box-shadow: 0 10px 24px rgba(0,0,0,.18);
+            transition: transform .16s ease, border-color .16s ease, background .16s ease;
+        }
+
+        .module-back-btn:hover {
+            transform: translateY(-1px);
+            border-color: var(--brand-border);
+            background: var(--brand-soft);
+        }
+
+        .module-back-btn svg {
+            width: 17px;
+            height: 17px;
+            stroke: currentColor;
+            stroke-width: 2.4;
+            fill: none;
+        }
         .menu a{
             position:relative;
             overflow:hidden;
@@ -452,6 +488,16 @@
                 color:#fff;
                 font-size:20px;
                 box-shadow:0 10px 24px var(--brand-shadow);
+            }
+
+            .module-back-wrap {
+                margin-bottom: 12px;
+            }
+
+            .module-back-btn {
+                min-height: 42px;
+                padding: 10px 13px;
+                font-size: 13px;
             }
 
             .sidebar{
@@ -1084,6 +1130,12 @@
             <a href="{% url 'dashboard' %}"><span class="sidebar-icon"><svg><use href="#ci-dashboard"></use></svg></span><span class="sidebar-label">Dashboard</span></a>
             {% endif %}
 
+            {% if puede_ver_portal_funcionario %}
+            <a href="{% url 'portal_dashboard' %}"><span class="sidebar-icon"><svg><use href="#ci-users"></use></svg></span><span class="sidebar-label">Portal del Funcionario</span></a>
+            {% elif puede_gestionar_portal_funcionario %}
+            <a href="{% url 'portal_bandeja' %}"><span class="sidebar-icon"><svg><use href="#ci-users"></use></svg></span><span class="sidebar-label">Portal del Funcionario</span></a>
+            {% endif %}
+
             {% if puede_ver_empresas %}
             <a href="{% url 'empresas_lista' %}"><span class="sidebar-icon"><svg><use href="#ci-building"></use></svg></span><span class="sidebar-label">Empresas</span></a>
             {% endif %}
@@ -1223,6 +1275,17 @@
         </header>
 
         <section class="page page-transition">
+            {% if request.user.is_authenticated %}
+                <div class="module-back-wrap">
+                    <button type="button" class="module-back-btn" data-clockin-back>
+                        <svg viewBox="0 0 24 24" aria-hidden="true">
+                            <path d="M15 18l-6-6 6-6"></path>
+                        </svg>
+                        <span>Retroceder</span>
+                    </button>
+                </div>
+            {% endif %}
+
             {% if mostrar_alerta_suscripcion and suscripcion_sistema %}
                 <div class="alert-box {% if suscripcion_sistema.bloqueada %}error-box-strong{% else %}warning-box{% endif %}" style="margin-bottom:16px;">
                     Suscripci&oacute;n: <strong>{{ suscripcion_sistema.estado_visible }}</strong>.
@@ -1331,6 +1394,28 @@ document.addEventListener("DOMContentLoaded", function () {
 
     });
 
+});
+</script>
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    document.querySelectorAll("[data-clockin-back]").forEach(function (button) {
+        button.addEventListener("click", function () {
+            if (document.referrer) {
+                try {
+                    const previous = new URL(document.referrer);
+                    if (previous.origin === window.location.origin) {
+                        window.location.href = previous.href;
+                        return;
+                    }
+                } catch (error) {}
+            }
+            if (window.history.length > 1) {
+                window.history.back();
+                return;
+            }
+            window.location.href = "{% url 'dashboard' %}";
+        });
+    });
 });
 </script>
 <script>

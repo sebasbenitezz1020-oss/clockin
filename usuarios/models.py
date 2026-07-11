@@ -24,6 +24,15 @@ class Usuario(AbstractUser):
         blank=True,
         related_name="usuarios"
     )
+    funcionario = models.OneToOneField(
+        "core.Funcionario",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="usuario_portal"
+    )
+    portal_activo = models.BooleanField(default=True)
+    requiere_cambio_password = models.BooleanField(default=False)
 
     def save(self, *args, **kwargs):
         self.is_active = self.activo
@@ -40,6 +49,7 @@ class PermisoUsuario(models.Model):
         EMPRESAS = "empresas", "Empresas"
         SUCURSALES = "sucursales", "Sucursales"
         FUNCIONARIOS = "funcionarios", "Funcionarios"
+        PORTAL_FUNCIONARIO = "portal_funcionario", "Portal del Funcionario"
         USUARIOS = "usuarios", "Usuarios y Permisos"
 
         TURNOS = "turnos", "Turnos"

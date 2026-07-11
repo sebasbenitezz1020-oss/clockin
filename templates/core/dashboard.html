@@ -104,6 +104,67 @@
         font-weight: 950;
     }
 
+    .dash-filter-box {
+        min-width: 280px;
+        border-radius: 22px;
+        padding: 16px;
+        background: rgba(255,255,255,.055);
+        border: 1px solid rgba(255,255,255,.08);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,.04);
+    }
+
+    .dash-filter-box label {
+        display: block;
+        color: #94a3b8;
+        font-size: 12px;
+        font-weight: 850;
+        margin-bottom: 8px;
+    }
+
+    .dash-filter-row {
+        display: flex;
+        gap: 8px;
+        align-items: center;
+    }
+
+    .dash-filter-box select {
+        width: 100%;
+        border: 1px solid rgba(255,255,255,.12);
+        border-radius: 14px;
+        background: rgba(8,13,22,.92);
+        color: #fff;
+        padding: 11px 12px;
+        font-weight: 850;
+        outline: none;
+    }
+
+    .dash-filter-box select:focus {
+        border-color: var(--brand-primary);
+        box-shadow: 0 0 0 3px var(--brand-soft);
+    }
+
+    .dash-filter-action {
+        border: 1px solid var(--brand-border);
+        border-radius: 14px;
+        background: var(--brand-soft);
+        color: var(--brand-text-soft);
+        padding: 11px 13px;
+        font-weight: 950;
+        cursor: pointer;
+    }
+
+    .dash-filter-hint {
+        margin-top: 9px;
+        color: #cbd5e1;
+        font-size: 12px;
+        font-weight: 800;
+    }
+
+    .dash-hero-side {
+        display: grid;
+        gap: 12px;
+    }
+
     .dash-main-grid {
         display: grid;
         grid-template-columns: 1.25fr .75fr;
@@ -203,6 +264,135 @@
         grid-template-columns: repeat(3, 1fr);
         gap: 14px;
         margin-bottom: 18px;
+    }
+
+    .dash-insights-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+        margin-bottom: 18px;
+    }
+
+    .dash-kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 12px;
+    }
+
+    .dash-kpi {
+        border-radius: 18px;
+        padding: 14px;
+        background: rgba(255,255,255,.035);
+        border: 1px solid rgba(255,255,255,.06);
+    }
+
+    .dash-kpi span {
+        display: block;
+        color: #94a3b8;
+        font-size: 12px;
+        font-weight: 850;
+        margin-bottom: 8px;
+    }
+
+    .dash-kpi strong {
+        display: block;
+        color: #fff;
+        font-size: 24px;
+        font-weight: 950;
+        line-height: 1;
+    }
+
+    .dash-kpi small {
+        display: block;
+        color: #cbd5e1;
+        font-size: 11px;
+        margin-top: 8px;
+    }
+
+    .dash-chart-list {
+        display: grid;
+        gap: 13px;
+    }
+
+    .dash-chart-row {
+        display: grid;
+        grid-template-columns: 120px 1fr 46px;
+        gap: 10px;
+        align-items: center;
+    }
+
+    .dash-chart-label {
+        color: #cbd5e1;
+        font-size: 12px;
+        font-weight: 850;
+    }
+
+    .dash-chart-value {
+        color: #fff;
+        text-align: right;
+        font-size: 12px;
+        font-weight: 950;
+    }
+
+    .dash-bar {
+        height: 10px;
+        overflow: hidden;
+        border-radius: 999px;
+        background: rgba(255,255,255,.06);
+    }
+
+    .dash-bar-fill {
+        height: 100%;
+        width: 0;
+        border-radius: inherit;
+        background: linear-gradient(90deg, var(--brand-primary), var(--brand-primary-dark));
+        transition: width .8s ease;
+    }
+
+    .dash-bar-fill.ok { background: linear-gradient(90deg, #22c55e, #16a34a); }
+    .dash-bar-fill.warn { background: linear-gradient(90deg, #f59e0b, #d97706); }
+    .dash-bar-fill.info { background: linear-gradient(90deg, #3b82f6, #2563eb); }
+    .dash-bar-fill.danger { background: linear-gradient(90deg, #ef4444, #dc2626); }
+
+    .dash-branch-list {
+        display: grid;
+        gap: 10px;
+    }
+
+    .dash-branch-item {
+        padding: 12px;
+        border-radius: 16px;
+        background: rgba(255,255,255,.03);
+        border: 1px solid rgba(255,255,255,.055);
+    }
+
+    .dash-branch-top {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        align-items: center;
+        margin-bottom: 10px;
+    }
+
+    .dash-branch-top strong {
+        color: #fff;
+        font-size: 14px;
+    }
+
+    .dash-branch-top span {
+        color: #bfdbfe;
+        font-size: 12px;
+        font-weight: 900;
+    }
+
+    .dash-branch-meta {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 9px;
+        color: #94a3b8;
+        font-size: 12px;
+        font-weight: 750;
     }
 
     .dash-money-card {
@@ -470,6 +660,9 @@
         .dash-main-grid {
             grid-template-columns:1fr;
         }
+        .dash-insights-grid {
+            grid-template-columns:1fr;
+        }
         .dash-payroll-pro {
             grid-template-columns:1fr;
         }
@@ -480,8 +673,16 @@
             font-size:30px;
         }
         .dash-stats-pro,
+        .dash-kpi-grid,
         .dash-quick-grid {
             grid-template-columns:1fr;
+        }
+        .dash-chart-row {
+            grid-template-columns: 1fr;
+            gap: 6px;
+        }
+        .dash-chart-value {
+            text-align:left;
         }
         .dash-ring-wrap {
             grid-template-columns:1fr;
@@ -489,6 +690,14 @@
         .dash-date-box {
             text-align:left;
             width:100%;
+        }
+        .dash-filter-box {
+            width:100%;
+            min-width:0;
+        }
+        .dash-filter-row {
+            flex-direction:column;
+            align-items:stretch;
         }
     }
 </style>
@@ -502,7 +711,7 @@
                 <h2>Dashboard General</h2>
                 <p>Control operativo en tiempo real para el día {{ hoy|date:"d/m/Y" }}.</p>
 
-                {% if es_admin_master %}
+                {% if es_admin_master and not empresa_usuario %}
                     <div class="dash-company-pill">🌐 Vista global de todas las empresas</div>
                 {% elif empresa_usuario %}
                     <div class="dash-company-pill">🏢 Empresa actual: {{ empresa_usuario.nombre }}</div>
@@ -511,9 +720,35 @@
                 {% endif %}
             </div>
 
-            <div class="dash-date-box">
-                <div class="label">Fecha operativa</div>
-                <div class="value">{{ hoy|date:"d/m/Y" }}</div>
+            <div class="dash-hero-side">
+                {% if empresa_usuario %}
+                <form class="dash-filter-box" method="get">
+                    <label for="dashboard-sucursal">Vista por sucursal</label>
+                    <div class="dash-filter-row">
+                        <select id="dashboard-sucursal" name="sucursal">
+                            <option value="">Todas las sucursales</option>
+                            {% for sucursal in sucursales_dashboard %}
+                                <option value="{{ sucursal.id }}" {% if sucursal_seleccionada_id == sucursal.id|stringformat:"s" %}selected{% endif %}>
+                                    {{ sucursal.nombre }}
+                                </option>
+                            {% endfor %}
+                        </select>
+                        <button class="dash-filter-action" type="submit">Ver</button>
+                    </div>
+                    <div class="dash-filter-hint">
+                        {% if sucursal_seleccionada %}
+                            Filtrando: {{ sucursal_seleccionada.nombre }}
+                        {% else %}
+                            Vista general de la empresa
+                        {% endif %}
+                    </div>
+                </form>
+                {% endif %}
+
+                <div class="dash-date-box">
+                    <div class="label">Fecha operativa</div>
+                    <div class="value">{{ hoy|date:"d/m/Y" }}</div>
+                </div>
             </div>
         </div>
     </div>
@@ -602,6 +837,105 @@
         </div>
         {% endif %}
     </div>
+    {% endif %}
+
+    {% if perm_funcionarios or perm_asistencia or perm_nomina or perm_deudas %}
+    <div class="dash-insights-grid">
+        <div class="dash-card-pro">
+            <div class="dash-card-head">
+                <div>
+                    <h3>Indicadores ejecutivos</h3>
+                    <p>Lectura rápida del estado operativo y financiero.</p>
+                </div>
+            </div>
+            <div class="dash-card-body">
+                <div class="dash-kpi-grid">
+                    {% if perm_asistencia %}
+                    <div class="dash-kpi">
+                        <span>Asistencia</span>
+                        <strong>{{ tasa_asistencia }}%</strong>
+                        <small>{{ presentes_hoy }} de {{ total_funcionarios }} presentes</small>
+                    </div>
+                    <div class="dash-kpi">
+                        <span>Puntualidad</span>
+                        <strong>{{ tasa_puntualidad }}%</strong>
+                        <small>{{ llegadas_tarde_hoy }} llegada(s) tarde</small>
+                    </div>
+                    {% endif %}
+                    {% if perm_nomina %}
+                    <div class="dash-kpi">
+                        <span>Cobertura IPS</span>
+                        <strong>{{ tasa_ips }}%</strong>
+                        <small>{{ funcionarios_con_ips }} funcionario(s)</small>
+                    </div>
+                    {% endif %}
+                    {% if perm_deudas %}
+                    <div class="dash-kpi">
+                        <span>Deuda promedio</span>
+                        <strong>{{ deuda_promedio|guaranies }}</strong>
+                        <small>Sobre funcionarios activos</small>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        {% if perm_asistencia %}
+        <div class="dash-card-pro">
+            <div class="dash-card-head">
+                <div>
+                    <h3>Distribución de jornada</h3>
+                    <p>Estado actual del día por cantidad de funcionarios.</p>
+                </div>
+            </div>
+            <div class="dash-card-body">
+                <div class="dash-chart-list">
+                    {% for item in estados_jornada_dashboard %}
+                    <div class="dash-chart-row">
+                        <div class="dash-chart-label">{{ item.label }}</div>
+                        <div class="dash-bar">
+                            <div class="dash-bar-fill {{ item.class }}" data-progress="{{ item.percent }}"></div>
+                        </div>
+                        <div class="dash-chart-value">{{ item.value }}</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    {% if sucursales_metricas %}
+    <div class="dash-card-pro" style="margin-bottom:18px;">
+        <div class="dash-card-head">
+            <div>
+                <h3>Rendimiento por sucursal</h3>
+                <p>Comparativo de presencia, atrasos y pendientes según el filtro actual.</p>
+            </div>
+        </div>
+        <div class="dash-card-body">
+            <div class="dash-branch-list">
+                {% for sucursal in sucursales_metricas %}
+                <div class="dash-branch-item">
+                    <div class="dash-branch-top">
+                        <strong>{{ sucursal.nombre }}</strong>
+                        <span>{{ sucursal.percent }}%</span>
+                    </div>
+                    <div class="dash-bar">
+                        <div class="dash-bar-fill ok" data-progress="{{ sucursal.percent }}"></div>
+                    </div>
+                    <div class="dash-branch-meta">
+                        <span>{{ sucursal.presentes }} presentes</span>
+                        <span>{{ sucursal.tarde }} tarde</span>
+                        <span>{{ sucursal.pendientes }} pendientes</span>
+                        <span>{{ sucursal.total }} activos</span>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% endif %}
     {% endif %}
 
     {% if perm_asistencia or perm_funcionarios %}
@@ -804,7 +1138,7 @@
 
 <script>
 document.addEventListener("DOMContentLoaded", function () {
-    document.querySelectorAll(".dash-progress-fill").forEach(function (bar) {
+    document.querySelectorAll(".dash-progress-fill, .dash-bar-fill").forEach(function (bar) {
         const value = parseInt(bar.dataset.progress || "0", 10);
         const safeValue = Math.max(0, Math.min(100, value));
         bar.style.width = safeValue + "%";

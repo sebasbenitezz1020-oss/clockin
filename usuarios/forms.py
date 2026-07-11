@@ -2,7 +2,7 @@ from django import forms
 
 from .models import Usuario
 
-from core.models import Empresa
+from core.models import Empresa, Funcionario
 
 
 class UsuarioForm(forms.ModelForm):
@@ -27,6 +27,9 @@ class UsuarioForm(forms.ModelForm):
             "telefono",
             "rol",
             "empresa",
+            "funcionario",
+            "portal_activo",
+            "requiere_cambio_password",
             "activo",
         ]
         widgets = {
@@ -37,6 +40,9 @@ class UsuarioForm(forms.ModelForm):
             "telefono": forms.TextInput(attrs={"class": "form-control"}),
             "rol": forms.Select(attrs={"class": "form-control"}),
             "empresa": forms.Select(attrs={"class": "form-control"}),
+            "funcionario": forms.Select(attrs={"class": "form-control"}),
+            "portal_activo": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "requiere_cambio_password": forms.CheckboxInput(attrs={"class": "form-check-input"}),
             "activo": forms.CheckboxInput(attrs={"class": "form-check-input"}),
         }
 
@@ -45,6 +51,21 @@ class UsuarioForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
 
         self.fields["empresa"].queryset = Empresa.objects.filter(activo=True).order_by("nombre")
+        self.fields["funcionario"].queryset = Funcionario.objects.filter(activo=True).select_related(
+            "sucursal_rel",
+            "sucursal_rel__empresa",
+        ).order_by("apellido", "nombre")
+
+        empresa_id = None
+        if self.data.get("empresa"):
+            empresa_id = self.data.get("empresa")
+        elif self.instance and self.instance.empresa_id:
+            empresa_id = self.instance.empresa_id
+
+        if empresa_id:
+            self.fields["funcionario"].queryset = self.fields["funcionario"].queryset.filter(
+                sucursal_rel__empresa_id=empresa_id
+            )
 
         if not self.es_edicion:
             self.fields["password1"].required = True
@@ -69,6 +90,15 @@ class UsuarioForm(forms.ModelForm):
         cleaned = super().clean()
         p1 = cleaned.get("password1")
         p2 = cleaned.get("password2")
+        rol = cleaned.get("rol")
+        empresa = cleaned.get("empresa")
+        funcionario = cleaned.get("funcionario")
+
+        if rol == Usuario.Roles.FUNCIONARIO and not funcionario:
+            raise forms.ValidationError("Los usuarios con rol Funcionario deben estar vinculados a una ficha laboral.")
+
+        if funcionario and empresa and funcionario.empresa != empresa:
+            raise forms.ValidationError("El funcionario vinculado debe pertenecer a la misma empresa del usuario.")
 
         if self.es_edicion:
             if p1 or p2:

@@ -1,0 +1,35 @@
+{% extends "portal_funcionario/base_portal.html" %}
+
+{% block title %}Notificaciones | ClockIn{% endblock %}
+
+{% block content %}
+<section class="portal-hero">
+    <div>
+        <h1>Notificaciones</h1>
+        <p>Alertas personales de documentos, comunicaciones y respuestas del portal.</p>
+    </div>
+</section>
+
+<section class="card">
+    {% for item in notificaciones %}
+        <div class="line">
+            <span>
+                <span class="badge">{{ item.tipo }}</span>
+                {{ item.fecha|date:"d/m/Y H:i" }}
+            </span>
+            <strong>
+                {% if item.args|length == 2 %}
+                    <a href="{% url item.url_name item.args.0 item.args.1 %}">{{ item.titulo }}</a>
+                {% elif item.args|length == 1 %}
+                    <a href="{% url item.url_name item.args.0 %}">{{ item.titulo }}</a>
+                {% else %}
+                    <a href="{% url item.url_name %}">{{ item.titulo }}</a>
+                {% endif %}
+                <br><small class="muted">{{ item.detalle }}</small>
+            </strong>
+        </div>
+    {% empty %}
+        <div class="empty">No tienes notificaciones pendientes.</div>
+    {% endfor %}
+</section>
+{% endblock %}

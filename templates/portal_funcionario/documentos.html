@@ -1,0 +1,73 @@
+{% extends "portal_funcionario/base_portal.html" %}
+
+{% block title %}Mis documentos | ClockIn{% endblock %}
+
+{% block content %}
+<section class="portal-hero">
+    <div>
+        <h1>Mis documentos</h1>
+        <p>Documentos laborales disponibles para lectura y confirmación.</p>
+    </div>
+    <div class="portal-actions">
+        {% if modo_admin_portal %}
+            <a class="portal-link" href="{% url 'portal_admin_documento_solicitar' portal_funcionario.id %}">Solicitar documento</a>
+        {% else %}
+            <a class="portal-link" href="{% url 'portal_documento_solicitar' %}">Solicitar documento</a>
+        {% endif %}
+    </div>
+</section>
+
+<section class="card">
+    <h2>Documentos disponibles</h2>
+    {% for item in documentos %}
+        <div class="line">
+            <span>
+                {{ item.documento.get_tipo_display }} · {{ item.documento.creado_en|date:"d/m/Y" }}
+                {% if item.confirmado %}
+                    <span class="badge ok">Confirmado</span>
+                {% elif item.leido %}
+                    <span class="badge warn">Leído</span>
+                {% else %}
+                    <span class="badge danger">Nuevo</span>
+                {% endif %}
+            </span>
+            <strong>
+                {{ item.documento.titulo }}
+                {% if item.documento.archivo %}
+                    · <a class="portal-link" href="{{ item.documento.archivo.url }}" target="_blank">Abrir</a>
+                {% endif %}
+                {% if modo_admin_portal %}
+                <form method="post" action="{% url 'portal_admin_documento_confirmar' portal_funcionario.id item.documento.id %}" style="display:inline;">
+                {% else %}
+                <form method="post" action="{% url 'portal_documento_confirmar' item.documento.id %}" style="display:inline;">
+                {% endif %}
+                    {% csrf_token %}
+                    <button class="portal-btn" type="submit">Confirmar recepción</button>
+                </form>
+            </strong>
+        </div>
+    {% empty %}
+        <div class="empty">No hay documentos disponibles.</div>
+    {% endfor %}
+</section>
+
+<section class="card" style="margin-top:14px;">
+    <h2>Solicitudes documentales</h2>
+    {% for solicitud in solicitudes_documentos %}
+        <div class="line">
+            <span>{{ solicitud.creado_en|date:"d/m/Y" }} · {{ solicitud.get_tipo_display }}</span>
+            <strong>
+                {{ solicitud.get_estado_display }}
+                {% if solicitud.archivo_final %}
+                    · <a class="portal-link" href="{{ solicitud.archivo_final.url }}" target="_blank">Abrir final</a>
+                {% endif %}
+            </strong>
+        </div>
+        {% if solicitud.observacion_operador %}
+            <p class="muted">{{ solicitud.observacion_operador }}</p>
+        {% endif %}
+    {% empty %}
+        <div class="empty">Sin solicitudes documentales recientes.</div>
+    {% endfor %}
+</section>
+{% endblock %}

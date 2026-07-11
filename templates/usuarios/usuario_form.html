@@ -177,6 +177,13 @@
             </div>
 
             <div class="uform-field">
+                <label>Funcionario vinculado al portal</label>
+                {{ form.funcionario }}
+                {{ form.funcionario.errors }}
+                <div class="uform-help">Solo se usa para usuarios con rol Funcionario.</div>
+            </div>
+
+            <div class="uform-field">
                 <label>Contraseña</label>
                 {% if modo_edicion %}
                     <div class="uform-help">Déjala en blanco si no quieres cambiarla.</div>
@@ -198,6 +205,16 @@
         <label class="uform-check">
             {{ form.activo }}
             <span>Usuario activo</span>
+        </label>
+
+        <label class="uform-check">
+            {{ form.portal_activo }}
+            <span>Portal del funcionario activo</span>
+        </label>
+
+        <label class="uform-check">
+            {{ form.requiere_cambio_password }}
+            <span>Forzar cambio de contrase&ntilde;a en el proximo ingreso</span>
         </label>
 
         <div class="uform-actions">

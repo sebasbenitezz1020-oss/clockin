@@ -1,0 +1,76 @@
+{% extends "portal_funcionario/base_portal.html" %}
+
+{% block title %}Comunicación | ClockIn{% endblock %}
+
+{% block content %}
+<section class="portal-hero">
+    <div>
+        <h1>{{ comunicacion.titulo }}</h1>
+        <p>{{ comunicacion.get_tipo_display }} · {{ comunicacion.fecha_emision|date:"d/m/Y" }}</p>
+    </div>
+</section>
+
+<section class="grid two">
+    <article class="card">
+        <div class="line"><span>Estado</span><strong>{{ comunicacion.get_estado_display }}</strong></div>
+        <div class="line"><span>Asunto</span><strong>{{ comunicacion.asunto|default:"-" }}</strong></div>
+        {% if comunicacion.detalle_hecho %}
+            <h2>Detalle</h2>
+            <p class="muted">{{ comunicacion.detalle_hecho|linebreaksbr }}</p>
+        {% endif %}
+        {% if comunicacion.contenido %}
+            <h2>Contenido</h2>
+            <p class="muted">{{ comunicacion.contenido|linebreaksbr }}</p>
+        {% endif %}
+        {% if comunicacion.adjunto_firmado %}
+            <p><a class="portal-link" href="{{ comunicacion.adjunto_firmado.url }}" target="_blank">Abrir adjunto</a></p>
+        {% endif %}
+        {% if modo_admin_portal %}
+        <form method="post" action="{% url 'portal_admin_comunicacion_confirmar' portal_funcionario.id comunicacion.id %}">
+        {% else %}
+        <form method="post" action="{% url 'portal_comunicacion_confirmar' comunicacion.id %}">
+        {% endif %}
+            {% csrf_token %}
+            <button class="portal-btn" type="submit">Confirmar recepción</button>
+        </form>
+    </article>
+
+    <article class="card">
+        <h2>Descargo</h2>
+        {% if puede_enviar_descargo %}
+            {% for descargo in descargos %}
+                <div class="line">
+                    <span>{{ descargo.creado_en|date:"d/m/Y H:i" }}</span>
+                    <strong>{{ descargo.get_estado_display }}</strong>
+                </div>
+                <p class="muted">{{ descargo.mensaje|linebreaksbr }}</p>
+                {% if descargo.adjunto %}
+                    <p><a class="portal-link" href="{{ descargo.adjunto.url }}" target="_blank">Abrir adjunto</a></p>
+                {% endif %}
+            {% empty %}
+                <div class="empty">Aún no se envió descargo para esta comunicación.</div>
+            {% endfor %}
+
+            {% if modo_admin_portal %}
+            <form class="portal-form" method="post" enctype="multipart/form-data" action="{% url 'portal_admin_descargo_enviar' portal_funcionario.id comunicacion.id %}">
+            {% else %}
+            <form class="portal-form" method="post" enctype="multipart/form-data" action="{% url 'portal_descargo_enviar' comunicacion.id %}">
+            {% endif %}
+                {% csrf_token %}
+                {% for field in descargo_form %}
+                    <div class="form-row">
+                        <label for="{{ field.id_for_label }}">{{ field.label }}</label>
+                        {{ field }}
+                        {% for error in field.errors %}
+                            <div class="form-error">{{ error }}</div>
+                        {% endfor %}
+                    </div>
+                {% endfor %}
+                <button class="portal-btn" type="submit">Enviar descargo</button>
+            </form>
+        {% else %}
+            <div class="empty">Esta comunicación no requiere descargo.</div>
+        {% endif %}
+    </article>
+</section>
+{% endblock %}

@@ -1,0 +1,90 @@
+{% extends "portal_funcionario/base_portal.html" %}
+
+{% block title %}Mis asistencias | ClockIn{% endblock %}
+
+{% block content %}
+<section class="portal-hero">
+    <div>
+        <h1>Mis asistencias</h1>
+        <p>Consulta de entradas, salidas, almuerzo, atrasos, permisos y vacaciones.</p>
+    </div>
+    <div class="portal-actions">
+        {% if modo_admin_portal %}
+            <a class="portal-link" href="{% url 'portal_admin_permiso_solicitar' portal_funcionario.id %}">Solicitar permiso</a>
+            <a class="portal-link" href="{% url 'portal_admin_vacacion_solicitar' portal_funcionario.id %}">Solicitar vacaciones</a>
+            <a class="portal-link" href="{% url 'portal_admin_marcacion_solicitar' portal_funcionario.id %}">Corregir marcación</a>
+        {% else %}
+            <a class="portal-link" href="{% url 'portal_permiso_solicitar' %}">Solicitar permiso</a>
+            <a class="portal-link" href="{% url 'portal_vacacion_solicitar' %}">Solicitar vacaciones</a>
+            <a class="portal-link" href="{% url 'portal_marcacion_solicitar' %}">Corregir marcación</a>
+        {% endif %}
+    </div>
+</section>
+
+<section class="card">
+    <h2>Marcaciones recientes</h2>
+    <div class="table-wrap">
+        <table>
+            <thead>
+                <tr>
+                    <th>Fecha</th>
+                    <th>Entrada</th>
+                    <th>Almuerzo</th>
+                    <th>Regreso</th>
+                    <th>Salida</th>
+                    <th>Atraso</th>
+                    <th>Horas</th>
+                    <th>Estado</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for asistencia in asistencias %}
+                <tr>
+                    <td>{{ asistencia.fecha|date:"d/m/Y" }}</td>
+                    <td>{% if asistencia.hora_entrada %}{{ asistencia.hora_entrada|date:"H:i" }}{% else %}-{% endif %}</td>
+                    <td>{% if asistencia.hora_salida_almuerzo %}{{ asistencia.hora_salida_almuerzo|date:"H:i" }}{% else %}-{% endif %}</td>
+                    <td>{% if asistencia.hora_regreso_almuerzo %}{{ asistencia.hora_regreso_almuerzo|date:"H:i" }}{% else %}-{% endif %}</td>
+                    <td>{% if asistencia.hora_salida %}{{ asistencia.hora_salida|date:"H:i" }}{% else %}-{% endif %}</td>
+                    <td>{{ asistencia.minutos_atraso }} min</td>
+                    <td>{{ asistencia.horas_trabajadas_texto }}</td>
+                    <td>{{ asistencia.estado_jornada }}</td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="8">No hay asistencias registradas.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+
+<section class="grid two" style="margin-top:14px;">
+    <article class="card">
+        <h2>Permisos recientes</h2>
+        {% for permiso in permisos %}
+            <div class="line"><span>{{ permiso.fecha_desde|date:"d/m/Y" }} - {{ permiso.fecha_hasta|date:"d/m/Y" }}</span><strong>{{ permiso.get_estado_display }}</strong></div>
+        {% empty %}
+            <div class="empty">Sin permisos recientes.</div>
+        {% endfor %}
+    </article>
+    <article class="card">
+        <h2>Vacaciones recientes</h2>
+        {% for vacacion in vacaciones %}
+            <div class="line"><span>{{ vacacion.fecha_desde|date:"d/m/Y" }} - {{ vacacion.fecha_hasta|date:"d/m/Y" }}</span><strong>{{ vacacion.get_estado_display }}</strong></div>
+        {% empty %}
+            <div class="empty">Sin vacaciones recientes.</div>
+        {% endfor %}
+    </article>
+</section>
+
+<section class="card" style="margin-top:14px;">
+    <h2>Correcciones de marcación</h2>
+    {% for solicitud in solicitudes_marcacion %}
+        <div class="line">
+            <span>{{ solicitud.fecha|date:"d/m/Y" }} · {{ solicitud.get_tipo_display }}</span>
+            <strong>{{ solicitud.get_estado_display }}</strong>
+        </div>
+    {% empty %}
+        <div class="empty">Sin solicitudes de corrección recientes.</div>
+    {% endfor %}
+</section>
+{% endblock %}

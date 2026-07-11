@@ -1,0 +1,230 @@
+<style>
+    .live-employee-original {
+        position: absolute !important;
+        width: 1px !important;
+        height: 1px !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
+    }
+
+    .live-employee {
+        position: relative;
+        width: 100%;
+    }
+
+    .live-employee-input {
+        width: 100%;
+        border: 1px solid rgba(255,255,255,.10);
+        background: #0f1722;
+        color: #fff;
+        border-radius: 14px;
+        padding: 13px 42px 13px 14px;
+        font-size: 14px;
+        font-weight: 750;
+        outline: none;
+    }
+
+    .live-employee-input:focus {
+        border-color: var(--brand-primary);
+        box-shadow: 0 0 0 3px var(--brand-soft);
+    }
+
+    .live-employee-icon {
+        position: absolute;
+        right: 14px;
+        top: 14px;
+        color: #94a3b8;
+        pointer-events: none;
+    }
+
+    .live-employee-panel {
+        position: absolute;
+        z-index: 60;
+        inset: calc(100% + 8px) 0 auto 0;
+        max-height: 280px;
+        overflow-y: auto;
+        border-radius: 16px;
+        background: rgba(10, 15, 25, .98);
+        border: 1px solid rgba(255,255,255,.10);
+        box-shadow: 0 18px 44px rgba(0,0,0,.34);
+        padding: 8px;
+        display: none;
+    }
+
+    .live-employee.open .live-employee-panel {
+        display: block;
+    }
+
+    .live-employee-option,
+    .live-employee-empty {
+        width: 100%;
+        border: 0;
+        border-radius: 12px;
+        background: transparent;
+        color: #e5e7eb;
+        padding: 11px 12px;
+        text-align: left;
+        font-weight: 800;
+    }
+
+    .live-employee-option {
+        cursor: pointer;
+    }
+
+    .live-employee-option:hover,
+    .live-employee-option.active {
+        background: rgba(59,130,246,.16);
+        color: #bfdbfe;
+    }
+
+    .live-employee-empty {
+        color: #94a3b8;
+        cursor: default;
+    }
+
+    @media (max-width: 720px) {
+        .live-employee-input {
+            min-height: 48px;
+            font-size: 16px;
+        }
+
+        .live-employee-panel {
+            max-height: 330px;
+            border-radius: 18px;
+        }
+
+        .live-employee-option,
+        .live-employee-empty {
+            padding: 13px 12px;
+        }
+    }
+</style>
+
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+    const normalize = (value) => (value || "")
+        .toString()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .toLowerCase()
+        .trim();
+
+    document.querySelectorAll("select.js-live-employee-select").forEach(function (select) {
+        if (select.dataset.liveEnhanced === "true") return;
+        select.dataset.liveEnhanced = "true";
+        select.classList.add("live-employee-original");
+
+        const wrapper = document.createElement("div");
+        wrapper.className = "live-employee";
+
+        const input = document.createElement("input");
+        input.type = "text";
+        input.className = "live-employee-input";
+        input.placeholder = select.dataset.livePlaceholder || "Buscar funcionario";
+        input.autocomplete = "off";
+
+        const icon = document.createElement("span");
+        icon.className = "live-employee-icon";
+        icon.textContent = "⌕";
+
+        const panel = document.createElement("div");
+        panel.className = "live-employee-panel";
+
+        const options = Array.from(select.options).map(function (option) {
+            return {
+                value: option.value,
+                label: option.textContent.trim(),
+                haystack: normalize([
+                    option.textContent,
+                    option.dataset.search,
+                    option.dataset.cedula,
+                    option.dataset.nombre
+                ].join(" "))
+            };
+        });
+
+        function selectedLabel() {
+            const option = select.options[select.selectedIndex];
+            return option && option.value ? option.textContent.trim() : "";
+        }
+
+        function closePanel() {
+            wrapper.classList.remove("open");
+        }
+
+        function openPanel() {
+            wrapper.classList.add("open");
+            render(input.value);
+        }
+
+        function selectValue(value, label) {
+            select.value = value;
+            input.value = label;
+            select.dispatchEvent(new Event("input", { bubbles: true }));
+            select.dispatchEvent(new Event("change", { bubbles: true }));
+            closePanel();
+        }
+
+        function render(query) {
+            const normalizedQuery = normalize(query);
+            panel.innerHTML = "";
+
+            const filtered = options
+                .filter(item => item.value)
+                .filter(item => !normalizedQuery || item.haystack.includes(normalizedQuery))
+                .slice(0, 80);
+
+            if (!filtered.length) {
+                const empty = document.createElement("div");
+                empty.className = "live-employee-empty";
+                empty.textContent = "Sin coincidencias";
+                panel.appendChild(empty);
+                return;
+            }
+
+            filtered.forEach(function (item) {
+                const btn = document.createElement("button");
+                btn.type = "button";
+                btn.className = "live-employee-option";
+                btn.textContent = item.label;
+                if (String(item.value) === String(select.value)) {
+                    btn.classList.add("active");
+                }
+                btn.addEventListener("mousedown", function (event) {
+                    event.preventDefault();
+                    selectValue(item.value, item.label);
+                });
+                panel.appendChild(btn);
+            });
+        }
+
+        input.value = selectedLabel();
+        input.addEventListener("focus", openPanel);
+        input.addEventListener("input", openPanel);
+        input.addEventListener("keydown", function (event) {
+            if (event.key === "Escape") {
+                closePanel();
+                input.blur();
+            }
+            if (event.key === "Enter") {
+                const first = panel.querySelector(".live-employee-option");
+                if (first) {
+                    event.preventDefault();
+                    first.dispatchEvent(new MouseEvent("mousedown", { bubbles: true }));
+                }
+            }
+        });
+        input.addEventListener("blur", function () {
+            setTimeout(function () {
+                input.value = selectedLabel();
+                closePanel();
+            }, 120);
+        });
+
+        select.parentNode.insertBefore(wrapper, select.nextSibling);
+        wrapper.appendChild(input);
+        wrapper.appendChild(icon);
+        wrapper.appendChild(panel);
+    });
+});
+</script>

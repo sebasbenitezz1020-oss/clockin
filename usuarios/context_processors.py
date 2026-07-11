@@ -45,8 +45,17 @@ def permisos_menu(request):
 
     admin_total = es_admin_total(user)
 
+    funcionario_vinculado = getattr(user, "funcionario_id", None) and getattr(user, "portal_activo", True)
+    puede_gestionar_portal = (
+        es_admin_master(user)
+        or tiene_permiso(user, "portal_funcionario", "puede_ver")
+        or tiene_permiso(user, "funcionarios", "puede_ver")
+    )
+
     return {
         "puede_ver_dashboard": tiene_permiso(user, "dashboard", "puede_ver"),
+        "puede_ver_portal_funcionario": funcionario_vinculado,
+        "puede_gestionar_portal_funcionario": puede_gestionar_portal,
         "puede_ver_empresas": tiene_permiso(user, "empresas", "puede_ver"),
         "puede_ver_sucursales": tiene_permiso(user, "sucursales", "puede_ver"),
         "puede_ver_funcionarios": tiene_permiso(user, "funcionarios", "puede_ver"),

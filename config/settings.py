@@ -21,6 +21,7 @@ INSTALLED_APPS = [
     "core",
     "usuarios",
     "biometrico",
+    "portal_funcionario",
 ]
 
 MIDDLEWARE = [

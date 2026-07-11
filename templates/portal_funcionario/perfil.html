@@ -1,0 +1,28 @@
+{% extends "portal_funcionario/base_portal.html" %}
+
+{% block title %}Mi perfil | ClockIn{% endblock %}
+
+{% block content %}
+<section class="portal-hero">
+    <div>
+        <h1>Mi perfil</h1>
+        <p>Información laboral visible para el funcionario.</p>
+    </div>
+    {% if portal_funcionario.foto %}
+        <img class="avatar" src="{{ portal_funcionario.foto.url }}" alt="{{ portal_funcionario.nombre_completo }}">
+    {% endif %}
+</section>
+
+<section class="card">
+    <div class="line"><span>Nombre</span><strong>{{ portal_funcionario.nombre_completo }}</strong></div>
+    <div class="line"><span>Cédula</span><strong>{{ portal_funcionario.cedula }}</strong></div>
+    <div class="line"><span>Cargo</span><strong>{{ portal_funcionario.cargo|default:"-" }}</strong></div>
+    <div class="line"><span>Sector</span><strong>{{ portal_funcionario.sector|default:"-" }}</strong></div>
+    <div class="line"><span>Sucursal</span><strong>{{ portal_funcionario.sucursal_mostrar }}</strong></div>
+    <div class="line"><span>Fecha de ingreso</span><strong>{% if portal_funcionario.fecha_ingreso %}{{ portal_funcionario.fecha_ingreso|date:"d/m/Y" }}{% else %}-{% endif %}</strong></div>
+    <div class="line"><span>Turno</span><strong>{% if portal_funcionario.turno %}{{ portal_funcionario.turno.nombre }}{% else %}-{% endif %}</strong></div>
+    <div class="line"><span>Estado laboral</span><strong>{% if portal_funcionario.activo %}Activo{% else %}Inactivo{% endif %}</strong></div>
+    <div class="line"><span>Teléfono</span><strong>{{ portal_funcionario.telefono|default:"-" }}</strong></div>
+    <div class="line"><span>Correo</span><strong>{{ portal_funcionario.correo|default:"-" }}</strong></div>
+</section>
+{% endblock %}

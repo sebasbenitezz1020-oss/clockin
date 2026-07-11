@@ -1,0 +1,38 @@
+{% extends "portal_funcionario/base_portal.html" %}
+
+{% block title %}Mis comunicaciones | ClockIn{% endblock %}
+
+{% block content %}
+<section class="portal-hero">
+    <div>
+        <h1>Comunicaciones</h1>
+        <p>La confirmación acredita recepción del mensaje, no conformidad con su contenido.</p>
+    </div>
+</section>
+
+<section class="card">
+    {% for item in comunicaciones %}
+        <div class="line">
+            <span>
+                {{ item.comunicacion.fecha_emision|date:"d/m/Y" }} · {{ item.comunicacion.get_tipo_display }}
+                {% if item.confirmado %}
+                    <span class="badge ok">Confirmada</span>
+                {% elif item.abierto %}
+                    <span class="badge warn">Abierta</span>
+                {% else %}
+                    <span class="badge danger">Nueva</span>
+                {% endif %}
+            </span>
+            <strong>
+                {% if modo_admin_portal %}
+                    <a href="{% url 'portal_admin_comunicacion_detalle' portal_funcionario.id item.comunicacion.id %}">{{ item.comunicacion.titulo }}</a>
+                {% else %}
+                    <a href="{% url 'portal_comunicacion_detalle' item.comunicacion.id %}">{{ item.comunicacion.titulo }}</a>
+                {% endif %}
+            </strong>
+        </div>
+    {% empty %}
+        <div class="empty">No hay comunicaciones disponibles.</div>
+    {% endfor %}
+</section>
+{% endblock %}

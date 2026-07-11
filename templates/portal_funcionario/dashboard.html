@@ -1,0 +1,85 @@
+{% extends "portal_funcionario/base_portal.html" %}
+{% load number_filters %}
+
+{% block title %}Mi portal | ClockIn{% endblock %}
+
+{% block content %}
+<section class="portal-hero">
+    <div>
+        <h1>Hola, {{ portal_funcionario.nombre }}</h1>
+        <p>Tu espacio personal para consultar asistencia, documentos, comunicaciones y trámites.</p>
+    </div>
+    {% if portal_funcionario.foto %}
+        <img class="avatar" src="{{ portal_funcionario.foto.url }}" alt="{{ portal_funcionario.nombre_completo }}">
+    {% endif %}
+</section>
+
+<section class="grid stats">
+    <article class="card stat">
+        <span>Asistencia del día</span>
+        <strong>{% if asistencia_hoy %}{{ asistencia_hoy.estado_jornada }}{% else %}Sin marcación{% endif %}</strong>
+    </article>
+    <article class="card stat">
+        <span>Próximo turno</span>
+        <strong>{% if proximo_turno %}{{ proximo_turno.nombre }}{% else %}Sin turno{% endif %}</strong>
+    </article>
+    <article class="card stat">
+        <span>Vacaciones disponibles</span>
+        <strong>{{ vacaciones_disponibles|millares }} día(s)</strong>
+    </article>
+    <article class="card stat">
+        <span>Solicitudes pendientes</span>
+        <strong>{{ solicitudes_pendientes|millares }}</strong>
+    </article>
+    <article class="card stat">
+        <span>Saldo de deudas</span>
+        <strong>{{ saldo_deudas|guaranies }}</strong>
+    </article>
+    <article class="card stat">
+        <span>Documentos nuevos</span>
+        <strong>{{ documentos_nuevos|millares }}</strong>
+    </article>
+    <article class="card stat">
+        <span>Comunicaciones sin confirmar</span>
+        <strong>{{ comunicaciones_sin_confirmar|millares }}</strong>
+    </article>
+    <article class="card stat">
+        <span>Accesos rápidos</span>
+        {% if modo_admin_portal %}
+            <strong><a href="{% url 'portal_admin_notificaciones' portal_funcionario.id %}">Notificaciones</a></strong>
+        {% else %}
+            <strong><a href="{% url 'portal_notificaciones' %}">Notificaciones</a></strong>
+        {% endif %}
+    </article>
+</section>
+
+<section class="grid two" style="margin-top:14px;">
+    <article class="card">
+        <h2>Últimas comunicaciones</h2>
+        {% for comunicacion in ultimas_comunicaciones %}
+            <div class="line">
+                <span>{{ comunicacion.fecha_emision|date:"d/m/Y" }}</span>
+                {% if modo_admin_portal %}
+                    <strong><a href="{% url 'portal_admin_comunicacion_detalle' portal_funcionario.id comunicacion.id %}">{{ comunicacion.titulo }}</a></strong>
+                {% else %}
+                    <strong><a href="{% url 'portal_comunicacion_detalle' comunicacion.id %}">{{ comunicacion.titulo }}</a></strong>
+                {% endif %}
+            </div>
+        {% empty %}
+            <div class="empty">No hay comunicaciones recientes.</div>
+        {% endfor %}
+    </article>
+
+    <article class="card">
+        <h2>Últimos documentos</h2>
+        {% for documento in ultimos_documentos %}
+            <div class="line">
+                <span>{{ documento.get_tipo_display }}</span>
+                <strong>{{ documento.titulo }}</strong>
+            </div>
+        {% empty %}
+            <div class="empty">No hay documentos recientes.</div>
+        {% endfor %}
+    </article>
+</section>
+{% endblock %}
