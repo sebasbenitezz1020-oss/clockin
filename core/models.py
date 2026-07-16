@@ -29,6 +29,7 @@ class Empresa(models.Model):
     tema_visual = models.CharField(max_length=20, blank=True, default="")
     texto_legal_pdf = models.TextField(blank=True, default="")
     icl_activo = models.BooleanField(default=True)
+    permite_ajuste_manual_liquidacion = models.BooleanField(default=False)
     activo = models.BooleanField(default=True)
     estado = models.CharField(max_length=20, choices=Estados.choices, default=Estados.ACTIVA)
     plan_contratado = models.CharField(max_length=30, choices=Planes.choices, default=Planes.PROFESIONAL)
@@ -445,6 +446,8 @@ class Funcionario(models.Model):
     ips = models.BooleanField(default=False)
     salario_base = models.DecimalField(max_digits=12, decimal_places=2, default=2899048)
     bono = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    usa_salario_diferenciado = models.BooleanField(default=False)
+    salario_diferenciado = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
     porcentaje_limite_deuda = models.DecimalField(
         max_digits=5,
@@ -558,16 +561,44 @@ class Funcionario(models.Model):
 
     @property
     def salario_bruto(self):
-        return (Decimal(self.salario_base or 0) + Decimal(self.bono or 0)).quantize(Decimal("0.01"))
+        return self.salario_bruto_aplicable
 
     @property
     def neto_referencial(self):
-        return (Decimal(self.salario_base or 0) + Decimal(self.bono or 0)).quantize(Decimal("0.01"))
+        return self.salario_bruto_aplicable
+
+    @property
+    def modalidad_salarial(self):
+        return "diferenciado" if self.usa_salario_diferenciado else "normal"
+
+    @property
+    def modalidad_salarial_display(self):
+        return "Salario diferenciado" if self.usa_salario_diferenciado else "Salario base + bono"
+
+    @property
+    def salario_base_aplicable(self):
+        if self.usa_salario_diferenciado:
+            return Decimal(self.salario_diferenciado or 0).quantize(Decimal("0.01"))
+        return Decimal(self.salario_base or 0).quantize(Decimal("0.01"))
+
+    @property
+    def bono_aplicable(self):
+        if self.usa_salario_diferenciado:
+            return Decimal("0.00")
+        return Decimal(self.bono or 0).quantize(Decimal("0.01"))
+
+    @property
+    def salario_bruto_aplicable(self):
+        if self.usa_salario_diferenciado:
+            return Decimal(self.salario_diferenciado or 0).quantize(Decimal("0.01"))
+        return (
+            Decimal(self.salario_base or 0) + Decimal(self.bono or 0)
+        ).quantize(Decimal("0.01"))
 
     @property
     def descuento_ips(self):
         if self.ips:
-            return (Decimal(self.salario_base or 0) * Decimal("0.09")).quantize(Decimal("0.01"))
+            return (self.salario_bruto_aplicable * Decimal("0.09")).quantize(Decimal("0.01"))
         return Decimal("0.00")
 
     @property
@@ -587,7 +618,7 @@ class Funcionario(models.Model):
     @property
     def limite_deuda_monto(self):
         return (
-            Decimal(self.salario_base or 0) * (Decimal(self.porcentaje_limite_deuda or 0) / Decimal("100"))
+            self.salario_bruto_aplicable * (Decimal(self.porcentaje_limite_deuda or 0) / Decimal("100"))
         ).quantize(Decimal("0.01"))
 
     @property
@@ -762,6 +793,8 @@ class HistorialSalarialFuncionario(models.Model):
 class Asistencia(models.Model):
     ORIGEN_MARCACION_CHOICES = [
         ("lector", "Lector facial"),
+        ("biometrico_tablet", "Biométrico tablet"),
+        ("biometrico_celular", "Biométrico celular"),
         ("manual", "Manual"),
     ]
 
@@ -1409,8 +1442,13 @@ class Liquidacion(models.Model):
     tipo_salida = models.CharField(max_length=40, choices=TiposSalida.choices)
     motivo_observacion = models.TextField(blank=True, default="")
 
+    modalidad_salarial_snapshot = models.CharField(max_length=30, blank=True, default="normal")
     salario_base_snapshot = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     bono_base_snapshot = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    salario_diferenciado_snapshot = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    salario_bruto_aplicable_snapshot = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    porcentaje_ips_snapshot = models.DecimalField(max_digits=5, decimal_places=2, default=9)
+    descuento_ips_calculado_snapshot = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
     antiguedad_anios = models.PositiveIntegerField(default=0)
     antiguedad_meses = models.PositiveIntegerField(default=0)
@@ -1446,6 +1484,9 @@ class Liquidacion(models.Model):
     total_haberes = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     total_descuentos = models.DecimalField(max_digits=12, decimal_places=2, default=0)
     total_liquidacion = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_haberes_automatico = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_descuentos_automatico = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_liquidacion_automatico = models.DecimalField(max_digits=12, decimal_places=2, default=0)
 
     requiere_revision_juridica = models.BooleanField(default=False)
     alerta_revision = models.CharField(max_length=255, blank=True, default="")
@@ -1473,7 +1514,75 @@ class Liquidacion(models.Model):
         if self.funcionario and self.funcionario.sucursal_rel:
             self.empresa = self.funcionario.sucursal_rel.empresa
         super().save(*args, **kwargs)
-    
+
+
+class AjusteManualLiquidacion(models.Model):
+    class Tipos(models.TextChoices):
+        HABER = "haber", "Haber"
+        DESCUENTO = "descuento", "Descuento"
+
+    class Estados(models.TextChoices):
+        ACTIVO = "activo", "Activo"
+        ANULADO = "anulado", "Anulado"
+
+    liquidacion = models.ForeignKey(
+        Liquidacion,
+        on_delete=models.CASCADE,
+        related_name="ajustes_manuales"
+    )
+    empresa = models.ForeignKey(
+        Empresa,
+        on_delete=models.CASCADE,
+        related_name="ajustes_liquidacion"
+    )
+    funcionario = models.ForeignKey(
+        Funcionario,
+        on_delete=models.CASCADE,
+        related_name="ajustes_liquidacion"
+    )
+    tipo = models.CharField(max_length=20, choices=Tipos.choices)
+    concepto = models.CharField(max_length=150)
+    importe_anterior = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    importe_nuevo = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    diferencia = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    motivo = models.TextField()
+    estado = models.CharField(max_length=20, choices=Estados.choices, default=Estados.ACTIVO)
+    creado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="ajustes_liquidacion_creados"
+    )
+    creado_en = models.DateTimeField(auto_now_add=True)
+    anulado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="ajustes_liquidacion_anulados"
+    )
+    anulado_en = models.DateTimeField(null=True, blank=True)
+    motivo_anulacion = models.TextField(blank=True, default="")
+
+    class Meta:
+        ordering = ["-creado_en"]
+
+    def __str__(self):
+        return f"{self.get_tipo_display()} - {self.concepto} - {self.liquidacion_id}"
+
+    def save(self, *args, **kwargs):
+        self.diferencia = (
+            Decimal(self.importe_nuevo or 0) - Decimal(self.importe_anterior or 0)
+        ).quantize(Decimal("0.01"))
+
+        if self.liquidacion_id:
+            self.funcionario = self.liquidacion.funcionario
+            self.empresa = self.liquidacion.empresa or self.liquidacion.funcionario.empresa
+
+        super().save(*args, **kwargs)
+
+
 class DiaLibre(models.Model):
     class DiasSemana(models.IntegerChoices):
         LUNES = 0, "Lunes"

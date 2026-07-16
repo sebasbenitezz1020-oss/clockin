@@ -334,14 +334,14 @@
 <div class="container-fluid bio-page">
     <div class="bio-hero">
         <div class="bio-hero-text">
-            <h2>📸 Módulo Biométrico</h2>
+            <h2>Módulo Biométrico</h2>
             <p>
                 Administre el lector facial de ClockIn, controle qué funcionarios ya tienen rostro cargado
                 y acceda rápidamente al lector biométrico para marcación de entrada o salida.
             </p>
         </div>
         <div class="bio-hero-badge">
-            🔐 Reconocimiento facial activo
+            Reconocimiento facial activo
         </div>
     </div>
 
@@ -388,31 +388,55 @@
 
                 <div class="bio-action-grid">
                     <a href="{% url 'biometrico_kiosko' %}" class="bio-action-box">
-                        <div class="bio-action-icon">🚀</div>
-                        <div class="bio-action-title">Abrir lector biométrico</div>
+                        <div class="bio-action-icon" aria-hidden="true">
+                            <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
+                                <rect x="5" y="3" width="14" height="18" rx="2.5" stroke="currentColor" stroke-width="2"/>
+                                <path d="M9 18h6" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                <path d="M8 7h8v8H8z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                            </svg>
+                        </div>
+                        <div class="bio-action-title">Lector biométrico para tablet</div>
                         <div class="bio-action-text">
-                            Pantalla lista para usar en notebook, PC o tablet como punto de marcación.
+                            Mantiene el lector actual para tablet, notebook o punto fijo de marcación.
                         </div>
                     </a>
 
                     <a href="{% url 'funcionarios_lista' %}" class="bio-action-box">
-                        <div class="bio-action-icon">👥</div>
+                        <div class="bio-action-icon" aria-hidden="true">
+                            <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
+                                <path d="M16 11a4 4 0 1 0-8 0" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                <path d="M4 21a8 8 0 0 1 16 0" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                <path d="M17.5 7.5a3 3 0 0 1 2.5 3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                            </svg>
+                        </div>
                         <div class="bio-action-title">Ir a funcionarios</div>
                         <div class="bio-action-text">
                             Accede al listado completo y gestiona datos, turnos y rostros registrados.
                         </div>
                     </a>
 
-                    <a href="{% url 'biometrico_kiosko' %}" class="bio-action-box">
-                        <div class="bio-action-icon">🟢</div>
-                        <div class="bio-action-title">Marcar entrada / salida</div>
+                    <a href="{% url 'biometrico_celular' %}" class="bio-action-box">
+                        <div class="bio-action-icon" aria-hidden="true">
+                            <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
+                                <rect x="7" y="2.5" width="10" height="19" rx="2.5" stroke="currentColor" stroke-width="2"/>
+                                <path d="M10 6h4" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                <path d="M11 18h2" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                <circle cx="12" cy="12" r="3" stroke="currentColor" stroke-width="2"/>
+                            </svg>
+                        </div>
+                        <div class="bio-action-title">Lector biométrico para celular</div>
                         <div class="bio-action-text">
-                            Usa el kiosko biométrico con selección manual de entrada o salida.
+                            Vista optimizada para teléfonos móviles, cámara frontal y controles táctiles.
                         </div>
                     </a>
 
                     <a href="{% url 'funcionarios_lista' %}" class="bio-action-box">
-                        <div class="bio-action-icon">📸</div>
+                        <div class="bio-action-icon" aria-hidden="true">
+                            <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
+                                <path d="M4 8.5A2.5 2.5 0 0 1 6.5 6H9l1.2-1.6A2 2 0 0 1 11.8 3.6h.4a2 2 0 0 1 1.6.8L15 6h2.5A2.5 2.5 0 0 1 20 8.5v8A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5v-8Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
+                                <circle cx="12" cy="12.5" r="3.2" stroke="currentColor" stroke-width="2"/>
+                            </svg>
+                        </div>
                         <div class="bio-action-title">Actualizar rostros</div>
                         <div class="bio-action-text">
                             Revisa quiénes necesitan registrar o actualizar su rostro facial.

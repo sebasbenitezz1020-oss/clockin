@@ -93,6 +93,25 @@
                 </select>
             </div>
 
+            <div class="payroll-field">
+                <label>Sucursal</label>
+                <select name="sucursal">
+                    <option value="">Todas las sucursales</option>
+                    {% for sucursal in sucursales %}
+                        <option value="{{ sucursal.id }}" {% if sucursal_id == sucursal.id|stringformat:"s" %}selected{% endif %}>{{ sucursal.nombre }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
+            <div class="payroll-field">
+                <label>Sector</label>
+                <select name="sector" multiple size="4">
+                    {% for sector in sectores %}
+                        <option value="{{ sector }}" {% if sector in sectores_seleccionados %}selected{% endif %}>{{ sector }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+
             <button type="submit" class="payroll-btn payroll-btn-primary">Filtrar</button>
         </form>
 
@@ -130,6 +149,26 @@
                     <button type="submit" class="payroll-btn payroll-btn-secondary" formtarget="_blank">PDF general</button>
                 </div>
             </form>
+
+            <form method="get" action="{% url 'nomina_sectores_pdf' %}" class="payroll-action-panel">
+                <input type="hidden" name="mes" value="{{ mes }}">
+                <input type="hidden" name="anio" value="{{ anio }}">
+                <input type="hidden" name="estado" value="{{ estado }}">
+                <input type="hidden" name="sucursal" value="{{ sucursal_id }}">
+                {% for sector in sectores_seleccionados %}
+                    <input type="hidden" name="sector" value="{{ sector }}">
+                {% endfor %}
+
+                <div>
+                    <strong>Exportar por sector</strong>
+                    <span>Genera PDF separados por sector; si hay varios, descarga ZIP.</span>
+                </div>
+
+                <div class="payroll-inline-control">
+                    <button type="submit" class="payroll-btn payroll-btn-secondary" formtarget="_blank">PDF por sector</button>
+                    <button type="submit" formaction="{% url 'nomina_sectores_excel' %}" class="payroll-btn payroll-btn-secondary">Excel por sector</button>
+                </div>
+            </form>
         </div>
 
         <div class="payroll-close-panel {% if cierre_nomina %}is-closed{% else %}is-open{% endif %}">
@@ -151,6 +190,50 @@
             {% else %}
                 <a href="{% url 'nomina_cerrar_periodo' %}?mes={{ mes }}&anio={{ anio }}" class="payroll-btn payroll-btn-success">Cerrar n&oacute;mina</a>
             {% endif %}
+        </div>
+    </section>
+
+    <section class="payroll-table-card">
+        <div class="payroll-table-head">
+            <div>
+                <h3>Resumen por sector</h3>
+                <p>{{ resumen_sectores|length }} sector(es) incluidos en el filtro actual</p>
+            </div>
+        </div>
+
+        <div class="payroll-table-wrap">
+            <table class="payroll-table">
+                <thead>
+                    <tr>
+                        <th>Sector</th>
+                        <th class="text-right">Funcionarios</th>
+                        <th class="text-right">Haberes</th>
+                        <th class="text-right">IPS</th>
+                        <th class="text-right">Otros descuentos</th>
+                        <th class="text-right">Ajustes</th>
+                        <th class="text-right">Neto a pagar</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in resumen_sectores %}
+                    <tr>
+                        <td data-label="Sector"><strong>{{ item.sector }}</strong></td>
+                        <td class="text-right" data-label="Funcionarios">{{ item.cantidad|millares }}</td>
+                        <td class="text-right" data-label="Haberes">{{ item.total_haberes|guaranies }}</td>
+                        <td class="text-right" data-label="IPS">{{ item.total_ips|guaranies }}</td>
+                        <td class="text-right" data-label="Otros descuentos">{{ item.total_deudas|guaranies }}</td>
+                        <td class="text-right" data-label="Ajustes">{{ item.total_ajustes|guaranies }}</td>
+                        <td class="text-right" data-label="Neto"><strong class="payroll-net">{{ item.total_neto|guaranies }}</strong></td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7">
+                            <div class="payroll-empty">No hay sectores para el filtro actual.</div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </section>
 

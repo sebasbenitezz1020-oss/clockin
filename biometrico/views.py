@@ -386,9 +386,10 @@ def obtener_fecha_operativa_asistencia(funcionario, ahora=None):
 
     return hoy
 
-def _marcar_asistencia_biometrica(request, funcionario, modo):
+def _marcar_asistencia_biometrica(request, funcionario, modo, origen="biometrico_tablet"):
     ahora = timezone.localtime()
     fecha_operativa = obtener_fecha_operativa_asistencia(funcionario, ahora)
+    origen = origen if origen in ["biometrico_tablet", "biometrico_celular"] else "biometrico_tablet"
 
     if modo not in ["entrada", "salida"]:
         return {
@@ -421,6 +422,7 @@ def _marcar_asistencia_biometrica(request, funcionario, modo):
     if modo == "entrada":
         if siguiente == "entrada":
             asistencia.hora_entrada = ahora
+            asistencia.origen_marcacion = origen
             asistencia.calcular_atraso()
 
             if asistencia.llego_tarde:
@@ -454,6 +456,7 @@ def _marcar_asistencia_biometrica(request, funcionario, modo):
 
         if siguiente == "regreso_almuerzo":
             asistencia.hora_regreso_almuerzo = ahora
+            asistencia.origen_marcacion = origen
 
             if asistencia.observacion:
                 asistencia.observacion += " Regreso de almuerzo registrado por biométrico."
@@ -504,6 +507,7 @@ def _marcar_asistencia_biometrica(request, funcionario, modo):
     if modo == "salida":
         if siguiente == "salida_almuerzo":
             asistencia.hora_salida_almuerzo = ahora
+            asistencia.origen_marcacion = origen
 
             if asistencia.observacion:
                 asistencia.observacion += " Salida a almuerzo registrada por biométrico."
@@ -533,6 +537,7 @@ def _marcar_asistencia_biometrica(request, funcionario, modo):
 
         if siguiente == "salida":
             asistencia.hora_salida = ahora
+            asistencia.origen_marcacion = origen
 
             if asistencia.observacion:
                 asistencia.observacion += " Salida final registrada correctamente por biométrico."
@@ -610,6 +615,10 @@ def biometrico_inicio(request):
 
 def kiosko(request):
     return render(request, "biometrico/kiosko.html")
+
+
+def kiosko_celular(request):
+    return render(request, "biometrico/kiosko_celular.html")
 
 
 @csrf_exempt
@@ -699,6 +708,7 @@ def reconocimiento(request):
 
     data = request.POST.get("imagen")
     modo = request.POST.get("modo", "entrada").strip().lower()
+    origen = request.POST.get("origen", "biometrico_tablet").strip().lower()
     solo_deteccion = request.POST.get("solo_deteccion", "0").strip() in ["1", "true", "True"]
 
     if not data:
@@ -790,7 +800,7 @@ def reconocimiento(request):
                 "mensaje": "Lectura reciente detectada. Espere unos segundos."
             })
 
-        resultado = _marcar_asistencia_biometrica(request, funcionario, modo)
+        resultado = _marcar_asistencia_biometrica(request, funcionario, modo, origen=origen)
 
         return JsonResponse({
             "ok": resultado["ok"],
@@ -804,6 +814,7 @@ def reconocimiento(request):
             "llego_tarde": resultado.get("llego_tarde", False),
             "minutos_atraso": resultado.get("minutos_atraso", 0),
             "modo": modo,
+            "origen": origen,
         })
 
     except Exception as e:

@@ -266,6 +266,10 @@
             <a href="{% url 'liquidaciones_lista' %}" class="liqdet-btn liqdet-btn-soft">← Volver</a>
             <a href="{% url 'liquidacion_pdf' liquidacion.id %}" class="liqdet-btn liqdet-btn-soft" target="_blank">🖨️ PDF</a>
 
+            {% if puede_ajustar_liquidacion %}
+                <a href="{% url 'liquidacion_ajuste_manual' liquidacion.id %}" class="liqdet-btn liqdet-btn-main">Ajuste manual</a>
+            {% endif %}
+
             {% if liquidacion.estado == "borrador" %}
                 <a href="{% url 'liquidacion_confirmar' liquidacion.id %}" class="liqdet-btn liqdet-btn-main">✅ Confirmar</a>
             {% endif %}
@@ -460,6 +464,16 @@
                 <div class="liqdet-panel-title">Base salarial</div>
                 <div class="liqdet-list">
                     <div class="liqdet-line">
+                        <span>Modalidad salarial usada</span>
+                        <strong>
+                            {% if liquidacion.modalidad_salarial_snapshot == "diferenciado" %}
+                                Salario diferenciado
+                            {% else %}
+                                Salario base + bono
+                            {% endif %}
+                        </strong>
+                    </div>
+                    <div class="liqdet-line">
                         <span>Salario base snapshot</span>
                         <strong>{{ liquidacion.salario_base_snapshot|guaranies }}</strong>
                     </div>
@@ -467,6 +481,62 @@
                         <span>Bono base snapshot</span>
                         <strong>{{ liquidacion.bono_base_snapshot|guaranies }}</strong>
                     </div>
+                    <div class="liqdet-line">
+                        <span>Salario diferenciado snapshot</span>
+                        <strong>{{ liquidacion.salario_diferenciado_snapshot|guaranies }}</strong>
+                    </div>
+                    <div class="liqdet-line">
+                        <span>Salario bruto aplicable</span>
+                        <strong>{{ liquidacion.salario_bruto_aplicable_snapshot|guaranies }}</strong>
+                    </div>
+                    <div class="liqdet-line">
+                        <span>IPS aplicado</span>
+                        <strong>{{ liquidacion.porcentaje_ips_snapshot }}% · {{ liquidacion.descuento_ips_calculado_snapshot|guaranies }}</strong>
+                    </div>
+                </div>
+            </div>
+
+            <div class="liqdet-panel">
+                <div class="liqdet-panel-title">Ajustes manuales</div>
+                <div class="liqdet-list">
+                    <div class="liqdet-line">
+                        <span>Calculo automatico</span>
+                        <strong>{{ liquidacion.total_liquidacion_automatico|guaranies }}</strong>
+                    </div>
+                    <div class="liqdet-line">
+                        <span>Ajuste en haberes</span>
+                        <strong>{{ ajuste_haberes|guaranies }}</strong>
+                    </div>
+                    <div class="liqdet-line">
+                        <span>Ajuste en descuentos</span>
+                        <strong>{{ ajuste_descuentos|guaranies }}</strong>
+                    </div>
+                    <div class="liqdet-line">
+                        <span>Total final</span>
+                        <strong>{{ liquidacion.total_liquidacion|guaranies }}</strong>
+                    </div>
+
+                    {% for ajuste in ajustes_manuales %}
+                    <div class="liqdet-line">
+                        <span>
+                            {{ ajuste.get_tipo_display }} · {{ ajuste.concepto }}
+                            {% if ajuste.estado == "anulado" %}(Anulado){% endif %}
+                            <br>
+                            <small>{{ ajuste.creado_en|date:"d/m/Y H:i" }}{% if ajuste.creado_por %} · {{ ajuste.creado_por }}{% endif %}</small>
+                        </span>
+                        <strong>{{ ajuste.diferencia|guaranies }}</strong>
+                    </div>
+                    <div class="liqdet-note">{{ ajuste.motivo|linebreaksbr }}</div>
+                    {% if puede_ajustar_liquidacion and ajuste.estado == "activo" %}
+                    <form method="post" action="{% url 'liquidacion_ajuste_anular' liquidacion.id ajuste.id %}" class="liqdet-line">
+                        {% csrf_token %}
+                        <input type="text" name="motivo_anulacion" class="form-control" placeholder="Motivo de anulacion" required>
+                        <button type="submit" class="liqdet-btn liqdet-btn-danger">Anular ajuste</button>
+                    </form>
+                    {% endif %}
+                    {% empty %}
+                    <div class="liqdet-note">No hay ajustes manuales registrados.</div>
+                    {% endfor %}
                 </div>
             </div>
 

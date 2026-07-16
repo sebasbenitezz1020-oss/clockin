@@ -1,4 +1,5 @@
 from django import forms
+from decimal import Decimal
 from .models import (
     Empresa,
     Sucursal,
@@ -9,6 +10,7 @@ from .models import (
     Vacacion,
     ConfiguracionGeneral,
     Liquidacion,
+    AjusteManualLiquidacion,
     DiaLibre,
     ComunicacionLaboral,
     PlanillaBancaria,
@@ -108,6 +110,7 @@ class EmpresaForm(forms.ModelForm):
             "tema_visual",
             "texto_legal_pdf",
             "icl_activo",
+            "permite_ajuste_manual_liquidacion",
             "activo",
             "estado",
             "plan_contratado",
@@ -130,6 +133,7 @@ class EmpresaForm(forms.ModelForm):
             "tema_visual": forms.Select(choices=[("", "Usar tema global")] + ConfiguracionGeneral.TEMAS_CHOICES, attrs={"class": "form-control"}),
             "texto_legal_pdf": forms.Textarea(attrs={"class": "form-control", "rows": 4}),
             "icl_activo": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "permite_ajuste_manual_liquidacion": forms.CheckboxInput(attrs={"class": "form-check-input"}),
             "activo": forms.CheckboxInput(attrs={"class": "form-check-input"}),
             "estado": forms.Select(attrs={"class": "form-control"}),
             "plan_contratado": forms.Select(attrs={"class": "form-control"}),
@@ -458,6 +462,8 @@ class FuncionarioForm(forms.ModelForm):
             "sector",
             "ips",
             "bono",
+            "usa_salario_diferenciado",
+            "salario_diferenciado",
             "modalidad_cobro",
             "banco",
             "tipo_cuenta",
@@ -491,6 +497,13 @@ class FuncionarioForm(forms.ModelForm):
             "cargo": forms.Select(attrs={"class": "form-control"}),
             "sector": forms.Select(attrs={"class": "form-control"}),
             "bono": forms.NumberInput(attrs={"class": "form-control", "step": "0.01"}),
+            "usa_salario_diferenciado": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+            "salario_diferenciado": forms.NumberInput(attrs={
+                "class": "form-control",
+                "step": "1",
+                "min": "0",
+                "placeholder": "Ej: 8000000",
+            }),
             "modalidad_cobro": forms.Select(attrs={"class": "form-control"}),
             "banco": forms.Select(attrs={"class": "form-control"}),
             "tipo_cuenta": forms.Select(attrs={"class": "form-control"}),
@@ -518,6 +531,8 @@ class FuncionarioForm(forms.ModelForm):
         }
         labels = {
             "sucursal_rel": "Sucursal",
+            "usa_salario_diferenciado": "Utilizar salario diferenciado",
+            "salario_diferenciado": "Salario diferenciado mensual",
             "modalidad_cobro": "Modalidad de cobro",
             "tipo_cuenta": "Tipo de cuenta",
             "numero_cuenta": "Número de cuenta",
@@ -534,6 +549,7 @@ class FuncionarioForm(forms.ModelForm):
 
         self.fields["empresa"].required = False
         self.fields["empresa"].empty_label = "Seleccionar empresa"
+        self.fields["salario_diferenciado"].required = False
 
         self.fields["sucursal_rel"].required = False
         self.fields["sucursal_rel"].queryset = Sucursal.objects.none()
@@ -585,9 +601,20 @@ class FuncionarioForm(forms.ModelForm):
         banco = cleaned_data.get("banco")
         tipo_cuenta = cleaned_data.get("tipo_cuenta")
         numero_cuenta = (cleaned_data.get("numero_cuenta") or "").strip()
+        usa_salario_diferenciado = cleaned_data.get("usa_salario_diferenciado")
+        salario_diferenciado = cleaned_data.get("salario_diferenciado") or Decimal("0")
 
         if empresa and sucursal_rel and sucursal_rel.empresa_id != empresa.id:
             raise forms.ValidationError("La sucursal seleccionada no pertenece a la empresa elegida.")
+
+        if usa_salario_diferenciado and salario_diferenciado <= 0:
+            self.add_error(
+                "salario_diferenciado",
+                "Debes cargar un salario diferenciado mayor a cero."
+            )
+
+        if not usa_salario_diferenciado:
+            cleaned_data["salario_diferenciado"] = Decimal("0")
 
         if modalidad_cobro == Funcionario.ModalidadesCobro.TRANSFERENCIA:
             if not banco or not tipo_cuenta or not numero_cuenta:
@@ -608,6 +635,11 @@ class FuncionarioForm(forms.ModelForm):
 
         obj.salario_base = config.salario_base_default
         obj.porcentaje_limite_deuda = config.porcentaje_limite_deuda_default
+
+        if obj.usa_salario_diferenciado:
+            obj.bono = Decimal("0")
+        else:
+            obj.salario_diferenciado = Decimal("0")
 
         if obj.sucursal_rel:
             obj.sucursal = obj.sucursal_rel.nombre
@@ -899,6 +931,63 @@ class LiquidacionForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields["funcionario"].queryset = Funcionario.objects.filter(activo=True).select_related("sucursal_rel").order_by("apellido", "nombre")
         self.fields["funcionario"].empty_label = "Seleccionar funcionario"
+
+
+class AjusteManualLiquidacionForm(forms.ModelForm):
+    class Meta:
+        model = AjusteManualLiquidacion
+        fields = [
+            "tipo",
+            "concepto",
+            "importe_anterior",
+            "importe_nuevo",
+            "motivo",
+        ]
+        widgets = {
+            "tipo": forms.Select(attrs={"class": "form-control"}),
+            "concepto": forms.TextInput(attrs={
+                "class": "form-control",
+                "placeholder": "Ej: Haber extraordinario, correccion de descuento"
+            }),
+            "importe_anterior": forms.NumberInput(attrs={
+                "class": "form-control",
+                "step": "0.01",
+                "min": "0",
+            }),
+            "importe_nuevo": forms.NumberInput(attrs={
+                "class": "form-control",
+                "step": "0.01",
+                "min": "0",
+            }),
+            "motivo": forms.Textarea(attrs={
+                "class": "form-control",
+                "rows": 4,
+                "placeholder": "Justificacion obligatoria del ajuste"
+            }),
+        }
+        labels = {
+            "tipo": "Tipo de ajuste",
+            "concepto": "Concepto",
+            "importe_anterior": "Importe anterior",
+            "importe_nuevo": "Importe nuevo",
+            "motivo": "Motivo",
+        }
+
+    def clean_motivo(self):
+        motivo = (self.cleaned_data.get("motivo") or "").strip()
+        if len(motivo) < 10:
+            raise forms.ValidationError("El motivo es obligatorio y debe tener al menos 10 caracteres.")
+        return motivo
+
+    def clean(self):
+        cleaned_data = super().clean()
+        importe_anterior = cleaned_data.get("importe_anterior") or Decimal("0")
+        importe_nuevo = cleaned_data.get("importe_nuevo") or Decimal("0")
+
+        if importe_anterior == importe_nuevo:
+            raise forms.ValidationError("El importe nuevo debe ser diferente al importe anterior.")
+
+        return cleaned_data
         self.fields["funcionario"].label_from_instance = _label_funcionario_buscable
         self.fields["tipo_salida"].choices = [("", "Seleccionar tipo de salida")] + list(Liquidacion.TiposSalida.choices)
 

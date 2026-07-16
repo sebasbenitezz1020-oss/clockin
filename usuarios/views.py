@@ -16,6 +16,8 @@ ACCIONES = [
     ("puede_confirmar", "Confirmar"),
     ("puede_pagar", "Pagar"),
     ("puede_anular", "Anular"),
+    ("puede_ajustar", "Ajustar"),
+    ("puede_exportar", "Exportar"),
 ]
 
 
@@ -142,6 +144,8 @@ def usuario_permisos(request, pk):
             permiso.puede_confirmar = f"{modulo_valor}_puede_confirmar" in request.POST
             permiso.puede_pagar = f"{modulo_valor}_puede_pagar" in request.POST
             permiso.puede_anular = f"{modulo_valor}_puede_anular" in request.POST
+            permiso.puede_ajustar = f"{modulo_valor}_puede_ajustar" in request.POST
+            permiso.puede_exportar = f"{modulo_valor}_puede_exportar" in request.POST
             permiso.activo = True
             permiso.save()
 
@@ -167,6 +171,8 @@ def usuario_permisos(request, pk):
             "puede_confirmar": permiso.puede_confirmar if permiso else False,
             "puede_pagar": permiso.puede_pagar if permiso else False,
             "puede_anular": permiso.puede_anular if permiso else False,
+            "puede_ajustar": permiso.puede_ajustar if permiso else False,
+            "puede_exportar": permiso.puede_exportar if permiso else False,
         })
 
     return render(request, "usuarios/usuario_permisos.html", {

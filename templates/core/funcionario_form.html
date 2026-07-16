@@ -307,7 +307,17 @@
                     {{ form.fecha_ingreso.errors }}
                 </div>
 
-                <div class="func-form-field">
+                <div class="func-form-field func-salary-mode">
+                    <label class="check-item salary-switch">
+                        {{ form.usa_salario_diferenciado }} <span>Utilizar salario diferenciado</span>
+                    </label>
+                    <div class="helper-text">
+                        Al habilitar esta opcion, el salario diferenciado reemplaza al salario base y al bono en todos los calculos de nomina.
+                    </div>
+                    {{ form.usa_salario_diferenciado.errors }}
+                </div>
+
+                <div class="func-form-field salary-normal-field">
                     <label for="{{ form.salario_base_fijo.id_for_label }}">Salario base</label>
                     <div class="func-input-shell with-icon">
                         <span class="icon">💵</span>
@@ -317,13 +327,23 @@
                     {{ form.salario_base_fijo.errors }}
                 </div>
 
-                <div class="func-form-field">
+                <div class="func-form-field salary-normal-field">
                     <label for="{{ form.bono.id_for_label }}">Bono base</label>
                     <div class="func-input-shell with-icon">
                         <span class="icon">✨</span>
                         {{ form.bono }}
                     </div>
                     {{ form.bono.errors }}
+                </div>
+
+                <div class="func-form-field salary-diff-field">
+                    <label for="{{ form.salario_diferenciado.id_for_label }}">Salario diferenciado mensual</label>
+                    <div class="func-input-shell with-icon">
+                        <span class="icon">Gs.</span>
+                        {{ form.salario_diferenciado }}
+                    </div>
+                    <div class="helper-text">Debe ser un monto mensual fijo en guaranies.</div>
+                    {{ form.salario_diferenciado.errors }}
                 </div>
 
                 <div class="func-form-field">
@@ -499,6 +519,42 @@ document.addEventListener("DOMContentLoaded", function () {
     const sucursalSelect = document.getElementById("id_sucursal_rel");
     const modalidadCobro = document.getElementById("id_modalidad_cobro");
     const camposBancarios = document.querySelectorAll(".datos-bancarios");
+    const usaSalarioDiferenciado = document.getElementById("id_usa_salario_diferenciado");
+    const salarioDiferenciado = document.getElementById("id_salario_diferenciado");
+    const bono = document.getElementById("id_bono");
+    const salarioBaseFijo = document.getElementById("id_salario_base_fijo");
+    const camposNormales = document.querySelectorAll(".salary-normal-field");
+    const camposDiferenciados = document.querySelectorAll(".salary-diff-field");
+
+    function toggleSalarioDiferenciado() {
+        if (!usaSalarioDiferenciado) return;
+        const activo = usaSalarioDiferenciado.checked;
+
+        camposNormales.forEach(el => {
+            el.style.display = activo ? "none" : "flex";
+        });
+
+        camposDiferenciados.forEach(el => {
+            el.style.display = activo ? "flex" : "none";
+        });
+
+        if (salarioDiferenciado) {
+            salarioDiferenciado.required = activo;
+        }
+
+        if (bono) {
+            bono.readOnly = activo;
+        }
+
+        if (salarioBaseFijo) {
+            salarioBaseFijo.readOnly = true;
+        }
+    }
+
+    if (usaSalarioDiferenciado) {
+        usaSalarioDiferenciado.addEventListener("change", toggleSalarioDiferenciado);
+        toggleSalarioDiferenciado();
+    }
 
     function toggleCamposBancarios() {
         if (!modalidadCobro) return;

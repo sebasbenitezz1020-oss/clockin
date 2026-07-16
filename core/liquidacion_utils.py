@@ -115,7 +115,7 @@ def calcular_promedio_salarial_ultimos_6_meses(funcionario, fecha_salida):
             if nomina.anio == fecha_salida.year and nomina.mes > fecha_salida.month:
                 continue
 
-            salario = d(getattr(nomina, "salario_base", 0))
+            salario = d(getattr(nomina, "salario_bruto", 0) or getattr(nomina, "salario_base", 0))
             if salario > 0:
                 valores.append(salario)
 
@@ -255,10 +255,16 @@ def calcular_liquidacion_funcionario(
     descontar_preaviso=False,
     otros_descuentos=0,
 ):
-    salario_base = d(getattr(funcionario, "salario_base", 0))
-    bono_base = d(getattr(funcionario, "bono", 0))
-    salario_mensual = salario_base + bono_base
-    salario_diario_base = (salario_base / Decimal(30)).quantize(DECIMAL_2, rounding=ROUND_HALF_UP)
+    usa_salario_diferenciado = bool(getattr(funcionario, "usa_salario_diferenciado", False))
+    modalidad_salarial = getattr(funcionario, "modalidad_salarial", "diferenciado" if usa_salario_diferenciado else "normal")
+    salario_base_configurado = d(getattr(funcionario, "salario_base", 0))
+    bono_configurado = d(getattr(funcionario, "bono", 0))
+    salario_diferenciado = d(getattr(funcionario, "salario_diferenciado", 0)) if usa_salario_diferenciado else d(0)
+    salario_base = d(getattr(funcionario, "salario_base_aplicable", salario_base_configurado))
+    bono_base = d(getattr(funcionario, "bono_aplicable", bono_configurado))
+    salario_mensual = d(getattr(funcionario, "salario_bruto_aplicable", salario_base + bono_base))
+    salario_diario_base = (salario_mensual / Decimal(30)).quantize(DECIMAL_2, rounding=ROUND_HALF_UP)
+    porcentaje_ips = Decimal("9.00")
 
     fecha_ingreso = getattr(funcionario, "fecha_ingreso", None)
     antig = calcular_antiguedad_detalle(fecha_ingreso, fecha_salida)
@@ -290,12 +296,12 @@ def calcular_liquidacion_funcionario(
         if not preaviso_cumplido and dias_faltantes_preaviso > 0:
             preaviso_monto = (salario_diario_base * Decimal(dias_faltantes_preaviso)).quantize(DECIMAL_2)
 
-    salario_indemnizacion = calcular_promedio_salarial_ultimos_6_meses(funcionario, fecha_salida) or salario_base
+    salario_indemnizacion = calcular_promedio_salarial_ultimos_6_meses(funcionario, fecha_salida) or salario_mensual
     indemnizacion = calcular_indemnizacion(tipo_salida, fecha_ingreso, fecha_salida, salario_indemnizacion)
 
     ips_monto = d(0)
     if getattr(funcionario, "ips", False):
-        ips_monto = (salario_pendiente_monto * Decimal("0.09")).quantize(DECIMAL_2)
+        ips_monto = (salario_mensual * Decimal("0.09")).quantize(DECIMAL_2)
 
     deudas_monto = calcular_deudas_activas_funcionario(funcionario)
     otros_descuentos = d(otros_descuentos)
@@ -329,8 +335,13 @@ def calcular_liquidacion_funcionario(
         alerta_revision = "Caso cargado como abandono: verificar respaldo documental y causal antes de confirmar."
 
     resumen = {
-        "salario_base_snapshot": salario_base,
+        "modalidad_salarial_snapshot": modalidad_salarial,
+        "salario_base_snapshot": salario_base_configurado,
         "bono_base_snapshot": bono_base,
+        "salario_diferenciado_snapshot": salario_diferenciado,
+        "salario_bruto_aplicable_snapshot": salario_mensual,
+        "porcentaje_ips_snapshot": porcentaje_ips,
+        "descuento_ips_calculado_snapshot": ips_monto,
         "salario_indemnizacion_base": salario_indemnizacion,
         "salario_diario_base": salario_diario_base,
         "antiguedad_anios": antig["anios"],
@@ -361,6 +372,9 @@ def calcular_liquidacion_funcionario(
         "total_haberes": total_haberes,
         "total_descuentos": total_descuentos,
         "total_liquidacion": total_liquidacion,
+        "total_haberes_automatico": total_haberes,
+        "total_descuentos_automatico": total_descuentos,
+        "total_liquidacion_automatico": total_liquidacion,
         "requiere_revision_juridica": requiere_revision_juridica,
         "alerta_revision": alerta_revision,
     }

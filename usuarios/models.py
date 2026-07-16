@@ -92,6 +92,8 @@ class PermisoUsuario(models.Model):
     puede_confirmar = models.BooleanField(default=False)
     puede_pagar = models.BooleanField(default=False)
     puede_anular = models.BooleanField(default=False)
+    puede_ajustar = models.BooleanField(default=False)
+    puede_exportar = models.BooleanField(default=False)
 
     activo = models.BooleanField(default=True)
 

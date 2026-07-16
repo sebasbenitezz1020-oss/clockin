@@ -3,6 +3,8 @@ from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from io import BytesIO
 import csv
+import re
+from zipfile import ZipFile, ZIP_DEFLATED
 from django.http import HttpResponse
 import uuid
 import hashlib
@@ -66,6 +68,7 @@ from .forms import (
     HistorialSalarialFuncionarioForm,
     SuscripcionSistemaForm,
     PagoSuscripcionSistemaForm,
+    AjusteManualLiquidacionForm,
 )
 
 from .liquidacion_utils import (
@@ -81,6 +84,7 @@ from .models import (
     Funcionario,
     HistorialAccion,
     Liquidacion,
+    AjusteManualLiquidacion,
     NominaMensual,
     AguinaldoAnual,
     CierreNomina,
@@ -615,10 +619,10 @@ def generar_nomina_funcionario(funcionario, mes, anio):
     resumen_icl = calcular_icl_funcionario_mes(funcionario, mes, anio)
     icl_activo = icl_activo_para_funcionario(funcionario)
 
-    salario_base = Decimal(funcionario.salario_base or 0).quantize(Decimal("0.01"))
-    bono_base = Decimal(funcionario.bono or 0).quantize(Decimal("0.01"))
-    bono_icl = calcular_bono_pagable_por_icl(bono_base, resumen_icl["icl"], icl_activo)
-    salario_bruto = (salario_base + bono_icl).quantize(Decimal("0.01"))
+    salario_base = funcionario.salario_base_aplicable
+    bono_base = funcionario.bono_aplicable
+    bono_icl = Decimal("0.00") if funcionario.usa_salario_diferenciado else calcular_bono_pagable_por_icl(bono_base, resumen_icl["icl"], icl_activo)
+    salario_bruto = funcionario.salario_bruto_aplicable if funcionario.usa_salario_diferenciado else (salario_base + bono_icl).quantize(Decimal("0.01"))
     descuento_ips = funcionario.descuento_ips
     descuento_deudas = funcionario.descuento_deudas_mes
 
@@ -2989,10 +2993,10 @@ def icl_lista(request):
         icl = 100 - (atrasos_count * 2) - (ausencias_no_justificadas * 5)
         icl = max(0, min(100, icl))
 
-        bono_base = Decimal(funcionario.bono or 0).quantize(Decimal("0.01"))
-        bono_pagable_icl = calcular_bono_pagable_por_icl(bono_base, icl, icl_activo)
-        salario_base = Decimal(funcionario.salario_base or 0).quantize(Decimal("0.01"))
-        salario_bruto_mes = (salario_base + bono_pagable_icl).quantize(Decimal("0.01"))
+        bono_base = funcionario.bono_aplicable
+        bono_pagable_icl = Decimal("0.00") if funcionario.usa_salario_diferenciado else calcular_bono_pagable_por_icl(bono_base, icl, icl_activo)
+        salario_base = funcionario.salario_base_aplicable
+        salario_bruto_mes = funcionario.salario_bruto_aplicable if funcionario.usa_salario_diferenciado else (salario_base + bono_pagable_icl).quantize(Decimal("0.01"))
         deudas_mes = funcionario.descuento_deudas_mes
         salario_neto_mes = salario_bruto_mes - funcionario.descuento_ips - deudas_mes
         if salario_neto_mes < 0:
@@ -3312,10 +3316,10 @@ def reportes(request):
         icl = 100 - (atrasos_count * 2) - (ausencias_no_justificadas * 5)
         icl = max(0, min(100, icl))
         icl_activo = icl_activo_para_funcionario(funcionario)
-        salario_base_mes = Decimal(funcionario.salario_base or 0).quantize(Decimal("0.01"))
-        bono_base_mes = Decimal(funcionario.bono or 0).quantize(Decimal("0.01"))
-        bono_mes = calcular_bono_pagable_por_icl(bono_base_mes, icl, icl_activo)
-        salario_bruto_mes = (salario_base_mes + bono_mes).quantize(Decimal("0.01"))
+        salario_base_mes = funcionario.salario_base_aplicable
+        bono_base_mes = funcionario.bono_aplicable
+        bono_mes = Decimal("0.00") if funcionario.usa_salario_diferenciado else calcular_bono_pagable_por_icl(bono_base_mes, icl, icl_activo)
+        salario_bruto_mes = funcionario.salario_bruto_aplicable if funcionario.usa_salario_diferenciado else (salario_base_mes + bono_mes).quantize(Decimal("0.01"))
         salario_neto_mes = salario_bruto_mes - funcionario.descuento_ips - funcionario.descuento_deudas_mes
         if salario_neto_mes < 0:
             salario_neto_mes = Decimal("0.00")
@@ -4311,6 +4315,12 @@ def nomina_lista(request):
     mes = int(request.GET.get("mes", hoy.month))
     anio = int(request.GET.get("anio", hoy.year))
     estado = request.GET.get("estado", "").strip()
+    sucursal_id = request.GET.get("sucursal", "").strip()
+    sectores_seleccionados = [
+        sector.strip()
+        for sector in request.GET.getlist("sector")
+        if sector.strip()
+    ]
 
     empresa_usuario = obtener_empresa_activa(request)
     admin_master = es_admin_master(request.user) and empresa_usuario is None
@@ -4402,6 +4412,12 @@ def nomina_lista(request):
     if estado:
         nominas = nominas.filter(estado_pago=estado)
 
+    if sucursal_id:
+        nominas = nominas.filter(funcionario__sucursal_rel_id=sucursal_id)
+
+    if sectores_seleccionados:
+        nominas = nominas.filter(funcionario__sector__in=sectores_seleccionados)
+
     nominas = nominas.order_by("funcionario__apellido", "funcionario__nombre")
 
     total_bruto = nominas.aggregate(total=Sum("salario_bruto"))["total"] or Decimal("0.00")
@@ -4425,11 +4441,49 @@ def nomina_lista(request):
             empresa=empresa_usuario
         ).order_by("nombre") if empresa_usuario else Sucursal.objects.none()
 
+    sectores_qs = Funcionario.objects.filter(activo=True).exclude(sector="")
+    if not admin_master:
+        if empresa_usuario:
+            sectores_qs = sectores_qs.filter(sucursal_rel__empresa=empresa_usuario)
+        else:
+            sectores_qs = sectores_qs.none()
+    if sucursal_id:
+        sectores_qs = sectores_qs.filter(sucursal_rel_id=sucursal_id)
+    sectores = list(
+        sectores_qs.order_by("sector").values_list("sector", flat=True).distinct()
+    )
+
+    resumen_sectores = []
+    sectores_en_nomina = list(
+        nominas.order_by("funcionario__sector")
+        .values_list("funcionario__sector", flat=True)
+        .distinct()
+    )
+    for sector_nombre in sectores_en_nomina:
+        qs_sector = nominas.filter(funcionario__sector=sector_nombre)
+        resumen_sectores.append({
+            "sector": sector_nombre or "Sin sector",
+            "cantidad": qs_sector.count(),
+            "total_haberes": qs_sector.aggregate(total=Sum("salario_bruto"))["total"] or Decimal("0.00"),
+            "total_ips": qs_sector.aggregate(total=Sum("descuento_ips"))["total"] or Decimal("0.00"),
+            "total_descuentos": (
+                (qs_sector.aggregate(total=Sum("descuento_ips"))["total"] or Decimal("0.00"))
+                + (qs_sector.aggregate(total=Sum("descuento_deudas"))["total"] or Decimal("0.00"))
+            ),
+            "total_deudas": qs_sector.aggregate(total=Sum("descuento_deudas"))["total"] or Decimal("0.00"),
+            "total_ajustes": Decimal("0.00"),
+            "total_neto": qs_sector.aggregate(total=Sum("salario_neto"))["total"] or Decimal("0.00"),
+        })
+
     return render(request, "core/nomina_lista.html", {
         "nominas": nominas,
         "mes": mes,
         "anio": anio,
         "estado": estado,
+        "sucursal_id": sucursal_id,
+        "sectores": sectores,
+        "sectores_seleccionados": sectores_seleccionados,
+        "resumen_sectores": resumen_sectores,
         "meses": meses,
         "anios": anios,
         "sucursales": sucursales,
@@ -4582,6 +4636,152 @@ def _nomina_permitida(request, nomina):
         and nomina.funcionario.sucursal_rel
         and nomina.funcionario.sucursal_rel.empresa == empresa_usuario
     )
+
+
+def _filename_seguro(valor):
+    texto = re.sub(r"[^A-Za-z0-9_-]+", "_", str(valor or "sin_sector")).strip("_")
+    return texto or "sin_sector"
+
+
+def _nominas_filtradas_para_exportar(request, mes, anio, sucursal_id="", sectores=None, estado=""):
+    empresa_usuario = obtener_empresa_activa(request)
+    admin_master = es_admin_master(request.user) and empresa_usuario is None
+    sectores = [s for s in (sectores or []) if s]
+
+    nominas = NominaMensual.objects.select_related(
+        "funcionario",
+        "funcionario__sucursal_rel",
+        "funcionario__sucursal_rel__empresa"
+    ).filter(
+        mes=mes,
+        anio=anio,
+    )
+
+    if not admin_master:
+        if empresa_usuario:
+            nominas = nominas.filter(funcionario__sucursal_rel__empresa=empresa_usuario)
+        else:
+            nominas = nominas.none()
+
+    if sucursal_id:
+        nominas = nominas.filter(funcionario__sucursal_rel_id=sucursal_id)
+
+    if sectores:
+        nominas = nominas.filter(funcionario__sector__in=sectores)
+
+    if estado:
+        nominas = nominas.filter(estado_pago=estado)
+
+    return nominas.order_by(
+        "funcionario__sector",
+        "funcionario__apellido",
+        "funcionario__nombre",
+    )
+
+
+def _sectores_desde_nominas(nominas):
+    return [
+        sector or ""
+        for sector in nominas.order_by("funcionario__sector")
+        .values_list("funcionario__sector", flat=True)
+        .distinct()
+    ]
+
+
+def _totales_nomina_queryset(nominas):
+    total_bruto = nominas.aggregate(total=Sum("salario_bruto"))["total"] or Decimal("0.00")
+    total_ips = nominas.aggregate(total=Sum("descuento_ips"))["total"] or Decimal("0.00")
+    total_deudas = nominas.aggregate(total=Sum("descuento_deudas"))["total"] or Decimal("0.00")
+    total_neto = nominas.aggregate(total=Sum("salario_neto"))["total"] or Decimal("0.00")
+    return {
+        "cantidad": nominas.count(),
+        "total_haberes": total_bruto,
+        "total_ips": total_ips,
+        "total_deudas": total_deudas,
+        "total_descuentos": total_ips + total_deudas,
+        "total_ajustes": Decimal("0.00"),
+        "total_neto": total_neto,
+    }
+
+
+def _pdf_nomina_sector_bytes(request, nominas, sector_nombre, mes, anio):
+    primera = nominas.first()
+    empresa_pdf = obtener_empresa_documento(funcionario=primera.funcionario) if primera else None
+    sucursal_nombre = primera.funcionario.sucursal_mostrar if primera else "-"
+    totales = _totales_nomina_queryset(nominas)
+    sector_label = sector_nombre or "Sin sector"
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        leftMargin=10 * mm,
+        rightMargin=10 * mm,
+        topMargin=12 * mm,
+        bottomMargin=12 * mm,
+    )
+
+    styles = getSampleStyleSheet()
+    elementos = []
+
+    if empresa_pdf:
+        elementos += construir_encabezado_empresa_pdf(empresa_pdf, "NOMINA POR SECTOR")
+    else:
+        elementos.append(Paragraph("NOMINA POR SECTOR", styles["Heading1"]))
+
+    resumen = Table([
+        ["Sector", sector_label],
+        ["Sucursal", sucursal_nombre],
+        ["Periodo", f"{mes:02d}/{anio}"],
+        ["Fecha de generacion", timezone.localtime().strftime("%d/%m/%Y %H:%M")],
+        ["Cantidad de funcionarios", str(totales["cantidad"])],
+        ["Total haberes", _gs(totales["total_haberes"])],
+        ["Total IPS", _gs(totales["total_ips"])],
+        ["Total otros descuentos", _gs(totales["total_deudas"])],
+        ["Total ajustes", _gs(totales["total_ajustes"])],
+        ["Total neto a pagar", _gs(totales["total_neto"])],
+    ], colWidths=[60 * mm, 110 * mm])
+    resumen.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#eff6ff")),
+        ("TEXTCOLOR", (0, 0), (0, -1), colors.HexColor("#1d4ed8")),
+        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+        ("GRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#cbd5e1")),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+    ]))
+    elementos.append(Spacer(1, 8))
+    elementos.append(resumen)
+    elementos.append(Spacer(1, 10))
+
+    data = [["Funcionario", "CI", "Cargo", "Modalidad", "Haberes", "IPS", "Otros desc.", "Ajustes", "Neto"]]
+    for n in nominas:
+        modalidad = getattr(n.funcionario, "modalidad_salarial_display", "Salario base + bono")
+        data.append([
+            n.funcionario.nombre_completo,
+            n.funcionario.cedula,
+            n.funcionario.cargo or "-",
+            modalidad,
+            _gs(n.salario_bruto),
+            _gs(n.descuento_ips),
+            _gs(n.descuento_deudas),
+            _gs(0),
+            _gs(n.salario_neto),
+        ])
+
+    tabla = Table(data, colWidths=[34 * mm, 18 * mm, 24 * mm, 26 * mm, 22 * mm, 18 * mm, 22 * mm, 18 * mm, 22 * mm])
+    tabla.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#dbeafe")),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 6.2),
+        ("GRID", (0, 0), (-1, -1), 0.25, colors.HexColor("#cbd5e1")),
+        ("ALIGN", (4, 1), (-1, -1), "RIGHT"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+    ]))
+    elementos.append(tabla)
+
+    doc.build(elementos)
+    pdf = buffer.getvalue()
+    buffer.close()
+    return pdf
 
 
 @login_required
@@ -4850,6 +5050,167 @@ def nomina_sucursal_pdf(request):
     response["Content-Disposition"] = f'inline; filename="nomina_sucursal_{sucursal.id}_{mes:02d}_{anio}.pdf"'
     response.write(pdf)
     return response
+
+
+@login_required
+def nomina_sectores_pdf(request):
+    if not tiene_permiso(request.user, "nomina", "puede_exportar"):
+        messages.error(request, "No tienes permiso para exportar nominas.")
+        return redirect("nomina_lista")
+
+    hoy = timezone.localdate()
+    mes = int(request.GET.get("mes", hoy.month))
+    anio = int(request.GET.get("anio", hoy.year))
+    sucursal_id = request.GET.get("sucursal", "").strip()
+    estado = request.GET.get("estado", "").strip()
+    sectores = request.GET.getlist("sector")
+
+    nominas = _nominas_filtradas_para_exportar(request, mes, anio, sucursal_id, sectores, estado)
+    sectores_exportar = sectores or _sectores_desde_nominas(nominas)
+
+    if not sectores_exportar:
+        messages.error(request, "No hay sectores con nomina para exportar.")
+        return redirect(f"/nomina/?mes={mes}&anio={anio}")
+
+    if len(sectores_exportar) == 1:
+        sector = sectores_exportar[0]
+        nominas_sector = nominas.filter(funcionario__sector=sector)
+        pdf = _pdf_nomina_sector_bytes(request, nominas_sector, sector, mes, anio)
+        response = HttpResponse(content_type="application/pdf")
+        response["Content-Disposition"] = f'inline; filename="nomina_{_filename_seguro(sector)}_{mes:02d}_{anio}.pdf"'
+        response.write(pdf)
+        registrar_historial(request, "Nomina", "Exportar PDF por sector", f"Se exporto PDF de nomina del sector {sector or 'Sin sector'} {mes:02d}/{anio}.")
+        return response
+
+    buffer = BytesIO()
+    with ZipFile(buffer, "w", ZIP_DEFLATED) as zip_file:
+        for sector in sectores_exportar:
+            nominas_sector = nominas.filter(funcionario__sector=sector)
+            if not nominas_sector.exists():
+                continue
+            pdf = _pdf_nomina_sector_bytes(request, nominas_sector, sector, mes, anio)
+            zip_file.writestr(f"{_filename_seguro(sector)}.pdf", pdf)
+
+    registrar_historial(request, "Nomina", "Exportar ZIP PDF por sector", f"Se exporto ZIP PDF por sectores {mes:02d}/{anio}.")
+    response = HttpResponse(buffer.getvalue(), content_type="application/zip")
+    response["Content-Disposition"] = f'attachment; filename="nomina_{mes:02d}_{anio}_por_sectores_pdf.zip"'
+    return response
+
+
+def _xlsx_nomina_sector_bytes(nominas, sector_nombre, mes, anio):
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, PatternFill, Alignment
+    from openpyxl.utils import get_column_letter
+
+    sector_label = sector_nombre or "Sin sector"
+    primera = nominas.first()
+    empresa_nombre = primera.funcionario.empresa_mostrar if primera else "-"
+    sucursal_nombre = primera.funcionario.sucursal_mostrar if primera else "-"
+    totales = _totales_nomina_queryset(nominas)
+
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Nomina"
+
+    rows = [
+        ["NOMINA POR SECTOR"],
+        ["Empresa", empresa_nombre],
+        ["Sucursal", sucursal_nombre],
+        ["Sector", sector_label],
+        ["Periodo", f"{mes:02d}/{anio}"],
+        ["Fecha generacion", timezone.localtime().strftime("%d/%m/%Y %H:%M")],
+        [],
+        ["Funcionario", "Cedula", "Cargo", "Modalidad salarial", "Total haberes", "IPS", "Otros descuentos", "Ajustes", "Salario neto"],
+    ]
+
+    for row in rows:
+        ws.append(row)
+
+    for n in nominas:
+        modalidad = getattr(n.funcionario, "modalidad_salarial_display", "Salario base + bono")
+        ws.append([
+            n.funcionario.nombre_completo,
+            n.funcionario.cedula,
+            n.funcionario.cargo or "-",
+            modalidad,
+            float(n.salario_bruto or 0),
+            float(n.descuento_ips or 0),
+            float(n.descuento_deudas or 0),
+            0,
+            float(n.salario_neto or 0),
+        ])
+
+    ws.append([])
+    ws.append(["Resumen", "", "", "", float(totales["total_haberes"]), float(totales["total_ips"]), float(totales["total_deudas"]), float(totales["total_ajustes"]), float(totales["total_neto"])])
+    ws.append(["Cantidad funcionarios", totales["cantidad"]])
+
+    header_fill = PatternFill("solid", fgColor="1D4ED8")
+    header_font = Font(color="FFFFFF", bold=True)
+    for cell in ws[8]:
+        cell.fill = header_fill
+        cell.font = header_font
+        cell.alignment = Alignment(horizontal="center")
+
+    ws["A1"].font = Font(bold=True, size=16)
+    for col in range(1, 10):
+        ws.column_dimensions[get_column_letter(col)].width = 18
+    ws.column_dimensions["A"].width = 32
+    ws.column_dimensions["D"].width = 24
+
+    for row in ws.iter_rows(min_row=9, min_col=5, max_col=9):
+        for cell in row:
+            cell.number_format = '#,##0'
+
+    buffer = BytesIO()
+    wb.save(buffer)
+    return buffer.getvalue()
+
+
+@login_required
+def nomina_sectores_excel(request):
+    if not tiene_permiso(request.user, "nomina", "puede_exportar"):
+        messages.error(request, "No tienes permiso para exportar nominas.")
+        return redirect("nomina_lista")
+
+    hoy = timezone.localdate()
+    mes = int(request.GET.get("mes", hoy.month))
+    anio = int(request.GET.get("anio", hoy.year))
+    sucursal_id = request.GET.get("sucursal", "").strip()
+    estado = request.GET.get("estado", "").strip()
+    sectores = request.GET.getlist("sector")
+
+    nominas = _nominas_filtradas_para_exportar(request, mes, anio, sucursal_id, sectores, estado)
+    sectores_exportar = sectores or _sectores_desde_nominas(nominas)
+
+    if not sectores_exportar:
+        messages.error(request, "No hay sectores con nomina para exportar.")
+        return redirect(f"/nomina/?mes={mes}&anio={anio}")
+
+    content_type = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+    if len(sectores_exportar) == 1:
+        sector = sectores_exportar[0]
+        nominas_sector = nominas.filter(funcionario__sector=sector)
+        xlsx = _xlsx_nomina_sector_bytes(nominas_sector, sector, mes, anio)
+        registrar_historial(request, "Nomina", "Exportar Excel por sector", f"Se exporto Excel de nomina del sector {sector or 'Sin sector'} {mes:02d}/{anio}.")
+        response = HttpResponse(xlsx, content_type=content_type)
+        response["Content-Disposition"] = f'attachment; filename="nomina_{_filename_seguro(sector)}_{mes:02d}_{anio}.xlsx"'
+        return response
+
+    buffer = BytesIO()
+    with ZipFile(buffer, "w", ZIP_DEFLATED) as zip_file:
+        for sector in sectores_exportar:
+            nominas_sector = nominas.filter(funcionario__sector=sector)
+            if not nominas_sector.exists():
+                continue
+            xlsx = _xlsx_nomina_sector_bytes(nominas_sector, sector, mes, anio)
+            zip_file.writestr(f"{_filename_seguro(sector)}.xlsx", xlsx)
+
+    registrar_historial(request, "Nomina", "Exportar ZIP Excel por sector", f"Se exporto ZIP Excel por sectores {mes:02d}/{anio}.")
+    response = HttpResponse(buffer.getvalue(), content_type="application/zip")
+    response["Content-Disposition"] = f'attachment; filename="nomina_{mes:02d}_{anio}_por_sectores_excel.zip"'
+    return response
+
 
 @login_required
 def configuracion_general(request):
@@ -5419,6 +5780,59 @@ def _liq_alertas_proteccion_guardadas(liquidacion):
     return construir_alertas_proteccion_liquidacion(resumen, liquidacion.tipo_salida)
 
 
+def _liquidacion_empresa(liquidacion):
+    return liquidacion.empresa or getattr(liquidacion.funcionario, "empresa", None)
+
+
+def _usuario_puede_ajustar_liquidacion(request, liquidacion):
+    empresa = _liquidacion_empresa(liquidacion)
+    return bool(
+        empresa
+        and getattr(empresa, "permite_ajuste_manual_liquidacion", False)
+        and liquidacion.estado == Liquidacion.Estados.BORRADOR
+        and tiene_permiso(request.user, "liquidacion", "puede_ajustar")
+    )
+
+
+def _recalcular_totales_liquidacion_con_ajustes(liquidacion):
+    ajustes = liquidacion.ajustes_manuales.filter(
+        estado=AjusteManualLiquidacion.Estados.ACTIVO
+    )
+
+    ajuste_haberes = Decimal("0.00")
+    ajuste_descuentos = Decimal("0.00")
+
+    for ajuste in ajustes:
+        if ajuste.tipo == AjusteManualLiquidacion.Tipos.HABER:
+            ajuste_haberes += Decimal(ajuste.diferencia or 0)
+        elif ajuste.tipo == AjusteManualLiquidacion.Tipos.DESCUENTO:
+            ajuste_descuentos += Decimal(ajuste.diferencia or 0)
+
+    liquidacion.total_haberes = (
+        Decimal(liquidacion.total_haberes_automatico or 0) + ajuste_haberes
+    ).quantize(Decimal("0.01"))
+    liquidacion.total_descuentos = (
+        Decimal(liquidacion.total_descuentos_automatico or 0) + ajuste_descuentos
+    ).quantize(Decimal("0.01"))
+    liquidacion.total_liquidacion = (
+        liquidacion.total_haberes - liquidacion.total_descuentos
+    ).quantize(Decimal("0.01"))
+
+    if liquidacion.total_haberes < 0:
+        liquidacion.total_haberes = Decimal("0.00")
+    if liquidacion.total_descuentos < 0:
+        liquidacion.total_descuentos = Decimal("0.00")
+    if liquidacion.total_liquidacion < 0:
+        liquidacion.total_liquidacion = Decimal("0.00")
+
+    liquidacion.save(update_fields=[
+        "total_haberes",
+        "total_descuentos",
+        "total_liquidacion",
+        "actualizado_en",
+    ])
+
+
 @login_required
 def liquidacion_nueva(request):
     permiso = validar_permiso_o_redirigir(request, "liquidacion", "puede_crear")
@@ -5619,8 +6033,13 @@ def liquidacion_preview(request):
             "dias": resumen["antiguedad_dias"],
         },
 
+        "modalidad_salarial_snapshot": resumen["modalidad_salarial_snapshot"],
         "salario_base_snapshot": str(resumen["salario_base_snapshot"]),
         "bono_base_snapshot": str(resumen["bono_base_snapshot"]),
+        "salario_diferenciado_snapshot": str(resumen["salario_diferenciado_snapshot"]),
+        "salario_bruto_aplicable_snapshot": str(resumen["salario_bruto_aplicable_snapshot"]),
+        "porcentaje_ips_snapshot": str(resumen["porcentaje_ips_snapshot"]),
+        "descuento_ips_calculado_snapshot": str(resumen["descuento_ips_calculado_snapshot"]),
         "dias_trabajados_pendientes": resumen["dias_trabajados_pendientes"],
         "salario_pendiente_monto": str(resumen["salario_pendiente_monto"]),
 
@@ -5675,15 +6094,147 @@ def liquidacion_detalle(request, pk):
             return redirect("liquidaciones_lista")
 
     alertas_proteccion = _liq_alertas_proteccion_guardadas(liquidacion)
+    ajustes_manuales = liquidacion.ajustes_manuales.select_related(
+        "creado_por",
+        "anulado_por",
+    ).all()
+    ajustes_activos = [
+        ajuste for ajuste in ajustes_manuales
+        if ajuste.estado == AjusteManualLiquidacion.Estados.ACTIVO
+    ]
+    ajuste_haberes = sum(
+        (Decimal(ajuste.diferencia or 0) for ajuste in ajustes_activos if ajuste.tipo == AjusteManualLiquidacion.Tipos.HABER),
+        Decimal("0.00"),
+    )
+    ajuste_descuentos = sum(
+        (Decimal(ajuste.diferencia or 0) for ajuste in ajustes_activos if ajuste.tipo == AjusteManualLiquidacion.Tipos.DESCUENTO),
+        Decimal("0.00"),
+    )
 
     return render(request, "core/liquidacion_detalle.html", {
         "liquidacion": liquidacion,
+        "ajustes_manuales": ajustes_manuales,
+        "ajuste_haberes": ajuste_haberes,
+        "ajuste_descuentos": ajuste_descuentos,
+        "puede_ajustar_liquidacion": _usuario_puede_ajustar_liquidacion(request, liquidacion),
         "alertas_proteccion": alertas_proteccion,
         "preaviso_dias_faltantes": max(
             int(liquidacion.preaviso_dias_corresponde or 0) - int(liquidacion.preaviso_dias_otorgados or 0),
             0,
         ),
     })
+
+
+@login_required
+def liquidacion_ajuste_manual(request, pk):
+    empresa_usuario = obtener_empresa_activa(request)
+    admin_master = es_admin_master(request.user) and empresa_usuario is None
+
+    liquidacion = get_object_or_404(
+        Liquidacion.objects.select_related("funcionario", "funcionario__sucursal_rel", "funcionario__sucursal_rel__empresa"),
+        pk=pk
+    )
+
+    if not admin_master:
+        if not liquidacion.funcionario.sucursal_rel or liquidacion.funcionario.sucursal_rel.empresa != empresa_usuario:
+            messages.error(request, "No puedes ajustar liquidaciones de otra empresa.")
+            return redirect("liquidaciones_lista")
+
+    empresa_liquidacion = _liquidacion_empresa(liquidacion)
+
+    if not empresa_liquidacion or not getattr(empresa_liquidacion, "permite_ajuste_manual_liquidacion", False):
+        messages.error(request, "La empresa no permite ajustes manuales de liquidaciones.")
+        return redirect("liquidacion_detalle", pk=pk)
+
+    if liquidacion.estado != Liquidacion.Estados.BORRADOR:
+        messages.error(request, "Solo se pueden ajustar liquidaciones en estado borrador.")
+        return redirect("liquidacion_detalle", pk=pk)
+
+    if not tiene_permiso(request.user, "liquidacion", "puede_ajustar"):
+        messages.error(request, "No tienes permiso para realizar ajustes manuales de liquidaciones.")
+        return redirect("liquidacion_detalle", pk=pk)
+
+    if request.method == "POST":
+        form = AjusteManualLiquidacionForm(request.POST)
+        if form.is_valid():
+            ajuste = form.save(commit=False)
+            ajuste.liquidacion = liquidacion
+            ajuste.empresa = empresa_liquidacion
+            ajuste.funcionario = liquidacion.funcionario
+            ajuste.creado_por = request.user
+            ajuste.save()
+
+            _recalcular_totales_liquidacion_con_ajustes(liquidacion)
+
+            registrar_historial(
+                request,
+                "Liquidaciones",
+                "Ajuste manual",
+                f"Se creó ajuste manual '{ajuste.concepto}' para {liquidacion.funcionario.nombre_completo}. Diferencia: {ajuste.diferencia}."
+            )
+            messages.success(request, "Ajuste manual aplicado correctamente.")
+            return redirect("liquidacion_detalle", pk=pk)
+    else:
+        form = AjusteManualLiquidacionForm()
+
+    return render(request, "core/liquidacion_ajuste_form.html", {
+        "form": form,
+        "liquidacion": liquidacion,
+    })
+
+
+@login_required
+def liquidacion_ajuste_anular(request, pk, ajuste_id):
+    empresa_usuario = obtener_empresa_activa(request)
+    admin_master = es_admin_master(request.user) and empresa_usuario is None
+
+    liquidacion = get_object_or_404(
+        Liquidacion.objects.select_related("funcionario", "funcionario__sucursal_rel", "funcionario__sucursal_rel__empresa"),
+        pk=pk
+    )
+    ajuste = get_object_or_404(
+        AjusteManualLiquidacion.objects.select_related("liquidacion"),
+        pk=ajuste_id,
+        liquidacion=liquidacion,
+    )
+
+    if not admin_master:
+        if not liquidacion.funcionario.sucursal_rel or liquidacion.funcionario.sucursal_rel.empresa != empresa_usuario:
+            messages.error(request, "No puedes anular ajustes de otra empresa.")
+            return redirect("liquidaciones_lista")
+
+    if not _usuario_puede_ajustar_liquidacion(request, liquidacion):
+        messages.error(request, "No tienes permiso o la liquidación no permite ajustes.")
+        return redirect("liquidacion_detalle", pk=pk)
+
+    if request.method == "POST":
+        motivo = (request.POST.get("motivo_anulacion") or "").strip()
+        if len(motivo) < 10:
+            messages.error(request, "Debes indicar un motivo de anulación de al menos 10 caracteres.")
+            return redirect("liquidacion_detalle", pk=pk)
+
+        ajuste.estado = AjusteManualLiquidacion.Estados.ANULADO
+        ajuste.motivo_anulacion = motivo
+        ajuste.anulado_por = request.user
+        ajuste.anulado_en = timezone.now()
+        ajuste.save(update_fields=[
+            "estado",
+            "motivo_anulacion",
+            "anulado_por",
+            "anulado_en",
+        ])
+
+        _recalcular_totales_liquidacion_con_ajustes(liquidacion)
+
+        registrar_historial(
+            request,
+            "Liquidaciones",
+            "Anular ajuste",
+            f"Se anuló ajuste manual '{ajuste.concepto}' de {liquidacion.funcionario.nombre_completo}. Motivo: {motivo}"
+        )
+        messages.success(request, "Ajuste manual anulado correctamente.")
+
+    return redirect("liquidacion_detalle", pk=pk)
 
 
 @login_required
@@ -5823,6 +6374,9 @@ def liquidacion_pdf(request, pk):
     funcionario = liquidacion.funcionario
     config = ConfiguracionGeneral.obtener()
     alertas_proteccion = _liq_alertas_proteccion_guardadas(liquidacion)
+    ajustes_manuales_pdf = liquidacion.ajustes_manuales.filter(
+        estado=AjusteManualLiquidacion.Estados.ACTIVO
+    ).select_related("creado_por")
     preaviso_dias_faltantes = max(
         int(liquidacion.preaviso_dias_corresponde or 0) - int(liquidacion.preaviso_dias_otorgados or 0),
         0,
@@ -5945,6 +6499,38 @@ def liquidacion_pdf(request, pk):
     elementos.append(tabla_datos)
     elementos.append(Spacer(1, 12))
 
+    modalidad_salarial_pdf = (
+        "Salario diferenciado"
+        if liquidacion.modalidad_salarial_snapshot == "diferenciado"
+        else "Salario base + bono"
+    )
+
+    tabla_base_salarial = Table([
+        ["Base salarial historica", ""],
+        ["Modalidad salarial", modalidad_salarial_pdf],
+        ["Salario base snapshot", f"Gs. {liquidacion.salario_base_snapshot:,.0f}".replace(",", ".")],
+        ["Bono base snapshot", f"Gs. {liquidacion.bono_base_snapshot:,.0f}".replace(",", ".")],
+        ["Salario diferenciado snapshot", f"Gs. {liquidacion.salario_diferenciado_snapshot:,.0f}".replace(",", ".")],
+        ["Salario bruto aplicable", f"Gs. {liquidacion.salario_bruto_aplicable_snapshot:,.0f}".replace(",", ".")],
+        ["IPS aplicado", f"{liquidacion.porcentaje_ips_snapshot}% / Gs. {liquidacion.descuento_ips_calculado_snapshot:,.0f}".replace(",", ".")],
+    ], colWidths=[70 * mm, 90 * mm])
+
+    tabla_base_salarial.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#e0f2fe")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#075985")),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("SPAN", (0, 0), (-1, 0)),
+        ("BACKGROUND", (0, 1), (0, -1), colors.HexColor("#f0f9ff")),
+        ("FONTNAME", (0, 1), (0, -1), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 8.5),
+        ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#bae6fd")),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ]))
+
+    elementos.append(tabla_base_salarial)
+    elementos.append(Spacer(1, 12))
+
     elementos.append(
         Paragraph(
             "1. HABERES",
@@ -6046,6 +6632,58 @@ def liquidacion_pdf(request, pk):
 
     elementos.append(tabla_total)
     elementos.append(Spacer(1, 14))
+
+    if ajustes_manuales_pdf.exists():
+        elementos.append(
+            Paragraph(
+                "4. AJUSTES MANUALES",
+                styles["SeccionClockIn"]
+            )
+        )
+
+        data_ajustes = [[
+            "Tipo",
+            "Concepto",
+            "Automatico",
+            "Ajustado",
+            "Diferencia",
+            "Usuario",
+        ]]
+
+        for ajuste in ajustes_manuales_pdf:
+            data_ajustes.append([
+                ajuste.get_tipo_display(),
+                ajuste.concepto,
+                f"Gs. {ajuste.importe_anterior:,.0f}".replace(",", "."),
+                f"Gs. {ajuste.importe_nuevo:,.0f}".replace(",", "."),
+                f"Gs. {ajuste.diferencia:,.0f}".replace(",", "."),
+                str(ajuste.creado_por or "-"),
+            ])
+
+        data_ajustes.append([
+            "Total",
+            "Resultado final",
+            f"Gs. {liquidacion.total_liquidacion_automatico:,.0f}".replace(",", "."),
+            "",
+            "",
+            f"Gs. {liquidacion.total_liquidacion:,.0f}".replace(",", "."),
+        ])
+
+        tabla_ajustes = Table(data_ajustes, colWidths=[22 * mm, 45 * mm, 25 * mm, 25 * mm, 25 * mm, 28 * mm])
+        tabla_ajustes.setStyle(TableStyle([
+            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#fef3c7")),
+            ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#92400e")),
+            ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+            ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+            ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#fffbeb")),
+            ("ALIGN", (2, 1), (5, -1), "RIGHT"),
+            ("FONTSIZE", (0, 0), (-1, -1), 7),
+            ("GRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#fde68a")),
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ]))
+
+        elementos.append(tabla_ajustes)
+        elementos.append(Spacer(1, 12))
 
     if liquidacion.motivo_observacion:
         elementos.append(

@@ -125,7 +125,7 @@
 
     .perm-actions {
         display:grid;
-        grid-template-columns:repeat(4, 1fr);
+        grid-template-columns:repeat(3, 1fr);
         gap:10px;
     }
 
@@ -296,6 +296,18 @@
                 <label class="perm-toggle">
                     <span>Anular</span>
                     <input type="checkbox" name="{{ fila.modulo_valor }}_puede_anular" {% if fila.puede_anular %}checked{% endif %}>
+                    <span class="perm-switch"></span>
+                </label>
+
+                <label class="perm-toggle">
+                    <span>Ajustar</span>
+                    <input type="checkbox" name="{{ fila.modulo_valor }}_puede_ajustar" {% if fila.puede_ajustar %}checked{% endif %}>
+                    <span class="perm-switch"></span>
+                </label>
+
+                <label class="perm-toggle">
+                    <span>Exportar</span>
+                    <input type="checkbox" name="{{ fila.modulo_valor }}_puede_exportar" {% if fila.puede_exportar %}checked{% endif %}>
                     <span class="perm-switch"></span>
                 </label>
             </div>

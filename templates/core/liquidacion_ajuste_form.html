@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+{% load number_filters %}
+
+{% block title %}Ajuste manual de liquidacion | ClockIn{% endblock %}
+
+{% block content %}
+<style>
+    .liqadj-page {
+        max-width: 980px;
+        margin: 0 auto;
+    }
+
+    .liqadj-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-end;
+        gap: 16px;
+        flex-wrap: wrap;
+        margin-bottom: 18px;
+    }
+
+    .liqadj-head h2 {
+        margin: 0;
+        color: #fff;
+        font-size: 34px;
+        font-weight: 900;
+    }
+
+    .liqadj-head p {
+        margin: 8px 0 0;
+        color: #9fb2ca;
+    }
+
+    .liqadj-card {
+        background: linear-gradient(180deg, rgba(20, 28, 42, .96), rgba(11, 17, 29, .98));
+        border: 1px solid rgba(148, 163, 184, .16);
+        border-radius: 22px;
+        padding: 22px;
+        box-shadow: 0 18px 42px rgba(0, 0, 0, .28);
+    }
+
+    .liqadj-summary {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 12px;
+        margin-bottom: 20px;
+    }
+
+    .liqadj-summary div {
+        background: rgba(15, 23, 42, .72);
+        border: 1px solid rgba(148, 163, 184, .13);
+        border-radius: 16px;
+        padding: 14px;
+    }
+
+    .liqadj-summary span {
+        display: block;
+        color: #93a8c3;
+        font-size: 12px;
+        margin-bottom: 6px;
+    }
+
+    .liqadj-summary strong {
+        color: #fff;
+        font-size: 18px;
+    }
+
+    .liqadj-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 16px;
+    }
+
+    .liqadj-field.full {
+        grid-column: 1 / -1;
+    }
+
+    .liqadj-field label {
+        display: block;
+        color: #dbeafe;
+        font-weight: 800;
+        margin-bottom: 8px;
+    }
+
+    .liqadj-actions {
+        display: flex;
+        justify-content: flex-end;
+        gap: 10px;
+        margin-top: 18px;
+        flex-wrap: wrap;
+    }
+
+    .liqadj-btn {
+        border: 0;
+        border-radius: 14px;
+        padding: 12px 16px;
+        font-weight: 900;
+        text-decoration: none;
+        cursor: pointer;
+    }
+
+    .liqadj-btn.soft {
+        background: rgba(255, 255, 255, .07);
+        color: #e5e7eb;
+        border: 1px solid rgba(255, 255, 255, .08);
+    }
+
+    .liqadj-btn.main {
+        background: linear-gradient(135deg, #2563eb, #0ea5e9);
+        color: #fff;
+        box-shadow: 0 14px 30px rgba(37, 99, 235, .26);
+    }
+
+    @media (max-width: 760px) {
+        .liqadj-summary,
+        .liqadj-grid {
+            grid-template-columns: 1fr;
+        }
+    }
+</style>
+
+<div class="liqadj-page">
+    <div class="liqadj-head">
+        <div>
+            <h2>Ajuste manual</h2>
+            <p>{{ liquidacion.funcionario.nombre_completo }} · Liquidacion {{ liquidacion.id }}</p>
+        </div>
+        <a href="{% url 'liquidacion_detalle' liquidacion.id %}" class="liqadj-btn soft">Volver al detalle</a>
+    </div>
+
+    <div class="liqadj-card">
+        <div class="liqadj-summary">
+            <div>
+                <span>Calculo automatico</span>
+                <strong>{{ liquidacion.total_liquidacion_automatico|guaranies }}</strong>
+            </div>
+            <div>
+                <span>Total final actual</span>
+                <strong>{{ liquidacion.total_liquidacion|guaranies }}</strong>
+            </div>
+            <div>
+                <span>Estado</span>
+                <strong>{{ liquidacion.get_estado_display }}</strong>
+            </div>
+        </div>
+
+        <form method="post">
+            {% csrf_token %}
+            {{ form.non_field_errors }}
+
+            <div class="liqadj-grid">
+                <div class="liqadj-field">
+                    <label for="{{ form.tipo.id_for_label }}">Tipo</label>
+                    {{ form.tipo }}
+                    {{ form.tipo.errors }}
+                </div>
+
+                <div class="liqadj-field">
+                    <label for="{{ form.concepto.id_for_label }}">Concepto</label>
+                    {{ form.concepto }}
+                    {{ form.concepto.errors }}
+                </div>
+
+                <div class="liqadj-field">
+                    <label for="{{ form.importe_anterior.id_for_label }}">Importe anterior</label>
+                    {{ form.importe_anterior }}
+                    {{ form.importe_anterior.errors }}
+                </div>
+
+                <div class="liqadj-field">
+                    <label for="{{ form.importe_nuevo.id_for_label }}">Importe nuevo</label>
+                    {{ form.importe_nuevo }}
+                    {{ form.importe_nuevo.errors }}
+                </div>
+
+                <div class="liqadj-field full">
+                    <label for="{{ form.motivo.id_for_label }}">Motivo obligatorio</label>
+                    {{ form.motivo }}
+                    {{ form.motivo.errors }}
+                </div>
+            </div>
+
+            <div class="liqadj-actions">
+                <a href="{% url 'liquidacion_detalle' liquidacion.id %}" class="liqadj-btn soft">Cancelar</a>
+                <button type="submit" class="liqadj-btn main">Aplicar ajuste</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}
