@@ -581,13 +581,18 @@ document.addEventListener("DOMContentLoaded", function () {
         }
 
         try {
-            const response = await fetch("{% url 'obtener_sucursales_por_empresa' %}?empresa_id=" + empresaId);
+            const params = new URLSearchParams({ empresa_id: empresaId });
+            if (sucursalSeleccionada) {
+                params.set("sucursal_actual_id", sucursalSeleccionada);
+            }
+
+            const response = await fetch("{% url 'obtener_sucursales_por_empresa' %}?" + params.toString());
             const data = await response.json();
 
             data.sucursales.forEach(function (sucursal) {
                 const option = document.createElement("option");
                 option.value = sucursal.id;
-                option.textContent = sucursal.nombre;
+                option.textContent = sucursal.activo ? sucursal.nombre : `${sucursal.nombre} (inactiva actual)`;
 
                 if (String(sucursal.id) === String(sucursalSeleccionada)) {
                     option.selected = true;
@@ -610,3 +615,4 @@ document.addEventListener("DOMContentLoaded", function () {
 });
 </script>
 {% endblock %}
+

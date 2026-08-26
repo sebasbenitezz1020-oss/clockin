@@ -1,5 +1,6 @@
 from django import forms
 from decimal import Decimal
+from django.db.models import Q
 from .models import (
     Empresa,
     Sucursal,
@@ -446,7 +447,20 @@ class FuncionarioForm(forms.ModelForm):
 
     fecha_ingreso = forms.DateField(
         required=False,
-        widget=forms.DateInput(attrs={"type": "date"})
+        input_formats=["%Y-%m-%d"],
+        widget=forms.DateInput(
+            format="%Y-%m-%d",
+            attrs={"type": "date", "class": "form-control"}
+        )
+    )
+
+    fecha_nacimiento = forms.DateField(
+        required=False,
+        input_formats=["%Y-%m-%d"],
+        widget=forms.DateInput(
+            format="%Y-%m-%d",
+            attrs={"type": "date", "class": "form-control"}
+        )
     )
 
     class Meta:
@@ -514,7 +528,6 @@ class FuncionarioForm(forms.ModelForm):
             "departamento": forms.TextInput(attrs={"class": "form-control"}),
             "telefono": forms.TextInput(attrs={"class": "form-control"}),
             "correo": forms.EmailInput(attrs={"class": "form-control"}),
-            "fecha_nacimiento": forms.DateInput(attrs={"type": "date", "class": "form-control"}),
             "nacionalidad": forms.TextInput(attrs={"class": "form-control"}),
             "estado_civil": forms.TextInput(attrs={"class": "form-control"}),
 
@@ -539,11 +552,39 @@ class FuncionarioForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
+        self.request = kwargs.pop("request", None)
+        self.empresa_activa = kwargs.pop("empresa_activa", None)
         super().__init__(*args, **kwargs)
 
         config = ConfiguracionGeneral.obtener()
+        self._sincronizar_choices_modelo(config)
+        self._original_salario_base = getattr(self.instance, "salario_base", None)
+        self._original_porcentaje_limite_deuda = getattr(self.instance, "porcentaje_limite_deuda", None)
 
-        self.fields["turno"].queryset = Turno.objects.filter(activo=True).order_by("nombre")
+        empresa_id = None
+
+        if self.is_bound:
+            empresa_id = self.data.get("empresa")
+        elif self.instance.pk and self.instance.sucursal_rel:
+            empresa_id = self.instance.sucursal_rel.empresa_id
+            self.fields["empresa"].initial = self.instance.sucursal_rel.empresa
+        elif self.empresa_activa:
+            empresa_id = self.empresa_activa.id
+            self.fields["empresa"].initial = self.empresa_activa
+
+        self.fields["empresa"].queryset = Empresa.objects.filter(activo=True).order_by("nombre")
+        if self.empresa_activa:
+            self.fields["empresa"].queryset = Empresa.objects.filter(pk=self.empresa_activa.pk)
+            self.fields["empresa"].initial = self.empresa_activa
+
+        turno_qs = Turno.objects.filter(activo=True)
+        if empresa_id:
+            turno_qs = turno_qs.filter(empresa_id=empresa_id)
+        if self.instance.pk and self.instance.turno_id:
+            turno_qs = Turno.objects.filter(
+                Q(pk=self.instance.turno_id) | Q(pk__in=turno_qs.values("pk"))
+            )
+        self.fields["turno"].queryset = turno_qs.order_by("nombre")
         self.fields["turno"].required = False
         self.fields["turno"].empty_label = "Seleccionar turno"
 
@@ -555,22 +596,28 @@ class FuncionarioForm(forms.ModelForm):
         self.fields["sucursal_rel"].queryset = Sucursal.objects.none()
         self.fields["sucursal_rel"].empty_label = "Seleccionar sucursal"
 
-        self.fields["cargo"].choices = [("", "Seleccionar cargo")] + config.cargos_choices
-        self.fields["sector"].choices = [("", "Seleccionar sector")] + config.sectores_choices
-
-        empresa_id = None
-
-        if self.is_bound:
-            empresa_id = self.data.get("empresa")
-        elif self.instance.pk and self.instance.sucursal_rel:
-            empresa_id = self.instance.sucursal_rel.empresa_id
-            self.fields["empresa"].initial = self.instance.sucursal_rel.empresa
+        self.fields["banco"].choices = self._choices_con_actual(
+            config.bancos_choices,
+            getattr(self.instance, "banco", ""),
+            "Seleccionar banco"
+        )
+        self.fields["cargo"].choices = self._choices_con_actual(
+            config.cargos_choices,
+            getattr(self.instance, "cargo", ""),
+            "Seleccionar cargo"
+        )
+        self.fields["sector"].choices = self._choices_con_actual(
+            config.sectores_choices,
+            getattr(self.instance, "sector", ""),
+            "Seleccionar sector"
+        )
+        self._sincronizar_choices_modelo_desde_formulario()
 
         if empresa_id:
             try:
                 self.fields["sucursal_rel"].queryset = Sucursal.objects.filter(
-                    empresa_id=empresa_id,
-                    activo=True
+                    Q(empresa_id=empresa_id, activo=True) |
+                    Q(pk=getattr(self.instance, "sucursal_rel_id", None), empresa_id=empresa_id)
                 ).order_by("nombre")
             except (ValueError, TypeError):
                 self.fields["sucursal_rel"].queryset = Sucursal.objects.none()
@@ -582,6 +629,27 @@ class FuncionarioForm(forms.ModelForm):
 
         self.fields["salario_base_fijo"].initial = f"{int(valor_salario):,}".replace(",", ".")
 
+    def _sincronizar_choices_modelo(self, config):
+        self.instance._meta.get_field("banco").choices = [("", "---------")] + config.bancos_choices
+        self.instance._meta.get_field("cargo").choices = config.cargos_choices
+        self.instance._meta.get_field("sector").choices = config.sectores_choices
+    def _sincronizar_choices_modelo_desde_formulario(self):
+        self.instance._meta.get_field("banco").choices = list(self.fields["banco"].choices)
+        self.instance._meta.get_field("cargo").choices = list(self.fields["cargo"].choices)
+        self.instance._meta.get_field("sector").choices = list(self.fields["sector"].choices)
+    def _choices_con_actual(self, choices_base, valor_actual, texto_vacio):
+        choices = [("", texto_vacio)]
+        valores = {""}
+
+        for valor, etiqueta in choices_base:
+            if valor not in valores:
+                choices.append((valor, etiqueta))
+                valores.add(valor)
+
+        if valor_actual and valor_actual not in valores:
+            choices.append((valor_actual, f"{valor_actual} (valor actual)"))
+
+        return choices
     def clean_cedula(self):
         cedula = self.cleaned_data["cedula"].strip()
         qs = Funcionario.objects.filter(cedula=cedula)
@@ -633,8 +701,12 @@ class FuncionarioForm(forms.ModelForm):
         obj = super().save(commit=False)
         config = ConfiguracionGeneral.obtener()
 
-        obj.salario_base = config.salario_base_default
-        obj.porcentaje_limite_deuda = config.porcentaje_limite_deuda_default
+        if not obj.pk:
+            obj.salario_base = config.salario_base_default
+            obj.porcentaje_limite_deuda = config.porcentaje_limite_deuda_default
+        else:
+            obj.salario_base = self._original_salario_base
+            obj.porcentaje_limite_deuda = self._original_porcentaje_limite_deuda
 
         if obj.usa_salario_diferenciado:
             obj.bono = Decimal("0")
@@ -1378,3 +1450,4 @@ class PagoSuscripcionSistemaForm(forms.ModelForm):
         if monto < 0:
             raise forms.ValidationError("El monto no puede ser negativo.")
         return monto
+

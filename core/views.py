@@ -1283,12 +1283,29 @@ def obtener_sucursales_por_empresa(request):
         if not empresa_usuario or empresa_id != str(empresa_usuario.id):
             return JsonResponse({"sucursales": []}, status=403)
 
+    sucursal_actual_id = request.GET.get("sucursal_actual_id", "").strip()
+
     sucursales = Sucursal.objects.filter(
         empresa_id=empresa_id,
         activo=True
-    ).order_by("nombre")
+    )
 
-    data = [{"id": s.id, "nombre": s.nombre} for s in sucursales]
+    if sucursal_actual_id:
+        sucursales = Sucursal.objects.filter(
+            Q(empresa_id=empresa_id, activo=True) |
+            Q(pk=sucursal_actual_id, empresa_id=empresa_id)
+        )
+
+    sucursales = sucursales.order_by("nombre")
+
+    data = [
+        {
+            "id": s.id,
+            "nombre": s.nombre,
+            "activo": s.activo,
+        }
+        for s in sucursales
+    ]
     return JsonResponse({"sucursales": data})
 
 
@@ -1799,18 +1816,7 @@ def funcionario_nuevo(request):
     admin_master = es_admin_master(request.user) and empresa_usuario is None
 
     if request.method == "POST":
-        form = FuncionarioForm(request.POST, request.FILES)
-
-        if not admin_master and empresa_usuario:
-            form.fields["sucursal_rel"].queryset = Sucursal.objects.filter(
-                activo=True,
-                empresa=empresa_usuario
-            ).order_by("nombre")
-
-            form.fields["turno"].queryset = Turno.objects.filter(
-                activo=True,
-                empresa=empresa_usuario
-            ).order_by("nombre")
+        form = FuncionarioForm(request.POST, request.FILES, request=request, empresa_activa=None if admin_master else empresa_usuario)
 
         if form.is_valid():
             funcionario = form.save(commit=False)
@@ -1836,23 +1842,7 @@ def funcionario_nuevo(request):
             messages.success(request, "Funcionario creado correctamente.")
             return redirect("funcionarios_lista")
     else:
-        form = FuncionarioForm()
-
-        if not admin_master and empresa_usuario:
-            form.fields["sucursal_rel"].queryset = Sucursal.objects.filter(
-                activo=True,
-                empresa=empresa_usuario
-            ).order_by("nombre")
-
-            form.fields["turno"].queryset = Turno.objects.filter(
-                activo=True,
-                empresa=empresa_usuario
-            ).order_by("nombre")
-
-        elif admin_master:
-            form.fields["turno"].queryset = Turno.objects.filter(
-                activo=True
-            ).order_by("nombre")
+        form = FuncionarioForm(request=request, empresa_activa=None if admin_master else empresa_usuario)
 
     return render(request, "core/funcionario_form.html", {
         "form": form,
@@ -1881,18 +1871,7 @@ def funcionario_editar(request, pk):
             return redirect("funcionarios_lista")
 
     if request.method == "POST":
-        form = FuncionarioForm(request.POST, request.FILES, instance=funcionario)
-
-        if not admin_master and empresa_usuario:
-            form.fields["sucursal_rel"].queryset = Sucursal.objects.filter(
-                activo=True,
-                empresa=empresa_usuario
-            ).order_by("nombre")
-
-            form.fields["turno"].queryset = Turno.objects.filter(
-                activo=True,
-                empresa=empresa_usuario
-            ).order_by("nombre")
+        form = FuncionarioForm(request.POST, request.FILES, instance=funcionario, request=request, empresa_activa=None if admin_master else empresa_usuario)
 
         if form.is_valid():
             funcionario_editado = form.save(commit=False)
@@ -1918,23 +1897,7 @@ def funcionario_editar(request, pk):
             messages.success(request, "Funcionario actualizado correctamente.")
             return redirect("funcionarios_lista")
     else:
-        form = FuncionarioForm(instance=funcionario)
-
-        if not admin_master and empresa_usuario:
-            form.fields["sucursal_rel"].queryset = Sucursal.objects.filter(
-                activo=True,
-                empresa=empresa_usuario
-            ).order_by("nombre")
-
-            form.fields["turno"].queryset = Turno.objects.filter(
-                activo=True,
-                empresa=empresa_usuario
-            ).order_by("nombre")
-
-        elif admin_master:
-            form.fields["turno"].queryset = Turno.objects.filter(
-                activo=True
-            ).order_by("nombre")
+        form = FuncionarioForm(instance=funcionario, request=request, empresa_activa=None if admin_master else empresa_usuario)
 
     return render(request, "core/funcionario_form.html", {
         "form": form,
@@ -5267,7 +5230,12 @@ def configuracion_general(request):
         if form.is_valid():
             config = form.save()
 
-            Funcionario.objects.all().update(
+            funcionarios_actualizables = Funcionario.objects.all()
+            empresa_usuario = obtener_empresa_activa(request)
+            if empresa_usuario:
+                funcionarios_actualizables = funcionarios_actualizables.filter(sucursal_rel__empresa=empresa_usuario)
+
+            funcionarios_actualizables.update(
                 salario_base=config.salario_base_default,
                 porcentaje_limite_deuda=config.porcentaje_limite_deuda_default,
             )
@@ -7972,3 +7940,4 @@ def reporte_mensual_pdf(request):
     response["Content-Disposition"] = f'inline; filename="reporte_mensual_{mes:02d}_{anio}.pdf"'
     response.write(pdf)
     return response
+

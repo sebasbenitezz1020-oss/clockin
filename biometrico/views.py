@@ -1,4 +1,7 @@
 import base64
+import hashlib
+import json
+import logging
 from io import BytesIO
 
 import cv2
@@ -6,7 +9,9 @@ import face_recognition
 import numpy as np
 from PIL import Image
 
-from django.http import JsonResponse
+from django.conf import settings
+from django.contrib.auth.decorators import login_required
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
@@ -39,6 +44,8 @@ ULTIMO_RECONOCIDO = {
 }
 
 ULTIMO_PROCESO = None
+
+logger = logging.getLogger(__name__)
 
 
 # =====================================================
@@ -145,6 +152,21 @@ def _cargar_rostros_cache():
 def _limpiar_cache_rostros():
     CACHE_ROSTROS["data"] = None
     CACHE_ROSTROS["count"] = 0
+
+
+def _permitir_laboratorio_offline(request):
+    return (
+        request.user.is_authenticated
+        and (
+            request.user.is_superuser
+            or settings.DEBUG
+        )
+    )
+
+
+def _token_laboratorio_funcionario(funcionario_id):
+    texto = f"fase0:{settings.SECRET_KEY}:{funcionario_id}".encode("utf-8")
+    return hashlib.sha256(texto).hexdigest()[:16]
 
 
 def _validar_iluminacion(image_np):
@@ -619,6 +641,150 @@ def kiosko(request):
 
 def kiosko_celular(request):
     return render(request, "biometrico/kiosko_celular.html")
+
+
+@login_required
+def laboratorio_offline(request):
+    if not _permitir_laboratorio_offline(request):
+        return JsonResponse({"ok": False, "error": "Acceso restringido."}, status=403)
+
+    total_descriptores = Funcionario.objects.filter(
+        activo=True,
+        face_encoding__isnull=False,
+    ).count()
+    total_sin_foto = Funcionario.objects.filter(
+        activo=True,
+        foto="",
+    ).count()
+
+    return render(request, "biometrico/laboratorio_offline.html", {
+        "total_descriptores": total_descriptores,
+        "total_sin_foto": total_sin_foto,
+        "debug_activo": settings.DEBUG,
+    })
+
+
+@login_required
+def laboratorio_offline_descriptores(request):
+    if not _permitir_laboratorio_offline(request):
+        return JsonResponse({"ok": False, "error": "Acceso restringido."}, status=403)
+
+    if request.method != "GET":
+        return JsonResponse({"ok": False, "error": "Metodo no permitido."}, status=405)
+
+    try:
+        limite = int(request.GET.get("limite", 10) or 10)
+    except (TypeError, ValueError):
+        limite = 10
+    limite = min(max(limite, 1), 10)
+    funcionarios = Funcionario.objects.filter(
+        activo=True,
+        face_encoding__isnull=False,
+    ).only("id", "face_encoding", "activo").order_by("id")[:limite]
+
+    descriptores = []
+    for funcionario in funcionarios:
+        try:
+            descriptor = np.frombuffer(funcionario.face_encoding, dtype=np.float64)
+            if descriptor.shape[0] != 128:
+                continue
+            descriptor_js = descriptor.astype(np.float32)
+
+            descriptores.append({
+                "token": _token_laboratorio_funcionario(funcionario.id),
+                "activo": bool(funcionario.activo),
+                "modelo_generador": "dlib_face_recognition",
+                "version_descriptor": "dlib-128-float64",
+                "dimension": int(descriptor.shape[0]),
+                "tipo_numerico_origen": "float64",
+                "tipo_numerico_transporte": "float32",
+                "endianess_origen": "native_numpy",
+                "bytes": int(len(funcionario.face_encoding or b"")),
+                "descriptor": [float(valor) for valor in descriptor_js.tolist()],
+            })
+        except Exception:
+            continue
+
+    logger.info(
+        "Laboratorio offline Fase 0: muestra de descriptores solicitada por usuario=%s cantidad=%s",
+        request.user.pk,
+        len(descriptores),
+    )
+
+    return JsonResponse({
+        "ok": True,
+        "fase": "0",
+        "uso": "laboratorio_offline_solo_lectura",
+        "contiene_datos_biometricos": True,
+        "limite": limite,
+        "cantidad": len(descriptores),
+        "descriptores": descriptores,
+        "advertencia": "Datos anonimizados para PoC. No registrar asistencias ni almacenar en informes.",
+    })
+
+
+@login_required
+def laboratorio_offline_sw(request):
+    if not _permitir_laboratorio_offline(request):
+        return HttpResponse("// Acceso restringido.", status=403, content_type="application/javascript")
+
+    assets = [
+        "/biometrico/laboratorio-offline/",
+        "/static/css/biometrico_laboratorio_offline.css",
+        "/static/js/biometrico_laboratorio_offline.js",
+        "/static/biometrico_offline/vendor/face-api.js/dist/face-api.min.js",
+        "/static/biometrico_offline/models/face-api/tiny_face_detector_model-weights_manifest.json",
+        "/static/biometrico_offline/models/face-api/tiny_face_detector_model-shard1",
+        "/static/biometrico_offline/models/face-api/face_landmark_68_model-weights_manifest.json",
+        "/static/biometrico_offline/models/face-api/face_landmark_68_model-shard1",
+        "/static/biometrico_offline/models/face-api/face_recognition_model-weights_manifest.json",
+        "/static/biometrico_offline/models/face-api/face_recognition_model-shard1",
+        "/static/biometrico_offline/models/face-api/face_recognition_model-shard2",
+    ]
+    contenido = f"""
+const CACHE_NAME = "clockin-biometrico-lab-fase0-v3";
+const LAB_ASSETS = {json.dumps(assets)};
+
+self.addEventListener("install", (event) => {{
+  event.waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(LAB_ASSETS))
+  );
+  self.skipWaiting();
+}});
+
+self.addEventListener("activate", (event) => {{
+  event.waitUntil(
+    caches.keys().then((keys) => Promise.all(
+      keys.filter((key) => key.startsWith("clockin-biometrico-lab-") && key !== CACHE_NAME)
+        .map((key) => caches.delete(key))
+    ))
+  );
+  self.clients.claim();
+}});
+
+self.addEventListener("fetch", (event) => {{
+  const url = new URL(event.request.url);
+  const esLaboratorio = url.pathname === "/biometrico/laboratorio-offline/" ||
+    url.pathname === "/biometrico/laboratorio-offline/sw.js" ||
+    url.pathname === "/static/css/biometrico_laboratorio_offline.css" ||
+    url.pathname === "/static/js/biometrico_laboratorio_offline.js" ||
+    url.pathname === "/static/biometrico_offline/vendor/face-api.js/dist/face-api.min.js" ||
+    url.pathname.startsWith("/static/biometrico_offline/models/face-api/");
+
+  if (!esLaboratorio || event.request.method !== "GET") return;
+
+  event.respondWith(
+    caches.match(event.request).then((cached) => {{
+      return cached || fetch(event.request).then((response) => {{
+        const clone = response.clone();
+        caches.open(CACHE_NAME).then((cache) => cache.put(event.request, clone));
+        return response;
+      }});
+    }})
+  );
+}});
+"""
+    return HttpResponse(contenido, content_type="application/javascript")
 
 
 @csrf_exempt

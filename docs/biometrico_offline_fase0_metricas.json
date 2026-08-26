@@ -1,0 +1,119 @@
+{
+  "fase": "0",
+  "estado": "laboratorio_creado",
+  "decision_provisional": "VIABLE_CON_LIMITACIONES_COMPATIBILIDAD_PENDIENTE",
+  "motor_facial_actual_servidor": {
+    "libreria": "face-recognition",
+    "version": "1.3.0",
+    "modelo_base": "dlib",
+    "descriptor_dimension": 128,
+    "descriptor_tipo": "float64",
+    "descriptor_bytes": 1024
+  },
+  "motor_facial_web": {
+    "seleccionado": true,
+    "nombre": "face-api.js",
+    "version": "0.22.2",
+    "licencia": "MIT",
+    "estado": "incorporado_localmente",
+    "detector": "tiny_face_detector_model",
+    "landmarks": "face_landmark_68_model",
+    "reconocimiento": "face_recognition_model",
+    "embedding_dimension": 128,
+    "backend": "TensorFlow.js browser",
+    "compatibilidad_dlib": "PENDIENTE_CAPTURAS_REALES",
+    "recursos": [
+      {
+        "archivo": "face-api.js-0.22.2.tgz",
+        "sha256": "DB4D2C5D08957CF761B092DE2DF733AB4C8AD7D4D4E8906B7C6924A6ED0604DD"
+      },
+      {
+        "archivo": "face-api.min.js",
+        "sha256": "5D66EC95338D7FCC365CE15481B8599BAF4B6E22C9A624B76D4CA821A669A659"
+      },
+      {
+        "archivo": "tiny_face_detector_model-weights_manifest.json",
+        "sha256": "14C60659A31B6B7B1320077171B8F8ADCB24EF0E62DDE62CE603BCB49A1B49B5"
+      },
+      {
+        "archivo": "tiny_face_detector_model-shard1",
+        "sha256": "B7503CE7DF31039B1C43316A9B865CAB6A70DD748CC602D3FA28B551503C3871"
+      },
+      {
+        "archivo": "face_landmark_68_model-weights_manifest.json",
+        "sha256": "D30F6CC341009EA4F8223876959289B96576FC54A2615F92DA9741AB9C5F0BBC"
+      },
+      {
+        "archivo": "face_landmark_68_model-shard1",
+        "sha256": "4611EF65C87D836D03D684B30EEC4D195D8B219FA1DD58FC58945831C6B9299B"
+      },
+      {
+        "archivo": "face_recognition_model-weights_manifest.json",
+        "sha256": "6619F4126F845C1F7857F39CBD79565F375734F46E0DD25D9602F8DC21CDA9F5"
+      },
+      {
+        "archivo": "face_recognition_model-shard1",
+        "sha256": "412566A2B8D814D84C60B8055EC5D3B3B2328EF7CD7853384E03EC3DB7B053D8"
+      },
+      {
+        "archivo": "face_recognition_model-shard2",
+        "sha256": "69350FDECD845C532E44DD8F7D0521C773505EF46B87CC34F46640A0CC334ECC"
+      }
+    ]
+  },
+  "muestra_desarrollo": {
+    "funcionarios_total": 7,
+    "funcionarios_activos": 7,
+    "funcionarios_activos_con_descriptor": 5,
+    "funcionarios_con_foto_referenciada": 0,
+    "incluye_descriptores_reales": false,
+    "incluye_imagenes": false
+  },
+  "laboratorio": {
+    "ruta": "/biometrico/laboratorio-offline/",
+    "endpoint_muestra": "/biometrico/laboratorio-offline/descriptores/",
+    "service_worker": "/biometrico/laboratorio-offline/sw.js",
+    "registra_asistencias": false,
+    "modifica_funcionarios": false,
+    "usa_cdn": false
+  },
+  "indexeddb": {
+    "estado": "pendiente_prueba_dispositivo",
+    "datasets_ficticios": [10, 100, 500, 1000, 5000]
+  },
+  "offline": {
+    "estado": "pendiente_prueba_dispositivo",
+    "requiere_prueba_manual": true
+  },
+  "prueba_compatibilidad": {
+    "estado": "implementada_pendiente_ejecucion_real",
+    "controles": [
+      "Generar embedding",
+      "Comparar contra descriptor A",
+      "Comparar contra descriptor B"
+    ],
+    "metricas_visibles": [
+      "dimension_web",
+      "dimension_dlib",
+      "distancia_euclidiana",
+      "similitud_coseno",
+      "tiempo_generacion",
+      "tiempo_comparacion"
+    ],
+    "resultados": {
+      "A_contra_A": "pendiente",
+      "A_contra_B": "pendiente",
+      "B_contra_A": "pendiente",
+      "B_contra_B": "pendiente"
+    }
+  },
+  "seguridad": {
+    "endpoint_protegido": true,
+    "muestra_limitada": true,
+    "anonimiza_identidad": true,
+    "no_expone_cedulas": true,
+    "no_expone_salarios": true,
+    "cifrado_definitivo": "pendiente_fase_futura"
+  },
+  "conclusion_re_registro": "INCONCLUSA_HASTA_EJECUTAR_CAPTURAS_REALES"
+}

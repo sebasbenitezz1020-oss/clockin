@@ -1,0 +1,159 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#07182d">
+    <title>Laboratorio biométrico offline - Fase 0 | ClockIn</title>
+    <link rel="stylesheet" href="{% static 'css/biometrico_laboratorio_offline.css' %}">
+</head>
+<body>
+    <main class="lab-shell" data-descriptores-url="{% url 'biometrico_laboratorio_descriptores' %}" data-sw-url="{% url 'biometrico_laboratorio_sw' %}" data-model-url="{% static 'biometrico_offline/models/face-api' %}">
+        <section class="lab-hero">
+            <div>
+                <span class="lab-kicker">ClockIn Fase 0</span>
+                <h1>Laboratorio biométrico offline</h1>
+                <p>
+                    Prueba aislada para investigar funcionamiento offline. No registra asistencias,
+                    no modifica funcionarios y no reemplaza el lector actual.
+                </p>
+            </div>
+            <div class="lab-guard">
+                <strong>Entorno protegido</strong>
+                <span>{% if request.user.is_superuser %}Superusuario{% elif debug_activo %}DEBUG activo{% else %}Restringido{% endif %}</span>
+            </div>
+        </section>
+
+        <section class="lab-alert">
+            <strong>No productivo:</strong>
+            reconocimiento local experimental. Si no hay motor facial web instalado, la compatibilidad de embeddings queda inconclusa.
+        </section>
+
+        <section class="lab-grid lab-grid-stats">
+            <article class="lab-card">
+                <span>Estado de red</span>
+                <strong id="networkStatus">Verificando</strong>
+            </article>
+            <article class="lab-card">
+                <span>Camara</span>
+                <strong id="cameraStatus">Sin iniciar</strong>
+            </article>
+            <article class="lab-card">
+                <span>Modelo facial web</span>
+                <strong id="modelStatus">No instalado</strong>
+            </article>
+            <article class="lab-card">
+                <span>Descriptores actuales</span>
+                <strong>{{ total_descriptores }}</strong>
+            </article>
+        </section>
+
+        <section class="lab-workspace">
+            <article class="lab-camera-card">
+                <div class="lab-card-head">
+                    <div>
+                        <h2>Camara de prueba</h2>
+                        <p>Captura local para mediciones. La imagen no se envia al servidor.</p>
+                    </div>
+                    <span id="offlineBadge" class="lab-badge">Online</span>
+                </div>
+                <div class="lab-camera">
+                    <video id="video" playsinline muted autoplay></video>
+                    <canvas id="canvas"></canvas>
+                    <canvas id="detectionCanvas" class="lab-detection-canvas"></canvas>
+                    <div class="lab-frame"></div>
+                </div>
+                <div class="lab-actions">
+                    <button type="button" id="btnModel">Cargar modelo</button>
+                    <button type="button" id="btnCamera">Iniciar camara</button>
+                    <button type="button" id="btnCapture">Probar deteccion</button>
+                    <button type="button" id="btnGenerateEmbedding">Generar embedding</button>
+                    <button type="button" id="btnSampleA">Guardar embedding A</button>
+                    <button type="button" id="btnSampleB">Guardar embedding B</button>
+                    <button type="button" id="btnDescriptors">Cargar muestra</button>
+                    <button type="button" id="btnCompareDescriptorA">Comparar contra descriptor A</button>
+                    <button type="button" id="btnCompareDescriptorB">Comparar contra descriptor B</button>
+                    <button type="button" id="btnIndexedDb">Probar IndexedDB</button>
+                    <button type="button" id="btnExport">Exportar metricas</button>
+                </div>
+            </article>
+
+            <article class="lab-panel">
+                <div class="lab-card-head">
+                    <div>
+                        <h2>Resultados</h2>
+                        <p>Mediciones locales generadas en el navegador.</p>
+                    </div>
+                </div>
+                <div class="lab-result-list">
+                    <div><span>Rostros detectados</span><strong id="facesDetected">0</strong></div>
+                    <div><span>Estado del rostro</span><strong id="faceStatus">Pendiente</strong></div>
+                    <div><span>Descriptores cargados</span><strong id="loadedDescriptors">0</strong></div>
+                    <div><span>Descriptor A</span><strong id="descriptorAStatus">Pendiente</strong></div>
+                    <div><span>Descriptor B</span><strong id="descriptorBStatus">Pendiente</strong></div>
+                    <div><span>Dimensión embedding</span><strong id="embeddingDimension">Pendiente</strong></div>
+                    <div><span>Tiempo deteccion/alineacion</span><strong id="detectionTime">Pendiente</strong></div>
+                    <div><span>Tiempo embedding</span><strong id="embeddingTime">Pendiente</strong></div>
+                    <div><span>Tiempo de comparacion</span><strong id="comparisonTime">Pendiente</strong></div>
+                    <div><span>Distancia / confianza</span><strong id="confidenceValue">Pendiente</strong></div>
+                    <div><span>Resultado</span><strong id="resultValue">Sin prueba</strong></div>
+                </div>
+                <div class="lab-note" id="labNote">
+                    El laboratorio esta listo para pruebas de almacenamiento y camara. La generacion real de embeddings en navegador requiere incorporar un motor facial web local.
+                </div>
+            </article>
+        </section>
+
+        <section class="lab-workspace lab-workspace-small">
+            <article class="lab-panel">
+                <div class="lab-card-head">
+                    <div>
+                        <h2>IndexedDB</h2>
+                        <p>Prueba con descriptores ficticios, sin datos biometricos reales.</p>
+                    </div>
+                </div>
+                <div class="lab-actions lab-actions-inline">
+                    <button type="button" data-idb-size="10">10</button>
+                    <button type="button" data-idb-size="100">100</button>
+                    <button type="button" data-idb-size="500">500</button>
+                    <button type="button" data-idb-size="1000">1.000</button>
+                    <button type="button" data-idb-size="5000">5.000</button>
+                    <button type="button" id="btnClearDb">Limpiar</button>
+                </div>
+                <pre id="indexedDbOutput">Sin pruebas ejecutadas.</pre>
+            </article>
+
+            <article class="lab-panel">
+                <div class="lab-card-head">
+                    <div>
+                        <h2>Service Worker</h2>
+                        <p>Cache exclusivo para esta ruta de laboratorio.</p>
+                    </div>
+                </div>
+                <div class="lab-result-list">
+                    <div><span>Registro</span><strong id="swStatus">Pendiente</strong></div>
+                    <div><span>Alcance</span><strong id="swScope">No registrado</strong></div>
+                    <div><span>Modo offline</span><strong id="offlineReady">Pendiente</strong></div>
+                </div>
+                <div class="lab-note">
+                    El Service Worker solo intercepta recursos de <code>/biometrico/laboratorio-offline/</code> y los assets del laboratorio.
+                </div>
+            </article>
+        </section>
+
+        <section class="lab-panel">
+            <div class="lab-card-head">
+                <div>
+                    <h2>Bitacora tecnica</h2>
+                    <p>Eventos controlados de la PoC. No se imprimen embeddings ni imagenes.</p>
+                </div>
+            </div>
+            <pre id="logOutput">Laboratorio cargado.</pre>
+        </section>
+    </main>
+
+    <script src="{% static 'biometrico_offline/vendor/face-api.js/dist/face-api.min.js' %}"></script>
+    <script src="{% static 'js/biometrico_laboratorio_offline.js' %}"></script>
+</body>
+</html>

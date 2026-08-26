@@ -154,6 +154,21 @@
     margin-top: 6px;
 }
 
+.catalog-count {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    width: fit-content;
+    margin-top: 8px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    background: rgba(16,185,129,.10);
+    border: 1px solid rgba(16,185,129,.18);
+    color: #bbf7d0;
+    font-size: 12px;
+    font-weight: 800;
+}
+
 .catalog-error {
     display: none;
     margin-top: 8px;
@@ -455,7 +470,8 @@
                             <button type="button" onclick="agregarItem('banco')" class="btn-guardar btn-add-chip">➕</button>
                         </div>
 
-                        <div class="catalog-meta">Hasta 100 caracteres por opcion. Presiona Enter o el boton para agregar.</div>
+                        <div class="catalog-meta">Hasta 100 caracteres por opción. Presiona Enter o el botón para agregar.</div>
+                        <div id="count_banco" class="catalog-count">0 bancos cargados</div>
                         <div id="error_banco" class="catalog-error"></div>
                         <div id="lista_banco" class="chips-container"></div>
 
@@ -471,7 +487,8 @@
                             <button type="button" onclick="agregarItem('cargo')" class="btn-guardar btn-add-chip">➕</button>
                         </div>
 
-                        <div class="catalog-meta">Los cargos se usan en la ficha del funcionario. Maximo 100 caracteres.</div>
+                        <div class="catalog-meta">Los cargos se usan en la ficha del funcionario. Máximo 100 caracteres.</div>
+                        <div id="count_cargo" class="catalog-count">0 cargos cargados</div>
                         <div id="error_cargo" class="catalog-error"></div>
                         <div id="lista_cargo" class="chips-container"></div>
 
@@ -487,7 +504,8 @@
                             <button type="button" onclick="agregarItem('sector')" class="btn-guardar btn-add-chip">➕</button>
                         </div>
 
-                        <div class="catalog-meta">Los sectores se usan en funcionarios, reportes y dias libres. Maximo 100 caracteres.</div>
+                        <div class="catalog-meta">Los sectores se usan en funcionarios, reportes y días libres. Máximo 100 caracteres.</div>
+                        <div id="count_sector" class="catalog-count">0 sectores cargados</div>
                         <div id="error_sector" class="catalog-error"></div>
                         <div id="lista_sector" class="chips-container"></div>
 
@@ -676,7 +694,7 @@ function agregarItem(tipo) {
     if (!valor) return;
 
     if (valor.length > 100) {
-        mostrarErrorCatalogo(tipo, "La opcion no puede superar 100 caracteres.");
+        mostrarErrorCatalogo(tipo, "La opción no puede superar 100 caracteres.");
         return;
     }
 
@@ -685,7 +703,7 @@ function agregarItem(tipo) {
     if (!items.includes(valor)) {
         items.push(valor);
     } else {
-        mostrarErrorCatalogo(tipo, "Esta opcion ya existe en la lista.");
+        mostrarErrorCatalogo(tipo, "Esta opción ya existe en la lista.");
         return;
     }
 
@@ -714,6 +732,17 @@ function renderLista(tipo) {
     lista.innerHTML = "";
 
     const items = obtenerItems(hidden);
+
+    const contador = document.getElementById("count_" + tipo);
+    if (contador) {
+        const etiquetas = {
+            banco: ["banco cargado", "bancos cargados"],
+            cargo: ["cargo cargado", "cargos cargados"],
+            sector: ["sector cargado", "sectores cargados"]
+        };
+        const texto = etiquetas[tipo] || ["opción cargada", "opciones cargadas"];
+        contador.textContent = `${items.length} ${items.length === 1 ? texto[0] : texto[1]}`;
+    }
 
     items.forEach(item => {
         const chip = document.createElement("div");
@@ -798,3 +827,5 @@ document.addEventListener("DOMContentLoaded", function () {
 </script>
 
 {% endblock %}
+
+
