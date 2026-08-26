@@ -408,6 +408,29 @@ def obtener_fecha_operativa_asistencia(funcionario, ahora=None):
 
     return hoy
 
+
+def _codigo_resultado_biometrico(resultado, modo):
+    tipo = resultado.get("tipo")
+
+    if resultado.get("ok"):
+        if tipo in ["entrada", "regreso_almuerzo"]:
+            return "SUCCESS_ENTRY"
+        if tipo in ["salida", "salida_almuerzo"]:
+            return "SUCCESS_EXIT"
+        return "SUCCESS"
+
+    if tipo in ["espera_salida_almuerzo", "espera_salida_final"]:
+        return "ALREADY_ENTRY"
+    if tipo == "espera_regreso_almuerzo":
+        return "ALREADY_EXIT"
+    if tipo == "ya_completo":
+        return "ALREADY_EXIT" if modo == "salida" else "ALREADY_COMPLETE"
+    if tipo == "sin_entrada":
+        return "PENDING_ENTRY"
+    if tipo in ["modo_invalido", "error"]:
+        return "TECHNICAL_ERROR"
+    return "TECHNICAL_ERROR"
+
 def _marcar_asistencia_biometrica(request, funcionario, modo, origen="biometrico_tablet"):
     ahora = timezone.localtime()
     fecha_operativa = obtener_fecha_operativa_asistencia(funcionario, ahora)
@@ -510,20 +533,23 @@ def _marcar_asistencia_biometrica(request, funcionario, modo, origen="biometrico
             return {
                 "ok": False,
                 "tipo": "espera_salida_almuerzo",
-                "mensaje": "Aún corresponde registrar salida a almuerzo."
+                "mensaje": "Aún corresponde registrar salida a almuerzo.",
+                "hora_previa": asistencia.hora_entrada.strftime("%H:%M:%S") if asistencia.hora_entrada else None,
             }
 
         if siguiente == "salida":
             return {
                 "ok": False,
                 "tipo": "espera_salida_final",
-                "mensaje": "Aún corresponde registrar salida final."
+                "mensaje": "Aún corresponde registrar salida final.",
+                "hora_previa": asistencia.hora_entrada.strftime("%H:%M:%S") if asistencia.hora_entrada else None,
             }
 
         return {
             "ok": False,
             "tipo": "ya_completo",
-            "mensaje": "El funcionario ya completó todas sus marcaciones del día."
+            "mensaje": "El funcionario ya completó todas sus marcaciones del día.",
+            "hora_previa": asistencia.hora_salida.strftime("%H:%M:%S") if asistencia.hora_salida else None,
         }
 
     if modo == "salida":
@@ -598,13 +624,15 @@ def _marcar_asistencia_biometrica(request, funcionario, modo, origen="biometrico
             return {
                 "ok": False,
                 "tipo": "espera_regreso_almuerzo",
-                "mensaje": "Antes de salir debe registrar regreso de almuerzo."
+                "mensaje": "Antes de salir debe registrar regreso de almuerzo.",
+                "hora_previa": asistencia.hora_salida_almuerzo.strftime("%H:%M:%S") if asistencia.hora_salida_almuerzo else None,
             }
 
         return {
             "ok": False,
             "tipo": "ya_completo",
-            "mensaje": "El funcionario ya completó todas sus marcaciones del día."
+            "mensaje": "El funcionario ya completó todas sus marcaciones del día.",
+            "hora_previa": asistencia.hora_salida.strftime("%H:%M:%S") if asistencia.hora_salida else None,
         }
 
     return {
@@ -887,6 +915,7 @@ def reconocimiento(request):
             return JsonResponse({
                 "ok": False,
                 "tipo": "error_imagen",
+                "result_code": "TECHNICAL_ERROR",
                 "mensaje": "No se pudo procesar la imagen."
             })
 
@@ -907,6 +936,7 @@ def reconocimiento(request):
             return JsonResponse({
                 "ok": False,
                 "tipo": "procesando",
+                "result_code": "COOLDOWN",
                 "mensaje": "Procesando lectura anterior."
             })
 
@@ -914,6 +944,7 @@ def reconocimiento(request):
             return JsonResponse({
                 "ok": False,
                 "tipo": analisis.get("tipo", "sin_rostro"),
+                "result_code": "FACE_NOT_RECOGNIZED",
                 "mensaje": analisis.get("mensaje", "Esperando rostro frente a cámara.")
             })
 
@@ -921,6 +952,7 @@ def reconocimiento(request):
             return JsonResponse({
                 "ok": False,
                 "tipo": "multiples_rostros",
+                "result_code": "TECHNICAL_ERROR",
                 "mensaje": "Hay más de un rostro frente a la cámara."
             })
 
@@ -936,6 +968,7 @@ def reconocimiento(request):
             return JsonResponse({
                 "ok": False,
                 "tipo": analisis.get("tipo"),
+                "result_code": "TECHNICAL_ERROR",
                 "mensaje": analisis.get("mensaje"),
             })
 
@@ -945,6 +978,7 @@ def reconocimiento(request):
             return JsonResponse({
                 "ok": False,
                 "tipo": "error_imagen",
+                "result_code": "TECHNICAL_ERROR",
                 "mensaje": "No se pudo leer la imagen capturada."
             })
 
@@ -954,6 +988,7 @@ def reconocimiento(request):
             return JsonResponse({
                 "ok": False,
                 "tipo": tipo_error or "no_reconocido",
+                "result_code": "FACE_NOT_RECOGNIZED",
                 "mensaje": error or "Rostro detectado, pero no fue reconocido."
             })
 
@@ -961,21 +996,25 @@ def reconocimiento(request):
             return JsonResponse({
                 "ok": False,
                 "tipo": "duplicado",
+                "result_code": "COOLDOWN",
                 "funcionario_id": funcionario.id,
                 "funcionario": funcionario.nombre_completo,
                 "mensaje": "Lectura reciente detectada. Espere unos segundos."
             })
 
         resultado = _marcar_asistencia_biometrica(request, funcionario, modo, origen=origen)
+        result_code = _codigo_resultado_biometrico(resultado, modo)
 
         return JsonResponse({
             "ok": resultado["ok"],
             "tipo": resultado.get("tipo"),
+            "result_code": result_code,
             "subtipo": resultado.get("subtipo"),
             "funcionario_id": funcionario.id,
             "funcionario": funcionario.nombre_completo,
             "mensaje": resultado.get("mensaje"),
             "hora": resultado.get("hora"),
+            "hora_previa": resultado.get("hora_previa"),
             "turno": resultado.get("turno"),
             "llego_tarde": resultado.get("llego_tarde", False),
             "minutos_atraso": resultado.get("minutos_atraso", 0),
@@ -987,5 +1026,6 @@ def reconocimiento(request):
         return JsonResponse({
             "ok": False,
             "tipo": "error_validacion",
+            "result_code": "TECHNICAL_ERROR",
             "mensaje": _mensaje_error_amigable(str(e))
         })
