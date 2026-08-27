@@ -464,7 +464,7 @@
                 <div class="liq-profile" id="funcionarioProfile">
                     <h4 id="fpNombre">Funcionario</h4>
                     <div class="liq-profile-grid">
-                        <div class="liq-profile-item"><span>CI</span><strong id="fpCedula">—</strong></div>
+                        <div class="liq-profile-item"><span>Documento</span><strong id="fpCedula">—</strong></div>
                         <div class="liq-profile-item"><span>Cargo</span><strong id="fpCargo">—</strong></div>
                         <div class="liq-profile-item"><span>Sector</span><strong id="fpSector">—</strong></div>
                         <div class="liq-profile-item"><span>Sucursal</span><strong id="fpSucursal">—</strong></div>
@@ -648,7 +648,7 @@
     function pintarPerfil(data) {
         funcionarioProfile.style.display = "block";
         setText("fpNombre", data.funcionario || "Funcionario");
-        setText("fpCedula", data.cedula || "—");
+        setText("fpCedula", data.documento_compacto || data.cedula || "—");
         setText("fpCargo", data.cargo || "—");
         setText("fpSector", data.sector || "—");
         setText("fpSucursal", data.sucursal || "—");

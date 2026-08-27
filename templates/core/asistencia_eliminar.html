@@ -15,7 +15,7 @@
 
     <div style="margin: 18px 0; color: #fff;">
         <p><strong>Funcionario:</strong> {{ asistencia.funcionario.nombre_completo }}</p>
-        <p><strong>Cédula:</strong> {{ asistencia.funcionario.cedula }}</p>
+        <p><strong>Documento:</strong> {{ asistencia.funcionario.documento_compacto }}</p>
         <p><strong>Fecha:</strong> {{ asistencia.fecha|date:"d/m/Y" }}</p>
         <p><strong>Entrada:</strong> {{ asistencia.hora_entrada|time:"H:i:s"|default:"-" }}</p>
         <p><strong>Salida almuerzo:</strong> {{ asistencia.hora_salida_almuerzo|time:"H:i:s"|default:"-" }}</p>

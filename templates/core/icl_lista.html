@@ -443,7 +443,7 @@
                         <td>
                             <div class="icl-main">
                                 <strong>{{ item.funcionario.nombre_completo }}</strong>
-                                <span class="icl-sub">CI: {{ item.funcionario.cedula|millares }}</span>
+                                <span class="icl-sub">{{ item.funcionario.documento_compacto }}</span>
                                 <span class="icl-sub">
                                     {% if item.funcionario.turno %}
                                         {{ item.funcionario.turno.nombre }}
@@ -524,7 +524,7 @@
                         <div class="rank-item">
                             <div class="rank-name">
                                 <strong>{{ item.funcionario.nombre_completo }}</strong>
-                                <span>{{ item.funcionario.cedula|millares }}</span>
+                                <span>{{ item.funcionario.documento_compacto }}</span>
                             </div>
                             <div class="rank-score">{{ item.icl|millares }}%</div>
                         </div>
@@ -541,7 +541,7 @@
                         <div class="rank-item">
                             <div class="rank-name">
                                 <strong>{{ item.funcionario.nombre_completo }}</strong>
-                                <span>{{ item.funcionario.cedula|millares }}</span>
+                                <span>{{ item.funcionario.documento_compacto }}</span>
                             </div>
                             <div class="rank-score">{{ item.icl|millares }}%</div>
                         </div>

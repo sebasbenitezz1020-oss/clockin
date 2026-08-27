@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}Diaristas{% endblock %}
+{% block content %}
+<style>
+.dia-page{padding:24px 0 42px;color:#e5eefb}.dia-hero{display:flex;justify-content:space-between;gap:16px;align-items:flex-end;margin-bottom:18px;padding:24px;border-radius:24px;background:radial-gradient(circle at 8% 0%,rgba(56,189,248,.16),transparent 34%),linear-gradient(180deg,rgba(15,23,42,.98),rgba(8,13,23,.98));border:1px solid rgba(148,163,184,.15);box-shadow:0 20px 55px rgba(0,0,0,.24)}.dia-hero h1{margin:0;color:#fff;font-size:clamp(30px,5vw,44px);font-weight:1000;letter-spacing:0}.dia-hero p{margin:8px 0 0;color:#9fb0c3;max-width:760px}.dia-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;padding:0 16px;border-radius:14px;text-decoration:none;border:1px solid rgba(148,163,184,.18);background:rgba(15,23,42,.72);color:#dbeafe;font-weight:950}.dia-btn.primary{background:linear-gradient(135deg,#2563eb,#38bdf8);border:0;color:#fff}.dia-stats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px;margin-bottom:16px}.dia-stat{padding:18px;border-radius:18px;background:rgba(15,23,42,.82);border:1px solid rgba(148,163,184,.14);box-shadow:0 14px 34px rgba(0,0,0,.16)}.dia-stat span{display:block;color:#93a4b7;font-size:12px;font-weight:900;margin-bottom:8px}.dia-stat strong{color:#fff;font-size:28px;line-height:1}.dia-filters{display:grid;grid-template-columns:1fr 1fr 1fr 1fr 1.3fr auto;gap:10px;padding:14px;margin-bottom:16px;border-radius:20px;background:rgba(15,23,42,.78);border:1px solid rgba(148,163,184,.14)}.dia-field label{display:block;color:#9fb0c3;font-size:12px;font-weight:900;margin-bottom:6px}.dia-field input,.dia-field select{width:100%;min-height:42px;border-radius:13px;border:1px solid rgba(148,163,184,.20);background:rgba(2,6,23,.55);color:#f8fafc;padding:0 11px;font-weight:800}.dia-card{border-radius:22px;overflow:hidden;background:rgba(15,23,42,.84);border:1px solid rgba(148,163,184,.14);box-shadow:0 18px 50px rgba(0,0,0,.22)}.dia-table{width:100%;border-collapse:collapse}.dia-table th,.dia-table td{padding:14px;border-bottom:1px solid rgba(148,163,184,.10);text-align:left;vertical-align:top}.dia-table th{color:#93a4b7;font-size:12px;text-transform:uppercase}.dia-name{color:#fff;font-weight:1000}.dia-meta{color:#9fb0c3;font-size:12px;margin-top:4px}.dia-badge{display:inline-flex;padding:7px 10px;border-radius:999px;font-size:11px;font-weight:1000;text-transform:uppercase;border:1px solid rgba(148,163,184,.18);color:#cbd5e1}.dia-badge.activo{color:#bbf7d0;background:rgba(34,197,94,.12);border-color:rgba(34,197,94,.24)}.dia-badge.pendiente{color:#fde68a;background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.24)}.dia-badge.finalizado{color:#bae6fd;background:rgba(56,189,248,.12);border-color:rgba(56,189,248,.24)}.dia-badge.cancelado{color:#fecaca;background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.24)}.dia-actions{display:flex;gap:8px;flex-wrap:wrap}.dia-empty{padding:28px;color:#cbd5e1;text-align:center}@media(max-width:1100px){.dia-stats{grid-template-columns:repeat(2,1fr)}.dia-filters{grid-template-columns:1fr 1fr}.dia-table{min-width:980px}.dia-card{overflow:auto}}@media(max-width:680px){.dia-page{padding-top:12px}.dia-hero{display:grid;padding:18px;border-radius:18px}.dia-stats,.dia-filters{grid-template-columns:1fr}.dia-btn{width:100%}}
+</style>
+<div class="container-fluid dia-page">
+  <section class="dia-hero">
+    <div><a class="dia-btn" href="{% url 'dashboard' %}">← Retroceder</a><h1>Diaristas</h1><p>Contrataciones temporales por día, completamente separadas de funcionarios permanentes, nómina mensual, ICL, vacaciones y aguinaldo.</p></div>
+    <div class="dia-actions"><a class="dia-btn" href="{% url 'diaristas_reporte' %}">Reporte</a><a class="dia-btn primary" href="{% url 'diarista_nuevo' %}">Nuevo diarista</a></div>
+  </section>
+  <section class="dia-stats">
+    <div class="dia-stat"><span>Activos actualmente</span><strong>{{ activos_actuales }}</strong></div>
+    <div class="dia-stat"><span>Pendientes</span><strong>{{ pendientes }}</strong></div>
+    <div class="dia-stat"><span>Finalizados este mes</span><strong>{{ finalizados_mes }}</strong></div>
+    <div class="dia-stat"><span>Total estimado</span><strong>Gs. {{ total_estimado|floatformat:0 }}</strong></div>
+    <div class="dia-stat"><span>Pagos pendientes</span><strong>{{ pagos_pendientes }}</strong></div>
+  </section>
+  <form class="dia-filters" method="get">
+    <div class="dia-field"><label>Empresa</label><select name="empresa"><option value="">Todas</option>{% for e in empresas %}<option value="{{ e.id }}" {% if empresa_id == e.id|stringformat:'s' %}selected{% endif %}>{{ e.nombre_visible|default:e.nombre }}</option>{% endfor %}</select></div>
+    <div class="dia-field"><label>Sucursal</label><select name="sucursal"><option value="">Todas</option>{% for s in sucursales %}<option value="{{ s.id }}" {% if sucursal_id == s.id|stringformat:'s' %}selected{% endif %}>{{ s.nombre }}</option>{% endfor %}</select></div>
+    <div class="dia-field"><label>Sector</label><select name="sector"><option value="">Todos</option>{% for s in sectores %}<option value="{{ s }}" {% if sector_sel == s %}selected{% endif %}>{{ s }}</option>{% endfor %}</select></div>
+    <div class="dia-field"><label>Estado</label><select name="estado"><option value="">Todos</option>{% for value,label in estados %}<option value="{{ value }}" {% if estado_sel == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+    <div class="dia-field"><label>Buscar</label><input name="q" value="{{ q }}" placeholder="Nombre, cédula o función"></div>
+    <button class="dia-btn primary" type="submit">Filtrar</button>
+  </form>
+  <section class="dia-card">
+    {% if diaristas %}
+    <table class="dia-table">
+      <thead><tr><th>Nombre</th><th>Sucursal / función</th><th>Periodo</th><th>Días</th><th>Monto diario</th><th>Total estimado</th><th>Estado</th><th>Acciones</th></tr></thead>
+      <tbody>{% for d in diaristas %}<tr>
+        <td><div class="dia-name">{{ d.nombre_completo }}</div><div class="dia-meta">CI: {{ d.cedula }}{% if d.telefono %} · {{ d.telefono }}{% endif %}</div></td>
+        <td>{{ d.sucursal.nombre|default:"Sin sucursal" }}<div class="dia-meta">{{ d.funcion_temporal|default:"Sin función" }}{% if d.sector %} · {{ d.sector }}{% endif %}</div></td>
+        <td>{{ d.fecha_inicio|date:"d/m/Y" }} → {{ d.fecha_fin|date:"d/m/Y" }}</td>
+        <td>{{ d.cantidad_dias_contratados }}</td>
+        <td>Gs. {{ d.monto_diario_acordado|floatformat:0 }}</td>
+        <td>Gs. {{ d.total_estimado|floatformat:0 }}</td>
+        <td><span class="dia-badge {{ d.estado }}">{{ d.get_estado_display }}</span></td>
+        <td><div class="dia-actions"><a class="dia-btn" href="{% url 'diarista_detalle' d.id %}">Ver</a><a class="dia-btn" href="{% url 'diarista_asistencias' d.id %}">Asistencias</a><a class="dia-btn" href="{% url 'diarista_pagos' d.id %}">Pagos</a><a class="dia-btn" href="{% url 'diarista_editar' d.id %}">Editar</a></div></td>
+      </tr>{% endfor %}</tbody>
+    </table>
+    {% else %}<div class="dia-empty">No hay diaristas con los filtros seleccionados.</div>{% endif %}
+  </section>
+</div>
+{% endblock %}

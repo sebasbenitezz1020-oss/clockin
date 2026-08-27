@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% block title %}{{ diarista.nombre_completo }}{% endblock %}
+{% block content %}
+<style>
+.dia-detail{padding:24px 0 42px;color:#e5eefb}.dia-hero{display:flex;justify-content:space-between;gap:16px;align-items:flex-end;margin-bottom:18px;padding:24px;border-radius:24px;background:radial-gradient(circle at 8% 0%,rgba(56,189,248,.16),transparent 34%),linear-gradient(180deg,rgba(15,23,42,.98),rgba(8,13,23,.98));border:1px solid rgba(148,163,184,.15)}.dia-hero h1{margin:0;color:#fff;font-size:clamp(30px,5vw,44px);font-weight:1000;letter-spacing:0}.dia-hero p{margin:8px 0 0;color:#9fb0c3}.dia-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;padding:0 16px;border-radius:14px;text-decoration:none;border:1px solid rgba(148,163,184,.18);background:rgba(15,23,42,.72);color:#dbeafe;font-weight:950}.dia-btn.primary{border:0;color:#fff;background:linear-gradient(135deg,#2563eb,#38bdf8)}.dia-btn.success{color:#bbf7d0;background:rgba(34,197,94,.12);border-color:rgba(34,197,94,.24)}.dia-btn.warn{color:#fde68a;background:rgba(245,158,11,.12);border-color:rgba(245,158,11,.24)}.dia-btn.danger{color:#fecaca;background:rgba(239,68,68,.12);border-color:rgba(239,68,68,.25)}.dia-admin-actions{display:flex;gap:8px;flex-wrap:wrap}.dia-admin-actions form{display:inline-flex}.dia-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}.dia-card{padding:20px;border-radius:22px;background:rgba(15,23,42,.84);border:1px solid rgba(148,163,184,.14);box-shadow:0 18px 50px rgba(0,0,0,.20)}.dia-card h3{margin:0 0 14px;color:#fff;font-size:18px;font-weight:1000}.dia-kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px}.dia-kpi{padding:16px;border-radius:18px;background:rgba(15,23,42,.84);border:1px solid rgba(148,163,184,.14)}.dia-kpi span{display:block;color:#93a4b7;font-size:12px;font-weight:900;margin-bottom:8px}.dia-kpi strong{font-size:28px;color:#fff}.dia-row{display:grid;grid-template-columns:170px 1fr;gap:10px;padding:10px 0;border-bottom:1px solid rgba(148,163,184,.10)}.dia-row span{color:#93a4b7;font-weight:800}.dia-row strong{color:#f8fafc}.dia-table{width:100%;border-collapse:collapse}.dia-table th,.dia-table td{padding:12px;border-bottom:1px solid rgba(148,163,184,.10);text-align:left}.dia-table th{color:#93a4b7;font-size:12px;text-transform:uppercase}.dia-empty{color:#9fb0c3;padding:14px 0}@media(max-width:900px){.dia-hero,.dia-grid{display:grid;grid-template-columns:1fr}.dia-kpis{grid-template-columns:1fr 1fr}.dia-row{grid-template-columns:1fr}.dia-btn{width:100%}}@media(max-width:520px){.dia-kpis{grid-template-columns:1fr}}
+</style>
+<div class="container-fluid dia-detail">
+  <section class="dia-hero"><div><a class="dia-btn" href="{% url 'diaristas_lista' %}">← Volver</a><h1>{{ diarista.nombre_completo }}</h1><p>CI {{ diarista.cedula }} · {{ diarista.funcion_temporal|default:"Sin función" }} · {{ diarista.get_estado_display }}</p></div><div style="display:flex;gap:10px;flex-wrap:wrap"><a class="dia-btn" href="{% url 'diarista_asistencias' diarista.id %}">Asistencias</a><a class="dia-btn" href="{% url 'diarista_pagos' diarista.id %}">Pagos</a><a class="dia-btn primary" href="{% url 'diarista_editar' diarista.id %}">Editar</a></div></section>
+  <section class="dia-kpis"><div class="dia-kpi"><span>Días contratados</span><strong>{{ diarista.cantidad_dias_contratados }}</strong></div><div class="dia-kpi"><span>Días trabajados</span><strong>{{ dias_trabajados }}</strong></div><div class="dia-kpi"><span>Ausencias</span><strong>{{ ausencias }}</strong></div><div class="dia-kpi"><span>Pagos generados</span><strong>Gs. {{ pagos_total|floatformat:0 }}</strong></div></section>
+  <div class="dia-grid">
+    <section class="dia-card"><h3>Contratación</h3>
+      <div class="dia-row"><span>Empresa</span><strong>{{ diarista.empresa.nombre_visible|default:diarista.empresa.nombre }}</strong></div>
+      <div class="dia-row"><span>Sucursal</span><strong>{{ diarista.sucursal.nombre|default:"Sin sucursal" }}</strong></div>
+      <div class="dia-row"><span>Sector</span><strong>{{ diarista.sector|default:"Sin sector" }}</strong></div>
+      <div class="dia-row"><span>Periodo</span><strong>{{ diarista.fecha_inicio|date:"d/m/Y" }} → {{ diarista.fecha_fin|date:"d/m/Y" }}</strong></div>
+      <div class="dia-row"><span>Monto diario</span><strong>Gs. {{ diarista.monto_diario_acordado|floatformat:0 }}</strong></div>
+      <div class="dia-row"><span>Total estimado</span><strong>Gs. {{ diarista.total_estimado|floatformat:0 }}</strong></div>
+      <div class="dia-row"><span>Forma de cálculo</span><strong>{{ diarista.get_forma_calculo_display }}</strong></div>
+      <div class="dia-row"><span>Turno</span><strong>{{ diarista.turno.nombre|default:"Sin turno" }}</strong></div>
+      <div class="dia-row"><span>Activo operativo</span><strong>{% if diarista.activo %}Sí{% else %}No{% endif %}</strong></div>
+    </section>
+
+    <section class="dia-card"><h3>Control administrativo</h3>
+      <p class="dia-empty" style="text-align:left;padding-top:0">Estas acciones cambian solo el estado del diarista. Las asistencias, pagos y comprobantes ya generados se conservan.</p>
+      <div class="dia-admin-actions">
+        {% if diarista.estado != 'finalizado' %}<form method="post" action="{% url 'diarista_cambiar_estado' diarista.id %}">{% csrf_token %}<input type="hidden" name="accion" value="finalizar"><button class="dia-btn warn" type="submit">Finalizar</button></form>{% endif %}
+        {% if diarista.estado != 'cancelado' %}<form method="post" action="{% url 'diarista_cambiar_estado' diarista.id %}">{% csrf_token %}<input type="hidden" name="accion" value="cancelar"><button class="dia-btn danger" type="submit">Cancelar</button></form>{% endif %}
+        {% if diarista.estado != 'activo' %}<form method="post" action="{% url 'diarista_cambiar_estado' diarista.id %}">{% csrf_token %}<input type="hidden" name="accion" value="activar"><button class="dia-btn success" type="submit">Activar</button></form>{% endif %}
+        {% if diarista.estado != 'pendiente' %}<form method="post" action="{% url 'diarista_cambiar_estado' diarista.id %}">{% csrf_token %}<input type="hidden" name="accion" value="pendiente"><button class="dia-btn" type="submit">Marcar pendiente</button></form>{% endif %}
+      </div>
+    </section>
+    <section class="dia-card"><h3>Datos personales</h3>
+      <div class="dia-row"><span>Teléfono</span><strong>{{ diarista.telefono|default:"-" }}</strong></div>
+      <div class="dia-row"><span>Dirección</span><strong>{{ diarista.direccion|default:"-" }}</strong></div>
+      <div class="dia-row"><span>Nacimiento</span><strong>{{ diarista.fecha_nacimiento|date:"d/m/Y"|default:"-" }}</strong></div>
+      <div class="dia-row"><span>Rostro</span><strong>{% if diarista.face_encoding %}Registrado{% else %}Pendiente{% endif %}</strong></div>
+      <div class="dia-row"><span>Observaciones</span><strong>{{ diarista.observaciones|default:"-" }}</strong></div>
+    </section>
+  </div>
+  <div class="dia-grid" style="margin-top:16px">
+    <section class="dia-card"><h3>Asistencias recientes</h3><p style="margin-top:-8px"><a class="dia-btn" href="{% url 'diarista_asistencias' diarista.id %}">Gestionar asistencias</a></p>{% if asistencias %}<table class="dia-table"><thead><tr><th>Fecha</th><th>Entrada</th><th>Salida</th><th>Horas</th><th>Atraso</th><th>Estado</th></tr></thead><tbody>{% for a in asistencias %}<tr><td>{{ a.fecha|date:"d/m/Y" }}</td><td>{{ a.hora_entrada|date:"H:i"|default:"-" }}</td><td>{{ a.hora_salida|date:"H:i"|default:"-" }}</td><td>{{ a.horas_trabajadas_display }}</td><td>{{ a.minutos_atraso }} min</td><td>{{ a.get_estado_display }}</td></tr>{% endfor %}</tbody></table>{% else %}<div class="dia-empty">Sin asistencias registradas todavía.</div>{% endif %}</section>
+    <section class="dia-card"><h3>Pagos recientes</h3><p style="margin-top:-8px"><a class="dia-btn" href="{% url 'diarista_pagos' diarista.id %}">Gestionar pagos</a></p>{% if pagos %}<table class="dia-table"><thead><tr><th>Fecha</th><th>Número</th><th>Total</th><th>Estado</th><th>Acción</th></tr></thead><tbody>{% for p in pagos %}<tr><td>{{ p.fecha_pago|date:"d/m/Y" }}</td><td>{{ p.numero_comprobante|default:"Borrador" }}</td><td>Gs. {{ p.total_pagado|floatformat:0 }}</td><td>{{ p.get_estado_display }}</td><td><div style="display:flex;gap:8px;flex-wrap:wrap"><a class="dia-btn" href="{% url 'diarista_pago_detalle' diarista.id p.id %}">Ver</a><a class="dia-btn" href="{% url 'diarista_pago_pdf' diarista.id p.id %}" target="_blank">PDF</a></div></td></tr>{% endfor %}</tbody></table>{% else %}<div class="dia-empty">Sin pagos generados todavía.</div>{% endif %}</section>
+  </div>
+</div>
+{% endblock %}

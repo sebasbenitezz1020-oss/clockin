@@ -2,98 +2,288 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <title>Registrar rostro</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <title>Registrar rostro | ClockIn</title>
     <style>
-        body {
-            background: #11151c;
-            color: white;
-            font-family: Arial, sans-serif;
-            text-align: center;
-            margin: 0;
-            padding: 30px;
-        }
-
-        video {
-            width: 90%;
-            max-width: 520px;
-            border-radius: 18px;
-            border: 3px solid #2a2f3a;
-            background: black;
-        }
-
-        button {
-            margin-top: 20px;
-            padding: 12px 24px;
-            font-size: 16px;
-            border: none;
-            border-radius: 10px;
-            cursor: pointer;
-        }
-
-        #mensaje {
-            margin-top: 20px;
-            font-size: 20px;
-            min-height: 30px;
-        }
+        :root { color-scheme: dark; --bg:#07111f; --panel:#0f172a; --line:rgba(148,163,184,.18); --muted:#9fb0c3; --text:#f8fafc; --blue:#38bdf8; --green:#22c55e; --amber:#f59e0b; --red:#ef4444; }
+        * { box-sizing:border-box; }
+        body { margin:0; min-height:100vh; font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color:var(--text); background:radial-gradient(circle at 12% 0%, rgba(56,189,248,.18), transparent 34%), linear-gradient(180deg,#0b1628,#050b14); padding:calc(14px + env(safe-area-inset-top)) 14px calc(18px + env(safe-area-inset-bottom)); }
+        .app { width:min(560px,100%); margin:0 auto; display:grid; gap:14px; }
+        .top { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:8px 0; }
+        .back { color:#bae6fd; text-decoration:none; font-weight:900; }
+        .company { color:#93a4b7; font-size:12px; font-weight:800; text-align:right; }
+        .hero { padding:18px; border-radius:24px; background:rgba(15,23,42,.82); border:1px solid var(--line); box-shadow:0 22px 60px rgba(0,0,0,.28); }
+        .hero h1 { margin:0; font-size:clamp(28px,8vw,42px); line-height:1; letter-spacing:0; }
+        .person { margin-top:12px; display:flex; gap:12px; align-items:center; }
+        .avatar { width:54px; height:54px; border-radius:18px; display:grid; place-items:center; background:linear-gradient(135deg,rgba(37,99,235,.28),rgba(56,189,248,.18)); border:1px solid rgba(96,165,250,.26); font-weight:1000; }
+        .person strong { display:block; font-size:18px; }
+        .person span { color:var(--muted); font-size:13px; line-height:1.45; }
+        .registered { padding:18px; border-radius:22px; background:rgba(34,197,94,.11); border:1px solid rgba(34,197,94,.24); color:#bbf7d0; }
+        .registered-actions { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:14px; }
+        .mode { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+        .mode button, .btn { min-height:46px; border:0; border-radius:16px; padding:0 14px; font-weight:1000; color:#e5eefb; background:rgba(15,23,42,.78); border:1px solid var(--line); touch-action:manipulation; }
+        .mode button.active { color:#fff; background:linear-gradient(135deg,#2563eb,#38bdf8); border-color:transparent; }
+        .panel { padding:14px; border-radius:24px; background:rgba(15,23,42,.78); border:1px solid var(--line); box-shadow:0 18px 50px rgba(0,0,0,.22); }
+        .camera-wrap { position:relative; overflow:hidden; border-radius:22px; aspect-ratio:3/4; max-height:62vh; background:#020617; border:1px solid rgba(148,163,184,.22); }
+        video, .preview img { width:100%; height:100%; object-fit:cover; display:block; }
+        .guide { position:absolute; inset:14% 17%; border:3px solid rgba(186,230,253,.74); border-radius:48% 48% 44% 44%; box-shadow:0 0 0 999px rgba(2,6,23,.24); pointer-events:none; transition:.2s ease; }
+        .guide.ok { border-color:#22c55e; box-shadow:0 0 0 999px rgba(2,6,23,.18),0 0 42px rgba(34,197,94,.45); }
+        .guide.bad { border-color:#ef4444; box-shadow:0 0 0 999px rgba(2,6,23,.18),0 0 42px rgba(239,68,68,.36); }
+        .camera-caption { position:absolute; left:14px; right:14px; bottom:14px; padding:12px; border-radius:16px; background:rgba(2,6,23,.72); backdrop-filter:blur(14px); border:1px solid rgba(148,163,184,.18); }
+        .camera-caption strong { display:block; font-size:16px; }
+        .camera-caption span { color:#cbd5e1; font-size:13px; }
+        canvas { display:none; }
+        .preview { display:none; position:relative; overflow:hidden; border-radius:22px; aspect-ratio:3/4; max-height:62vh; background:#020617; border:1px solid rgba(148,163,184,.22); }
+        .upload-zone { display:grid; place-items:center; min-height:260px; padding:22px; border-radius:22px; border:1px dashed rgba(125,211,252,.38); background:rgba(2,6,23,.42); text-align:center; }
+        .upload-zone input { display:none; }
+        .upload-zone label { display:grid; gap:8px; cursor:pointer; color:#dbeafe; font-weight:1000; }
+        .upload-zone small { color:#9fb0c3; font-weight:700; line-height:1.45; }
+        .status { min-height:52px; display:flex; align-items:center; gap:10px; padding:12px 14px; border-radius:18px; background:rgba(2,6,23,.44); border:1px solid rgba(148,163,184,.14); color:#cbd5e1; font-weight:850; }
+        .status.ok { color:#bbf7d0; border-color:rgba(34,197,94,.28); background:rgba(34,197,94,.10); }
+        .status.warn { color:#fde68a; border-color:rgba(245,158,11,.28); background:rgba(245,158,11,.10); }
+        .status.bad { color:#fecaca; border-color:rgba(239,68,68,.30); background:rgba(239,68,68,.10); }
+        .actions { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+        .btn.primary { color:#fff; background:linear-gradient(135deg,#16a34a,#22c55e); border-color:transparent; }
+        .btn.blue { color:#fff; background:linear-gradient(135deg,#2563eb,#38bdf8); border-color:transparent; }
+        .btn:disabled { opacity:.48; cursor:not-allowed; }
+        .success-overlay { position:fixed; inset:0; z-index:20; display:grid; place-items:center; padding:24px; background:rgba(2,6,23,.72); opacity:0; pointer-events:none; transform:scale(.98); transition:.2s ease; }
+        .success-overlay.show { opacity:1; pointer-events:auto; transform:scale(1); }
+        .success-card { display:grid; justify-items:center; gap:10px; text-align:center; }
+        .success-mark { width:128px; height:128px; border-radius:50%; display:grid; place-items:center; font-size:74px; font-weight:1000; background:linear-gradient(135deg,#16a34a,#22c55e); box-shadow:0 0 70px rgba(34,197,94,.52); animation:pop .5s cubic-bezier(.2,1.2,.32,1) both; }
+        .success-card h2 { margin:0; font-size:42px; line-height:1; }
+        .success-card p { margin:0; color:#cbd5e1; font-weight:850; }
+        @keyframes pop { 0%{opacity:0; transform:scale(.68) translateY(12px);} 65%{opacity:1; transform:scale(1.08);} 100%{transform:scale(1);} }
+        @media (max-width:380px) { body{padding-left:10px; padding-right:10px;} .hero,.panel{border-radius:20px;} .actions,.registered-actions{grid-template-columns:1fr;} .camera-wrap,.preview{max-height:58vh;} }
     </style>
 </head>
 <body>
-    <h2>Registrar rostro</h2>
-    <p>{{ funcionario }}</p>
+    <main class="app">
+        <div class="top">
+            <a class="back" href="{{ retorno }}">← Volver</a>
+            <div class="company">{% if empresa %}{{ empresa.nombre_visible|default:empresa.nombre }}{% else %}Sin empresa{% endif %}</div>
+        </div>
 
-    <video id="video" autoplay playsinline></video>
-    <canvas id="canvas" style="display:none;"></canvas>
+        <section class="hero">
+            <h1>Registrar rostro</h1>
+            <div class="person">
+                <div class="avatar">ID</div>
+                <div>
+                    <strong>{{ funcionario.nombre_completo }}</strong>
+                    <span>{{ funcionario.documento_compacto }}<br>{{ funcionario.cargo|default:"Sin cargo" }} · {{ funcionario.sector|default:"Sin sector" }} · {{ funcionario.sucursal_rel.nombre|default:funcionario.sucursal|default:"Sin sucursal" }}</span>
+                </div>
+            </div>
+        </section>
 
-    <br>
-    <button onclick="capturar()">Guardar rostro</button>
+        {% if rostro_existente and not actualizar %}
+            <section class="registered">
+                <strong>Rostro ya registrado</strong><br>
+                Este funcionario ya cuenta con descriptor facial. Para reemplazarlo, use Actualizar rostro.
+                <div class="registered-actions">
+                    <a class="btn" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none;" href="{{ retorno }}">Volver</a>
+                    <a class="btn blue" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none;" href="?actualizar=1&next={{ retorno|urlencode }}">Actualizar rostro</a>
+                </div>
+            </section>
+        {% else %}
+            <section class="mode" aria-label="Método de registro">
+                <button id="modeCamera" class="active" type="button">Cámara</button>
+                <button id="modeUpload" type="button">Subir foto</button>
+            </section>
 
-    <div id="mensaje"></div>
+            <section class="panel" id="cameraPanel">
+                <div class="camera-wrap" id="cameraWrap">
+                    <video id="video" autoplay playsinline muted></video>
+                    <div class="guide" id="guide"></div>
+                    <div class="camera-caption"><strong id="cameraTitle">Coloque el rostro dentro del marco</strong><span id="cameraHelp">Cámara frontal activa. Capture cuando el rostro esté centrado.</span></div>
+                </div>
+            </section>
+
+            <section class="panel" id="uploadPanel" style="display:none;">
+                <div class="upload-zone">
+                    <label for="fileInput">
+                        <span>Seleccionar fotografía</span>
+                        <small>JPG, PNG o WEBP. Debe aparecer una sola persona, de frente y con buena iluminación.</small>
+                    </label>
+                    <input id="fileInput" type="file" accept="image/jpeg,image/png,image/webp">
+                </div>
+            </section>
+
+            <section class="panel preview" id="previewPanel">
+                <img id="previewImage" alt="Preview de rostro">
+            </section>
+
+            <canvas id="canvas"></canvas>
+            <div class="status" id="statusBox">Listo para capturar o seleccionar una foto.</div>
+
+            <section class="actions">
+                <button class="btn blue" id="btnCapture" type="button">Capturar</button>
+                <button class="btn" id="btnRepeat" type="button" disabled>Repetir</button>
+                <button class="btn primary" id="btnSave" type="button" disabled>Guardar rostro</button>
+            </section>
+        {% endif %}
+    </main>
+
+    <div class="success-overlay" id="successOverlay" aria-hidden="true">
+        <div class="success-card">
+            <div class="success-mark">✓</div>
+            <h2>Correcto</h2>
+            <p>Rostro registrado<br>{{ funcionario.nombre_completo }}</p>
+        </div>
+    </div>
 
     <script>
-        const video = document.getElementById("video");
-        const canvas = document.getElementById("canvas");
-        const mensaje = document.getElementById("mensaje");
+    const retorno = "{{ retorno|escapejs }}";
+    const video = document.getElementById("video");
+    const canvas = document.getElementById("canvas");
+    const modeCamera = document.getElementById("modeCamera");
+    const modeUpload = document.getElementById("modeUpload");
+    const cameraPanel = document.getElementById("cameraPanel");
+    const uploadPanel = document.getElementById("uploadPanel");
+    const previewPanel = document.getElementById("previewPanel");
+    const previewImage = document.getElementById("previewImage");
+    const statusBox = document.getElementById("statusBox");
+    const guide = document.getElementById("guide");
+    const cameraTitle = document.getElementById("cameraTitle");
+    const cameraHelp = document.getElementById("cameraHelp");
+    const fileInput = document.getElementById("fileInput");
+    const btnCapture = document.getElementById("btnCapture");
+    const btnRepeat = document.getElementById("btnRepeat");
+    const btnSave = document.getElementById("btnSave");
+    const successOverlay = document.getElementById("successOverlay");
+    let stream = null;
+    let currentImage = "";
+    let currentOrigin = "CAMARA";
+    let validImage = false;
 
-        navigator.mediaDevices.getUserMedia({ video: true })
-            .then(stream => {
-                video.srcObject = stream;
-            })
-            .catch(error => {
-                mensaje.innerHTML = "❌ No se pudo abrir la cámara: " + error;
-            });
+    function setStatus(message, kind="") {
+        if (!statusBox) return;
+        statusBox.textContent = message;
+        statusBox.className = "status" + (kind ? " " + kind : "");
+        if (guide) guide.className = "guide" + (kind === "ok" ? " ok" : kind === "bad" ? " bad" : "");
+    }
 
-        function capturar() {
-            if (!video.videoWidth || !video.videoHeight) {
-                mensaje.innerHTML = "❌ La cámara aún no está lista";
-                return;
-            }
-
-            const ctx = canvas.getContext("2d");
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-            const data = canvas.toDataURL("image/jpeg", 0.9);
-
-            fetch("", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/x-www-form-urlencoded",
-                },
-                body: new URLSearchParams({ imagen: data })
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.ok) {
-                    mensaje.innerHTML = "✅ " + data.mensaje;
-                } else {
-                    mensaje.innerHTML = "❌ " + (data.error || "Error al guardar rostro");
-                }
-            })
-            .catch(error => {
-                mensaje.innerHTML = "❌ Error: " + error;
-            });
+    async function startCamera() {
+        if (!video) return;
+        stopCamera();
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: { ideal: 720 }, height: { ideal: 960 } }, audio: false });
+            video.srcObject = stream;
+            await video.play().catch(() => {});
+            setStatus("Cámara lista. Capture cuando el rostro esté centrado.");
+        } catch (error) {
+            setStatus("No se pudo abrir la cámara. Revise permisos del navegador.", "bad");
         }
+    }
+
+    function stopCamera() {
+        if (stream) stream.getTracks().forEach(track => track.stop());
+        stream = null;
+    }
+
+    function showMode(mode) {
+        currentOrigin = mode === "upload" ? "ARCHIVO" : "CAMARA";
+        currentImage = "";
+        validImage = false;
+        previewPanel.style.display = "none";
+        btnSave.disabled = true;
+        btnRepeat.disabled = true;
+        modeCamera.classList.toggle("active", mode === "camera");
+        modeUpload.classList.toggle("active", mode === "upload");
+        cameraPanel.style.display = mode === "camera" ? "block" : "none";
+        uploadPanel.style.display = mode === "upload" ? "block" : "none";
+        btnCapture.textContent = mode === "camera" ? "Capturar" : "Validar foto";
+        if (mode === "camera") { startCamera(); } else { stopCamera(); setStatus("Seleccione una fotografía para validarla."); }
+    }
+
+    function captureFrame() {
+        if (!video || !video.videoWidth) { setStatus("La cámara aún no está lista.", "bad"); return; }
+        const ctx = canvas.getContext("2d");
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        currentImage = canvas.toDataURL("image/jpeg", 0.9);
+        previewImage.src = currentImage;
+        previewPanel.style.display = "block";
+        btnRepeat.disabled = false;
+        validarImagen();
+    }
+
+    function readFile(file) {
+        if (!file) return;
+        if (!/^image\/(jpeg|png|webp)$/.test(file.type)) { setStatus("Formato no válido. Use JPG, PNG o WEBP.", "bad"); return; }
+        if (file.size > 6 * 1024 * 1024) { setStatus("La imagen es demasiado pesada. Use una foto más liviana.", "bad"); return; }
+        const reader = new FileReader();
+        reader.onload = () => {
+            currentImage = reader.result;
+            previewImage.src = currentImage;
+            previewPanel.style.display = "block";
+            btnRepeat.disabled = false;
+            validarImagen();
+        };
+        reader.readAsDataURL(file);
+    }
+
+    async function postImage(accion) {
+        const body = new URLSearchParams({ imagen: currentImage, origen: currentOrigin, accion, next: retorno });
+        {% if actualizar %}body.set("actualizar", "1");{% endif %}
+        const res = await fetch("", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body });
+        return await res.json();
+    }
+
+    async function validarImagen() {
+        if (!currentImage) return;
+        btnSave.disabled = true;
+        validImage = false;
+        setStatus("Validando rostro…");
+        try {
+            const data = await postImage("validar");
+            if (data.ok) {
+                validImage = true;
+                btnSave.disabled = false;
+                setStatus("✓ Rostro detectado correctamente. Puede guardar.", "ok");
+                cameraTitle.textContent = "Rostro detectado";
+                cameraHelp.textContent = "Revise la captura y guarde si se ve clara.";
+            } else {
+                setStatus(data.error || "No pudimos utilizar esta imagen.", "bad");
+            }
+        } catch (error) {
+            setStatus("No se pudo validar la imagen. Intente nuevamente.", "bad");
+        }
+    }
+
+    async function guardarRostro() {
+        if (!validImage || !currentImage) return;
+        btnSave.disabled = true;
+        btnCapture.disabled = true;
+        setStatus("Guardando rostro…");
+        try {
+            const data = await postImage("guardar");
+            if (data.ok) {
+                successOverlay.classList.add("show");
+                successOverlay.setAttribute("aria-hidden", "false");
+                stopCamera();
+                setTimeout(() => { window.location.href = data.retorno || retorno; }, 1300);
+            } else {
+                btnSave.disabled = false;
+                btnCapture.disabled = false;
+                setStatus(data.error || "No pudimos guardar el rostro.", "bad");
+            }
+        } catch (error) {
+            btnSave.disabled = false;
+            btnCapture.disabled = false;
+            setStatus("No pudimos guardar el rostro. Intente nuevamente.", "bad");
+        }
+    }
+
+    if (modeCamera) {
+        modeCamera.addEventListener("click", () => showMode("camera"));
+        modeUpload.addEventListener("click", () => showMode("upload"));
+        btnCapture.addEventListener("click", () => currentOrigin === "CAMARA" ? captureFrame() : fileInput.click());
+        btnRepeat.addEventListener("click", () => { currentImage = ""; validImage = false; previewPanel.style.display = "none"; btnSave.disabled = true; btnRepeat.disabled = true; setStatus(currentOrigin === "CAMARA" ? "Capture nuevamente cuando el rostro esté centrado." : "Seleccione otra fotografía."); });
+        btnSave.addEventListener("click", guardarRostro);
+        fileInput.addEventListener("change", (event) => readFile(event.target.files[0]));
+        document.addEventListener("visibilitychange", () => { if (document.hidden) stopCamera(); else if (currentOrigin === "CAMARA") startCamera(); });
+        startCamera();
+    }
     </script>
 </body>
 </html>

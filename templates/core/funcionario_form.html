@@ -243,12 +243,22 @@
                 </div>
 
                 <div class="func-form-field">
-                    <label for="{{ form.cedula.id_for_label }}">Cédula</label>
+                    <label for="{{ form.tipo_documento.id_for_label }}">Tipo de documento</label>
                     <div class="func-input-shell with-icon">
-                        <span class="icon">🪪</span>
+                        <span class="icon">ID</span>
+                        {{ form.tipo_documento }}
+                    </div>
+                    {{ form.tipo_documento.errors }}
+                </div>
+
+                <div class="func-form-field">
+                    <label for="{{ form.cedula.id_for_label }}">Número de documento</label>
+                    <div class="func-input-shell with-icon">
+                        <span class="icon">#</span>
                         {{ form.cedula }}
                     </div>
                     {{ form.cedula.errors }}
+                    <div class="helper-text">Acepta CI, CPF o CNPJ según el tipo seleccionado.</div>
                 </div>
 
                 <div class="func-form-section">Datos laborales</div>

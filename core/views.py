@@ -14,6 +14,7 @@ from django.urls import reverse
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db import IntegrityError, transaction
 from django.db.models import Count, Q, Sum
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -69,7 +70,19 @@ from .forms import (
     SuscripcionSistemaForm,
     PagoSuscripcionSistemaForm,
     AjusteManualLiquidacionForm,
+    DiaristaForm,
+    AsistenciaDiaristaForm,
+    PagoDiaristaForm,
 )
+
+
+
+def _documento_busqueda_q(campo_cedula, campo_tipo, termino):
+    limpio = re.sub(r"\D", "", termino or "")
+    q_obj = Q(**{f"{campo_cedula}__icontains": termino}) | Q(**{f"{campo_tipo}__icontains": termino})
+    if limpio and limpio != termino:
+        q_obj |= Q(**{f"{campo_cedula}__icontains": limpio})
+    return q_obj
 
 from .liquidacion_utils import (
     calcular_liquidacion_funcionario,
@@ -103,6 +116,9 @@ from .models import (
     HistorialSalarialFuncionario,
     SuscripcionSistema,
     PagoSuscripcionSistema,
+    Diarista,
+    AsistenciaDiarista,
+    PagoDiarista,
 )
 
 
@@ -1309,6 +1325,1054 @@ def obtener_sucursales_por_empresa(request):
     return JsonResponse({"sucursales": data})
 
 
+def _usuario_puede_operar_diarista(request, diarista):
+    empresa_usuario = obtener_empresa_activa(request)
+    admin_master = es_admin_master(request.user) and empresa_usuario is None
+    if admin_master:
+        return True
+    return bool(empresa_usuario and diarista.empresa_id == empresa_usuario.id)
+
+
+def _datetime_jornada(fecha, hora):
+    if not fecha or not hora:
+        return None
+    valor = datetime.combine(fecha, hora)
+    if timezone.is_naive(valor):
+        return timezone.make_aware(valor, timezone.get_current_timezone())
+    return valor
+
+
+def _actualizar_calculos_asistencia_diarista(asistencia):
+    asistencia.recalcular_minutos_trabajados()
+    asistencia.minutos_atraso = 0
+    if asistencia.hora_entrada and asistencia.diarista and asistencia.diarista.turno:
+        turno = asistencia.diarista.turno
+        hora_entrada = timezone.localtime(asistencia.hora_entrada).time()
+        base = datetime.combine(asistencia.fecha, turno.hora_entrada)
+        real = datetime.combine(asistencia.fecha, hora_entrada)
+        tolerancia = int(turno.tolerancia_minutos or 0)
+        atraso = int((real - base).total_seconds() // 60) - tolerancia
+        asistencia.minutos_atraso = max(atraso, 0)
+    return asistencia
+
+
+@login_required
+def diaristas_lista(request):
+    permiso = validar_permiso_o_redirigir(request, "diaristas", "puede_ver")
+    if permiso:
+        return permiso
+
+    q = request.GET.get("q", "").strip()
+    empresa_id = request.GET.get("empresa", "").strip()
+    sucursal_id = request.GET.get("sucursal", "").strip()
+    sector = request.GET.get("sector", "").strip()
+    estado = request.GET.get("estado", "").strip()
+    desde = request.GET.get("desde", "").strip()
+    hasta = request.GET.get("hasta", "").strip()
+
+    empresa_usuario = obtener_empresa_activa(request)
+    admin_master = es_admin_master(request.user) and empresa_usuario is None
+
+    diaristas = Diarista.objects.select_related("empresa", "sucursal", "turno").all()
+
+    if not admin_master:
+        if empresa_usuario:
+            diaristas = diaristas.filter(empresa=empresa_usuario)
+            empresa_id = str(empresa_usuario.id)
+        else:
+            diaristas = diaristas.none()
+
+    if admin_master and empresa_id:
+        diaristas = diaristas.filter(empresa_id=empresa_id)
+
+    if sucursal_id:
+        diaristas = diaristas.filter(sucursal_id=sucursal_id)
+
+    if sector:
+        diaristas = diaristas.filter(sector=sector)
+
+    if estado:
+        diaristas = diaristas.filter(estado=estado)
+
+    if desde:
+        diaristas = diaristas.filter(fecha_fin__gte=desde)
+
+    if hasta:
+        diaristas = diaristas.filter(fecha_inicio__lte=hasta)
+
+    if q:
+        diaristas = diaristas.filter(
+            Q(nombres__icontains=q)
+            | Q(apellidos__icontains=q)
+            | Q(cedula__icontains=q)
+            | Q(funcion_temporal__icontains=q)
+            | Q(sector__icontains=q)
+            | Q(sucursal__nombre__icontains=q)
+        )
+
+    hoy = timezone.localdate()
+    mes_inicio = hoy.replace(day=1)
+    base_stats = Diarista.objects.select_related("empresa", "sucursal")
+    if not admin_master:
+        base_stats = base_stats.filter(empresa=empresa_usuario) if empresa_usuario else base_stats.none()
+    elif empresa_id:
+        base_stats = base_stats.filter(empresa_id=empresa_id)
+
+    activos_actuales = base_stats.filter(
+        estado=Diarista.Estados.ACTIVO,
+        fecha_inicio__lte=hoy,
+        fecha_fin__gte=hoy,
+    ).count()
+    pendientes = base_stats.filter(estado=Diarista.Estados.PENDIENTE).count()
+    finalizados_mes = base_stats.filter(estado=Diarista.Estados.FINALIZADO, fecha_fin__gte=mes_inicio, fecha_fin__lte=hoy).count()
+    total_estimado = sum((item.total_estimado for item in base_stats.filter(estado__in=[Diarista.Estados.ACTIVO, Diarista.Estados.PENDIENTE])), Decimal("0"))
+    pagos_pendientes = PagoDiarista.objects.filter(estado__in=[PagoDiarista.Estados.BORRADOR, PagoDiarista.Estados.GENERADO])
+    if not admin_master:
+        pagos_pendientes = pagos_pendientes.filter(empresa=empresa_usuario) if empresa_usuario else pagos_pendientes.none()
+    elif empresa_id:
+        pagos_pendientes = pagos_pendientes.filter(empresa_id=empresa_id)
+
+    if admin_master:
+        empresas = Empresa.objects.filter(activo=True).order_by("nombre")
+        sucursales = Sucursal.objects.filter(activo=True).order_by("empresa__nombre", "nombre")
+        if empresa_id:
+            sucursales = sucursales.filter(empresa_id=empresa_id)
+        sectores_qs = Diarista.objects.filter(empresa_id=empresa_id) if empresa_id else Diarista.objects.all()
+    else:
+        empresas = Empresa.objects.filter(id=empresa_usuario.id) if empresa_usuario else Empresa.objects.none()
+        sucursales = Sucursal.objects.filter(empresa=empresa_usuario, activo=True).order_by("nombre") if empresa_usuario else Sucursal.objects.none()
+        sectores_qs = Diarista.objects.filter(empresa=empresa_usuario) if empresa_usuario else Diarista.objects.none()
+
+    sectores = sectores_qs.exclude(sector="").values_list("sector", flat=True).distinct().order_by("sector")
+
+    return render(request, "core/diaristas_lista.html", {
+        "diaristas": diaristas.order_by("-fecha_inicio", "apellidos", "nombres"),
+        "q": q,
+        "empresas": empresas,
+        "sucursales": sucursales,
+        "sectores": sectores,
+        "empresa_id": empresa_id,
+        "sucursal_id": sucursal_id,
+        "sector_sel": sector,
+        "estado_sel": estado,
+        "desde": desde,
+        "hasta": hasta,
+        "estados": Diarista.Estados.choices,
+        "activos_actuales": activos_actuales,
+        "pendientes": pendientes,
+        "finalizados_mes": finalizados_mes,
+        "total_estimado": total_estimado,
+        "pagos_pendientes": pagos_pendientes.count(),
+        "empresa_usuario": empresa_usuario,
+        "es_admin_master": admin_master,
+    })
+
+
+@login_required
+def diarista_detalle(request, pk):
+    permiso = validar_permiso_o_redirigir(request, "diaristas", "puede_ver")
+    if permiso:
+        return permiso
+
+    empresa_usuario = obtener_empresa_activa(request)
+    admin_master = es_admin_master(request.user) and empresa_usuario is None
+
+    diarista = get_object_or_404(Diarista.objects.select_related("empresa", "sucursal", "turno"), pk=pk)
+    if not admin_master:
+        if not empresa_usuario or diarista.empresa != empresa_usuario:
+            messages.error(request, "No puedes ver diaristas de otra empresa.")
+            return redirect("diaristas_lista")
+
+    asistencias = diarista.asistencias.select_related("pago").order_by("-fecha")[:20]
+    pagos = diarista.pagos.order_by("-fecha_pago", "-creado_en")[:12]
+    dias_trabajados = diarista.asistencias.filter(estado=AsistenciaDiarista.Estados.TRABAJADO).count()
+    ausencias = diarista.asistencias.filter(estado=AsistenciaDiarista.Estados.AUSENTE).count()
+    pagos_total = diarista.pagos.exclude(estado=PagoDiarista.Estados.ANULADO).aggregate(total=Sum("total_pagado"))["total"] or Decimal("0")
+
+    return render(request, "core/diarista_detalle.html", {
+        "diarista": diarista,
+        "asistencias": asistencias,
+        "pagos": pagos,
+        "dias_trabajados": dias_trabajados,
+        "ausencias": ausencias,
+        "pagos_total": pagos_total,
+        "empresa_usuario": empresa_usuario,
+        "es_admin_master": admin_master,
+    })
+
+
+@login_required
+def diarista_asistencias(request, pk):
+    permiso = validar_permiso_o_redirigir(request, "diaristas", "puede_ver")
+    if permiso:
+        return permiso
+
+    diarista = get_object_or_404(Diarista.objects.select_related("empresa", "sucursal", "turno"), pk=pk)
+    if not _usuario_puede_operar_diarista(request, diarista):
+        messages.error(request, "No puedes ver asistencias de diaristas de otra empresa.")
+        return redirect("diaristas_lista")
+
+    desde = request.GET.get("desde", "").strip()
+    hasta = request.GET.get("hasta", "").strip()
+    estado = request.GET.get("estado", "").strip()
+
+    asistencias = diarista.asistencias.select_related("pago").all()
+    if desde:
+        asistencias = asistencias.filter(fecha__gte=desde)
+    if hasta:
+        asistencias = asistencias.filter(fecha__lte=hasta)
+    if estado:
+        asistencias = asistencias.filter(estado=estado)
+
+    trabajadas = asistencias.filter(estado=AsistenciaDiarista.Estados.TRABAJADO).count()
+    ausencias = asistencias.filter(estado=AsistenciaDiarista.Estados.AUSENTE).count()
+    incompletas = asistencias.filter(estado=AsistenciaDiarista.Estados.INCOMPLETO).count()
+    minutos_total = asistencias.aggregate(total=Sum("minutos_trabajados"))["total"] or 0
+    horas_total = f"{int(minutos_total // 60)}h {int(minutos_total % 60):02d}m"
+
+    return render(request, "core/diarista_asistencias.html", {
+        "diarista": diarista,
+        "asistencias": asistencias.order_by("-fecha"),
+        "desde": desde,
+        "hasta": hasta,
+        "estado_sel": estado,
+        "estados": AsistenciaDiarista.Estados.choices,
+        "trabajadas": trabajadas,
+        "ausencias": ausencias,
+        "incompletas": incompletas,
+        "horas_total": horas_total,
+    })
+
+
+@login_required
+def diarista_asistencia_nueva(request, pk):
+    permiso = validar_permiso_o_redirigir(request, "diaristas", "puede_editar")
+    if permiso:
+        return permiso
+
+    diarista = get_object_or_404(Diarista.objects.select_related("empresa", "sucursal", "turno"), pk=pk)
+    if not _usuario_puede_operar_diarista(request, diarista):
+        messages.error(request, "No puedes registrar asistencias para otra empresa.")
+        return redirect("diaristas_lista")
+
+    if request.method == "POST":
+        form = AsistenciaDiaristaForm(request.POST)
+        if form.is_valid():
+            asistencia = form.save(commit=False)
+            asistencia.diarista = diarista
+            asistencia.empresa = diarista.empresa
+            asistencia.sucursal = diarista.sucursal
+            asistencia.origen_marcacion = "manual"
+            asistencia.hora_entrada = _datetime_jornada(asistencia.fecha, form.cleaned_data.get("hora_entrada_simple"))
+            asistencia.hora_salida = _datetime_jornada(asistencia.fecha, form.cleaned_data.get("hora_salida_simple"))
+            _actualizar_calculos_asistencia_diarista(asistencia)
+            try:
+                asistencia.save()
+            except IntegrityError:
+                messages.error(request, "Ya existe una jornada para esa fecha.")
+                return redirect("diarista_asistencias", pk=diarista.pk)
+            registrar_historial(request, "Diaristas", "Asistencia", f"Se registró asistencia de diarista {diarista.nombre_completo} para {asistencia.fecha:%d/%m/%Y}.")
+            messages.success(request, "Asistencia registrada correctamente.")
+            return redirect("diarista_asistencias", pk=diarista.pk)
+    else:
+        form = AsistenciaDiaristaForm(initial={"fecha": timezone.localdate()})
+
+    return render(request, "core/diarista_asistencia_form.html", {
+        "form": form,
+        "diarista": diarista,
+        "titulo_form": "Nueva jornada",
+        "boton_texto": "Guardar jornada",
+    })
+
+
+@login_required
+def diarista_asistencia_editar(request, pk, asistencia_id):
+    permiso = validar_permiso_o_redirigir(request, "diaristas", "puede_editar")
+    if permiso:
+        return permiso
+
+    diarista = get_object_or_404(Diarista.objects.select_related("empresa", "sucursal", "turno"), pk=pk)
+    asistencia = get_object_or_404(AsistenciaDiarista.objects.select_related("diarista", "pago"), pk=asistencia_id, diarista=diarista)
+    if not _usuario_puede_operar_diarista(request, diarista):
+        messages.error(request, "No puedes editar asistencias de otra empresa.")
+        return redirect("diaristas_lista")
+    if asistencia.pago_estado in [AsistenciaDiarista.EstadosPago.INCLUIDO, AsistenciaDiarista.EstadosPago.PAGADO]:
+        messages.error(request, "No puedes editar una jornada incluida en un pago.")
+        return redirect("diarista_asistencias", pk=diarista.pk)
+
+    if request.method == "POST":
+        form = AsistenciaDiaristaForm(request.POST, instance=asistencia)
+        if form.is_valid():
+            asistencia_editada = form.save(commit=False)
+            asistencia_editada.hora_entrada = _datetime_jornada(asistencia_editada.fecha, form.cleaned_data.get("hora_entrada_simple"))
+            asistencia_editada.hora_salida = _datetime_jornada(asistencia_editada.fecha, form.cleaned_data.get("hora_salida_simple"))
+            _actualizar_calculos_asistencia_diarista(asistencia_editada)
+            asistencia_editada.save()
+            registrar_historial(request, "Diaristas", "Editar asistencia", f"Se editó asistencia de diarista {diarista.nombre_completo} para {asistencia_editada.fecha:%d/%m/%Y}.")
+            messages.success(request, "Asistencia actualizada correctamente.")
+            return redirect("diarista_asistencias", pk=diarista.pk)
+    else:
+        form = AsistenciaDiaristaForm(instance=asistencia)
+
+    return render(request, "core/diarista_asistencia_form.html", {
+        "form": form,
+        "diarista": diarista,
+        "asistencia": asistencia,
+        "titulo_form": "Editar jornada",
+        "boton_texto": "Guardar cambios",
+    })
+
+
+@login_required
+def diarista_asistencia_ausente(request, pk):
+    permiso = validar_permiso_o_redirigir(request, "diaristas", "puede_editar")
+    if permiso:
+        return permiso
+
+    diarista = get_object_or_404(Diarista.objects.select_related("empresa", "sucursal"), pk=pk)
+    if not _usuario_puede_operar_diarista(request, diarista):
+        messages.error(request, "No puedes registrar ausencias para otra empresa.")
+        return redirect("diaristas_lista")
+
+    fecha_txt = request.POST.get("fecha") or request.GET.get("fecha") or timezone.localdate().isoformat()
+    try:
+        fecha = datetime.strptime(fecha_txt, "%Y-%m-%d").date()
+    except ValueError:
+        fecha = timezone.localdate()
+
+    asistencia, creada = AsistenciaDiarista.objects.get_or_create(
+        diarista=diarista,
+        fecha=fecha,
+        defaults={
+            "empresa": diarista.empresa,
+            "sucursal": diarista.sucursal,
+            "estado": AsistenciaDiarista.Estados.AUSENTE,
+            "origen_marcacion": "manual",
+            "observacion": "Ausencia registrada manualmente.",
+        }
+    )
+    if not creada and asistencia.pago_estado in [AsistenciaDiarista.EstadosPago.INCLUIDO, AsistenciaDiarista.EstadosPago.PAGADO]:
+        messages.error(request, "No puedes modificar una jornada incluida en un pago.")
+        return redirect("diarista_asistencias", pk=diarista.pk)
+    if not creada:
+        asistencia.hora_entrada = None
+        asistencia.hora_salida = None
+        asistencia.minutos_trabajados = 0
+        asistencia.minutos_atraso = 0
+        asistencia.estado = AsistenciaDiarista.Estados.AUSENTE
+        asistencia.observacion = asistencia.observacion or "Ausencia registrada manualmente."
+        asistencia.save()
+
+    registrar_historial(request, "Diaristas", "Ausencia", f"Se registró ausencia de diarista {diarista.nombre_completo} para {fecha:%d/%m/%Y}.")
+    messages.success(request, "Ausencia registrada correctamente.")
+    return redirect("diarista_asistencias", pk=diarista.pk)
+
+
+def _horas_desde_minutos(minutos):
+    minutos = int(minutos or 0)
+    return f"{minutos // 60}h {minutos % 60:02d}m"
+
+
+def _jornadas_pagables_diarista(diarista, desde, hasta):
+    return AsistenciaDiarista.objects.filter(
+        diarista=diarista,
+        empresa=diarista.empresa,
+        fecha__gte=desde,
+        fecha__lte=hasta,
+        estado=AsistenciaDiarista.Estados.TRABAJADO,
+        pago_estado__in=[AsistenciaDiarista.EstadosPago.PENDIENTE, AsistenciaDiarista.EstadosPago.REABIERTO],
+        pago__isnull=True,
+    ).order_by("fecha")
+
+
+def _asignar_numero_pago_diarista(pago):
+    if not pago.numero_comprobante:
+        pago.numero_comprobante = f"DIA-{pago.fecha_pago:%Y%m%d}-{pago.pk:05d}"
+        pago.save(update_fields=["numero_comprobante"])
+    return pago.numero_comprobante
+
+
+@login_required
+def diaristas_reporte(request):
+    permiso = validar_permiso_o_redirigir(request, "diaristas", "puede_ver")
+    if permiso:
+        return permiso
+
+    hoy = timezone.localdate()
+    desde = request.GET.get("desde", hoy.replace(day=1).isoformat()).strip()
+    hasta = request.GET.get("hasta", hoy.isoformat()).strip()
+    empresa_id = request.GET.get("empresa", "").strip()
+    sucursal_id = request.GET.get("sucursal", "").strip()
+    estado = request.GET.get("estado", "").strip()
+    q = request.GET.get("q", "").strip()
+    export = request.GET.get("export", "").strip().lower()
+
+    try:
+        desde_fecha = datetime.strptime(desde, "%Y-%m-%d").date()
+    except ValueError:
+        desde_fecha = hoy.replace(day=1)
+        desde = desde_fecha.isoformat()
+    try:
+        hasta_fecha = datetime.strptime(hasta, "%Y-%m-%d").date()
+    except ValueError:
+        hasta_fecha = hoy
+        hasta = hasta_fecha.isoformat()
+    if hasta_fecha < desde_fecha:
+        desde_fecha, hasta_fecha = hasta_fecha, desde_fecha
+        desde, hasta = desde_fecha.isoformat(), hasta_fecha.isoformat()
+
+    empresa_usuario = obtener_empresa_activa(request)
+    admin_master = es_admin_master(request.user) and empresa_usuario is None
+
+    diaristas = Diarista.objects.select_related("empresa", "sucursal", "turno").all()
+    if not admin_master:
+        if empresa_usuario:
+            diaristas = diaristas.filter(empresa=empresa_usuario)
+            empresa_id = str(empresa_usuario.id)
+        else:
+            diaristas = diaristas.none()
+    elif empresa_id:
+        diaristas = diaristas.filter(empresa_id=empresa_id)
+
+    if sucursal_id:
+        diaristas = diaristas.filter(sucursal_id=sucursal_id)
+    if estado:
+        diaristas = diaristas.filter(estado=estado)
+    if q:
+        diaristas = diaristas.filter(
+            Q(nombres__icontains=q)
+            | Q(apellidos__icontains=q)
+            | Q(cedula__icontains=q)
+            | Q(funcion_temporal__icontains=q)
+            | Q(sector__icontains=q)
+            | Q(sucursal__nombre__icontains=q)
+        )
+
+    asistencias_base = AsistenciaDiarista.objects.filter(
+        diarista__in=diaristas,
+        fecha__gte=desde_fecha,
+        fecha__lte=hasta_fecha,
+    )
+    pagos_base = PagoDiarista.objects.filter(
+        diarista__in=diaristas,
+        fecha_pago__gte=desde_fecha,
+        fecha_pago__lte=hasta_fecha,
+    )
+
+    total_diaristas = diaristas.count()
+    jornadas_trabajadas = asistencias_base.filter(estado=AsistenciaDiarista.Estados.TRABAJADO).count()
+    ausencias = asistencias_base.filter(estado=AsistenciaDiarista.Estados.AUSENTE).count()
+    incompletas = asistencias_base.filter(estado=AsistenciaDiarista.Estados.INCOMPLETO).count()
+    pendientes_pago = asistencias_base.filter(
+        estado=AsistenciaDiarista.Estados.TRABAJADO,
+        pago_estado__in=[AsistenciaDiarista.EstadosPago.PENDIENTE, AsistenciaDiarista.EstadosPago.REABIERTO],
+        pago__isnull=True,
+    ).count()
+    minutos_total = asistencias_base.aggregate(total=Sum("minutos_trabajados"))["total"] or 0
+    total_generado = pagos_base.exclude(estado=PagoDiarista.Estados.ANULADO).aggregate(total=Sum("total_pagado"))["total"] or Decimal("0")
+    total_pagado = pagos_base.filter(estado=PagoDiarista.Estados.PAGADO).aggregate(total=Sum("total_pagado"))["total"] or Decimal("0")
+
+    filas = []
+    pendiente_estimado_total = Decimal("0")
+    for diarista in diaristas.order_by("empresa__nombre", "sucursal__nombre", "apellidos", "nombres"):
+        asistencias = asistencias_base.filter(diarista=diarista)
+        pagos = pagos_base.filter(diarista=diarista).exclude(estado=PagoDiarista.Estados.ANULADO)
+        trabajadas = asistencias.filter(estado=AsistenciaDiarista.Estados.TRABAJADO).count()
+        ausencias_d = asistencias.filter(estado=AsistenciaDiarista.Estados.AUSENTE).count()
+        incompletas_d = asistencias.filter(estado=AsistenciaDiarista.Estados.INCOMPLETO).count()
+        pendientes_d = asistencias.filter(
+            estado=AsistenciaDiarista.Estados.TRABAJADO,
+            pago_estado__in=[AsistenciaDiarista.EstadosPago.PENDIENTE, AsistenciaDiarista.EstadosPago.REABIERTO],
+            pago__isnull=True,
+        ).count()
+        minutos_d = asistencias.aggregate(total=Sum("minutos_trabajados"))["total"] or 0
+        generado_d = pagos.aggregate(total=Sum("total_pagado"))["total"] or Decimal("0")
+        pendiente_estimado = Decimal(pendientes_d) * (diarista.monto_diario_acordado or Decimal("0"))
+        pendiente_estimado_total += pendiente_estimado
+        filas.append({
+            "diarista": diarista,
+            "trabajadas": trabajadas,
+            "ausencias": ausencias_d,
+            "incompletas": incompletas_d,
+            "pendientes_pago": pendientes_d,
+            "horas": _horas_desde_minutos(minutos_d),
+            "generado": generado_d,
+            "pendiente_estimado": pendiente_estimado,
+        })
+
+    if export == "csv":
+        response = HttpResponse(content_type="text/csv; charset=utf-8")
+        response["Content-Disposition"] = f'attachment; filename="reporte_diaristas_{desde}_{hasta}.csv"'
+        response.write("\ufeff")
+        writer = csv.writer(response, delimiter=";")
+        writer.writerow(["Diarista", "Documento", "Empresa", "Sucursal", "Estado", "Trabajadas", "Ausencias", "Incompletas", "Pendientes de pago", "Horas", "Generado", "Pendiente estimado"])
+        for fila in filas:
+            d = fila["diarista"]
+            writer.writerow([
+                d.nombre_completo,
+                d.cedula,
+                d.empresa.nombre if d.empresa else "",
+                d.sucursal.nombre if d.sucursal else "",
+                d.get_estado_display(),
+                fila["trabajadas"],
+                fila["ausencias"],
+                fila["incompletas"],
+                fila["pendientes_pago"],
+                fila["horas"],
+                fila["generado"],
+                fila["pendiente_estimado"],
+            ])
+        return response
+
+    if admin_master:
+        empresas = Empresa.objects.filter(activo=True).order_by("nombre")
+        sucursales = Sucursal.objects.filter(activo=True).order_by("empresa__nombre", "nombre")
+        if empresa_id:
+            sucursales = sucursales.filter(empresa_id=empresa_id)
+    else:
+        empresas = Empresa.objects.filter(id=empresa_usuario.id) if empresa_usuario else Empresa.objects.none()
+        sucursales = Sucursal.objects.filter(empresa=empresa_usuario, activo=True).order_by("nombre") if empresa_usuario else Sucursal.objects.none()
+
+    return render(request, "core/diaristas_reporte.html", {
+        "filas": filas,
+        "desde": desde,
+        "hasta": hasta,
+        "empresa_id": empresa_id,
+        "sucursal_id": sucursal_id,
+        "estado_sel": estado,
+        "q": q,
+        "empresas": empresas,
+        "sucursales": sucursales,
+        "estados": Diarista.Estados.choices,
+        "total_diaristas": total_diaristas,
+        "jornadas_trabajadas": jornadas_trabajadas,
+        "ausencias": ausencias,
+        "incompletas": incompletas,
+        "pendientes_pago": pendientes_pago,
+        "horas_total": _horas_desde_minutos(minutos_total),
+        "total_generado": total_generado,
+        "total_pagado": total_pagado,
+        "pendiente_estimado_total": pendiente_estimado_total,
+    })
+
+
+@login_required
+def diarista_pagos(request, pk):
+    permiso = validar_permiso_o_redirigir(request, "diaristas", "puede_ver")
+    if permiso:
+        return permiso
+
+    diarista = get_object_or_404(Diarista.objects.select_related("empresa", "sucursal", "turno"), pk=pk)
+    if not _usuario_puede_operar_diarista(request, diarista):
+        messages.error(request, "No puedes ver pagos de diaristas de otra empresa.")
+        return redirect("diaristas_lista")
+
+    estado = request.GET.get("estado", "").strip()
+    desde = request.GET.get("desde", "").strip()
+    hasta = request.GET.get("hasta", "").strip()
+
+    pagos = diarista.pagos.select_related("empresa", "sucursal").all()
+    if estado:
+        pagos = pagos.filter(estado=estado)
+    if desde:
+        pagos = pagos.filter(fecha_pago__gte=desde)
+    if hasta:
+        pagos = pagos.filter(fecha_pago__lte=hasta)
+
+    pagos_validos = diarista.pagos.exclude(estado=PagoDiarista.Estados.ANULADO)
+    total_pagado = pagos_validos.aggregate(total=Sum("total_pagado"))["total"] or Decimal("0")
+    pendientes_jornadas = diarista.asistencias.filter(
+        estado=AsistenciaDiarista.Estados.TRABAJADO,
+        pago_estado__in=[AsistenciaDiarista.EstadosPago.PENDIENTE, AsistenciaDiarista.EstadosPago.REABIERTO],
+        pago__isnull=True,
+    ).count()
+
+    return render(request, "core/diarista_pagos.html", {
+        "diarista": diarista,
+        "pagos": pagos.order_by("-fecha_pago", "-creado_en"),
+        "estados": PagoDiarista.Estados.choices,
+        "estado_sel": estado,
+        "desde": desde,
+        "hasta": hasta,
+        "total_pagado": total_pagado,
+        "pagos_generados": pagos_validos.count(),
+        "pendientes_jornadas": pendientes_jornadas,
+    })
+
+
+@login_required
+def diarista_pago_nuevo(request, pk):
+    permiso = validar_permiso_o_redirigir(request, "diaristas", "puede_editar")
+    if permiso:
+        return permiso
+
+    diarista = get_object_or_404(Diarista.objects.select_related("empresa", "sucursal", "turno"), pk=pk)
+    if not _usuario_puede_operar_diarista(request, diarista):
+        messages.error(request, "No puedes generar pagos para otra empresa.")
+        return redirect("diaristas_lista")
+
+    jornadas_preview = AsistenciaDiarista.objects.none()
+    dias_preview = Decimal("0")
+    total_preview = Decimal("0")
+
+    if request.method == "POST":
+        form = PagoDiaristaForm(request.POST, diarista=diarista)
+        if form.is_valid():
+            desde = form.cleaned_data["periodo_desde"]
+            hasta = form.cleaned_data["periodo_hasta"]
+            jornadas_preview = _jornadas_pagables_diarista(diarista, desde, hasta)
+            dias_preview = Decimal(jornadas_preview.count())
+            if dias_preview <= 0:
+                form.add_error(None, "No hay jornadas trabajadas pendientes de pago en el periodo seleccionado.")
+            else:
+                with transaction.atomic():
+                    jornadas = _jornadas_pagables_diarista(diarista, desde, hasta).select_for_update()
+                    dias_calculados = Decimal(jornadas.count())
+                    if dias_calculados <= 0:
+                        messages.error(request, "Las jornadas seleccionadas ya fueron tomadas por otro pago.")
+                        return redirect("diarista_pagos", pk=diarista.pk)
+
+                    pago = form.save(commit=False)
+                    pago.diarista = diarista
+                    pago.empresa = diarista.empresa
+                    pago.sucursal = diarista.sucursal
+                    pago.dias_calculados = dias_calculados
+                    pago.generado_por = request.user
+                    pago.estado = PagoDiarista.Estados.PAGADO if form.cleaned_data.get("marcar_pagado") else PagoDiarista.Estados.GENERADO
+                    pago.calcular_total()
+                    if pago.total_pagado < 0:
+                        form.add_error("descuentos", "Los descuentos no pueden superar el subtotal más adicionales.")
+                    else:
+                        pago.save()
+                        _asignar_numero_pago_diarista(pago)
+                        nuevo_estado_jornada = AsistenciaDiarista.EstadosPago.PAGADO if pago.estado == PagoDiarista.Estados.PAGADO else AsistenciaDiarista.EstadosPago.INCLUIDO
+                        jornadas.update(pago=pago, pago_estado=nuevo_estado_jornada)
+                        registrar_historial(request, "Diaristas", "Pago", f"Se generó pago {pago.numero_comprobante} para diarista {diarista.nombre_completo}.")
+                        messages.success(request, "Pago de diarista generado correctamente.")
+                        return redirect("diarista_pago_detalle", pk=diarista.pk, pago_id=pago.pk)
+    else:
+        form = PagoDiaristaForm(diarista=diarista, initial={"fecha_pago": timezone.localdate()})
+
+
+    return render(request, "core/diarista_pago_form.html", {
+        "form": form,
+        "diarista": diarista,
+        "jornadas_preview": jornadas_preview,
+        "dias_preview": dias_preview,
+        "total_preview": total_preview,
+    })
+
+
+@login_required
+def diarista_pago_detalle(request, pk, pago_id):
+    permiso = validar_permiso_o_redirigir(request, "diaristas", "puede_ver")
+    if permiso:
+        return permiso
+
+    diarista = get_object_or_404(Diarista.objects.select_related("empresa", "sucursal"), pk=pk)
+    if not _usuario_puede_operar_diarista(request, diarista):
+        messages.error(request, "No puedes ver pagos de otra empresa.")
+        return redirect("diaristas_lista")
+    pago = get_object_or_404(PagoDiarista.objects.select_related("empresa", "sucursal", "diarista", "generado_por", "anulado_por"), pk=pago_id, diarista=diarista)
+    jornadas = pago.jornadas.order_by("fecha")
+
+    return render(request, "core/diarista_pago_detalle.html", {
+        "diarista": diarista,
+        "pago": pago,
+        "jornadas": jornadas,
+    })
+
+
+@login_required
+def diarista_pago_pdf(request, pk, pago_id):
+    permiso = validar_permiso_o_redirigir(request, "diaristas", "puede_ver")
+    if permiso:
+        return permiso
+
+    diarista = get_object_or_404(Diarista.objects.select_related("empresa", "sucursal", "turno"), pk=pk)
+    if not _usuario_puede_operar_diarista(request, diarista):
+        messages.error(request, "No puedes generar comprobantes de otra empresa.")
+        return redirect("diaristas_lista")
+
+    pago = get_object_or_404(
+        PagoDiarista.objects.select_related("empresa", "sucursal", "diarista", "generado_por", "anulado_por"),
+        pk=pago_id,
+        diarista=diarista,
+    )
+    _asignar_numero_pago_diarista(pago)
+    jornadas = list(pago.jornadas.order_by("fecha"))
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        leftMargin=18 * mm,
+        rightMargin=18 * mm,
+        topMargin=18 * mm,
+        bottomMargin=18 * mm,
+    )
+
+    styles = getSampleStyleSheet()
+    normal = ParagraphStyle(
+        name="DiaristaPagoNormal",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=9,
+        leading=12,
+        textColor=colors.HexColor("#111827"),
+    )
+    nota = ParagraphStyle(
+        name="DiaristaPagoNota",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=8,
+        leading=11,
+        textColor=colors.HexColor("#475569"),
+    )
+
+    elementos = []
+    empresa_pdf = pago.empresa or diarista.empresa
+    elementos += construir_encabezado_empresa_pdf(empresa_pdf, "COMPROBANTE DE PAGO DIARISTA")
+    elementos.append(Spacer(1, 8))
+
+    datos = [
+        ["Comprobante", pago.numero_comprobante or "-"],
+        ["Diarista", diarista.nombre_completo],
+        ["Documento", diarista.cedula],
+        ["Empresa", getattr(empresa_pdf, "nombre", "-") or "-"],
+        ["Sucursal", diarista.sucursal.nombre if diarista.sucursal else "-"],
+        ["Sector", diarista.sector or "-"],
+        ["Función / tarea", diarista.funcion_temporal or "-"],
+        ["Periodo liquidado", f"{pago.periodo_desde:%d/%m/%Y} al {pago.periodo_hasta:%d/%m/%Y}"],
+        ["Fecha de pago", pago.fecha_pago.strftime("%d/%m/%Y") if pago.fecha_pago else "-"],
+        ["Estado", pago.get_estado_display()],
+    ]
+
+    tabla_datos = Table(datos, colWidths=[48 * mm, 112 * mm])
+    tabla_datos.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (0, -1), colors.HexColor("#eff6ff")),
+        ("TEXTCOLOR", (0, 0), (0, -1), colors.HexColor("#1d4ed8")),
+        ("FONTNAME", (0, 0), (0, -1), "Helvetica-Bold"),
+        ("FONTNAME", (1, 0), (1, -1), "Helvetica"),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#cbd5e1")),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+    ]))
+    elementos.append(tabla_datos)
+    elementos.append(Spacer(1, 12))
+
+    detalle = [["Fecha", "Entrada", "Salida", "Horas", "Atraso", "Estado"]]
+    for jornada in jornadas:
+        detalle.append([
+            jornada.fecha.strftime("%d/%m/%Y"),
+            timezone.localtime(jornada.hora_entrada).strftime("%H:%M") if jornada.hora_entrada else "-",
+            timezone.localtime(jornada.hora_salida).strftime("%H:%M") if jornada.hora_salida else "-",
+            jornada.horas_trabajadas_display,
+            f"{jornada.minutos_atraso or 0} min",
+            jornada.get_estado_display(),
+        ])
+
+    if len(detalle) == 1:
+        detalle.append(["-", "-", "-", "-", "-", "Sin jornadas asociadas"])
+
+    tabla_jornadas = Table(detalle, colWidths=[25 * mm, 25 * mm, 25 * mm, 28 * mm, 25 * mm, 32 * mm], repeatRows=1)
+    tabla_jornadas.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#dbeafe")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.HexColor("#1e3a8a")),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+        ("FONTSIZE", (0, 0), (-1, -1), 8),
+        ("ALIGN", (1, 1), (4, -1), "CENTER"),
+        ("GRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#cbd5e1")),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+    ]))
+    elementos.append(Paragraph("<b>Jornadas incluidas</b>", normal))
+    elementos.append(Spacer(1, 5))
+    elementos.append(tabla_jornadas)
+    elementos.append(Spacer(1, 12))
+
+    liquidacion = [
+        ["Concepto", "Monto"],
+        [f"Días calculados ({pago.dias_calculados}) x monto diario", _gs(pago.subtotal)],
+        ["Adicionales" if not pago.concepto_adicional else f"Adicionales - {pago.concepto_adicional}", _gs(pago.adicionales)],
+        ["Descuentos", f"- {_gs(pago.descuentos)}"],
+        ["TOTAL A COBRAR", _gs(pago.total_pagado)],
+    ]
+    tabla_liquidacion = Table(liquidacion, colWidths=[110 * mm, 50 * mm])
+    tabla_liquidacion.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#dbeafe")),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#dcfce7")),
+        ("TEXTCOLOR", (0, -1), (-1, -1), colors.HexColor("#166534")),
+        ("FONTNAME", (0, -1), (-1, -1), "Helvetica-Bold"),
+        ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+        ("GRID", (0, 0), (-1, -1), 0.4, colors.HexColor("#cbd5e1")),
+        ("TOPPADDING", (0, 0), (-1, -1), 5),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 5),
+    ]))
+    elementos.append(tabla_liquidacion)
+
+    if pago.motivo_ajuste:
+        elementos.append(Spacer(1, 8))
+        elementos.append(Paragraph(f"<b>Motivo de ajuste:</b> {pago.motivo_ajuste}", nota))
+    if pago.observacion:
+        elementos.append(Spacer(1, 5))
+        elementos.append(Paragraph(f"<b>Observación:</b> {pago.observacion}", nota))
+    if pago.estado == PagoDiarista.Estados.ANULADO:
+        elementos.append(Spacer(1, 5))
+        elementos.append(Paragraph(f"<b>Pago anulado:</b> {pago.motivo_anulacion or '-'}", nota))
+
+    elementos.append(Spacer(1, 24))
+    firmas = Table([
+        ["_______________________________", "_______________________________"],
+        ["Firma responsable", "Firma diarista"],
+    ], colWidths=[80 * mm, 80 * mm])
+    firmas.setStyle(TableStyle([
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("FONTSIZE", (0, 0), (-1, -1), 9),
+    ]))
+    elementos.append(firmas)
+
+    agregar_firma_qr_documento_pdf(
+        elementos=elementos,
+        request=request,
+        empresa=empresa_pdf,
+        tipo_documento="PAGO_DIARISTA",
+        documento_id=pago.id,
+        funcionario=None,
+        titulo="Comprobante de Pago Diarista",
+    )
+    agregar_texto_legal_empresa_pdf(elementos, empresa_pdf)
+
+    doc.build(elementos)
+    pdf = buffer.getvalue()
+    buffer.close()
+
+    response = HttpResponse(content_type="application/pdf")
+    response["Content-Disposition"] = f'inline; filename="pago_diarista_{diarista.cedula}_{pago.id}.pdf"'
+    response.write(pdf)
+    return response
+
+
+@login_required
+def diarista_pago_marcar_pagado(request, pk, pago_id):
+    permiso = validar_permiso_o_redirigir(request, "diaristas", "puede_editar")
+    if permiso:
+        return permiso
+
+    diarista = get_object_or_404(Diarista.objects.select_related("empresa", "sucursal"), pk=pk)
+    if not _usuario_puede_operar_diarista(request, diarista):
+        messages.error(request, "No puedes modificar pagos de otra empresa.")
+        return redirect("diaristas_lista")
+    pago = get_object_or_404(PagoDiarista, pk=pago_id, diarista=diarista)
+    if request.method != "POST":
+        return redirect("diarista_pago_detalle", pk=diarista.pk, pago_id=pago.pk)
+    if pago.estado == PagoDiarista.Estados.ANULADO:
+        messages.error(request, "No puedes marcar como pagado un pago anulado.")
+        return redirect("diarista_pago_detalle", pk=diarista.pk, pago_id=pago.pk)
+
+    pago.estado = PagoDiarista.Estados.PAGADO
+    pago.save(update_fields=["estado", "actualizado_en"])
+    pago.jornadas.update(pago_estado=AsistenciaDiarista.EstadosPago.PAGADO)
+    registrar_historial(request, "Diaristas", "Pago", f"Se marcó como pagado el pago {pago.numero_comprobante}.")
+    messages.success(request, "Pago marcado como pagado.")
+    return redirect("diarista_pago_detalle", pk=diarista.pk, pago_id=pago.pk)
+
+
+@login_required
+def diarista_pago_anular(request, pk, pago_id):
+    permiso = validar_permiso_o_redirigir(request, "diaristas", "puede_editar")
+    if permiso:
+        return permiso
+
+    diarista = get_object_or_404(Diarista.objects.select_related("empresa", "sucursal"), pk=pk)
+    if not _usuario_puede_operar_diarista(request, diarista):
+        messages.error(request, "No puedes anular pagos de otra empresa.")
+        return redirect("diaristas_lista")
+    pago = get_object_or_404(PagoDiarista, pk=pago_id, diarista=diarista)
+    if request.method != "POST":
+        return redirect("diarista_pago_detalle", pk=diarista.pk, pago_id=pago.pk)
+    if pago.estado == PagoDiarista.Estados.ANULADO:
+        messages.info(request, "Este pago ya estaba anulado.")
+        return redirect("diarista_pago_detalle", pk=diarista.pk, pago_id=pago.pk)
+
+    motivo = (request.POST.get("motivo_anulacion") or "Anulación administrativa.").strip()
+    with transaction.atomic():
+        pago.estado = PagoDiarista.Estados.ANULADO
+        pago.motivo_anulacion = motivo
+        pago.anulado_por = request.user
+        pago.fecha_anulacion = timezone.now()
+        pago.save(update_fields=["estado", "motivo_anulacion", "anulado_por", "fecha_anulacion", "actualizado_en"])
+        pago.jornadas.update(pago=None, pago_estado=AsistenciaDiarista.EstadosPago.REABIERTO)
+
+    registrar_historial(request, "Diaristas", "Anular pago", f"Se anuló pago {pago.numero_comprobante} de diarista {diarista.nombre_completo}.")
+    messages.success(request, "Pago anulado y jornadas reabiertas.")
+    return redirect("diarista_pagos", pk=diarista.pk)
+
+
+@login_required
+def diarista_cambiar_estado(request, pk):
+    permiso = validar_permiso_o_redirigir(request, "diaristas", "puede_editar")
+    if permiso:
+        return permiso
+
+    diarista = get_object_or_404(Diarista.objects.select_related("empresa", "sucursal", "turno"), pk=pk)
+    if not _usuario_puede_operar_diarista(request, diarista):
+        messages.error(request, "No puedes modificar diaristas de otra empresa.")
+        return redirect("diaristas_lista")
+
+    if request.method != "POST":
+        return redirect("diarista_detalle", pk=diarista.pk)
+
+    accion = (request.POST.get("accion") or "").strip().lower()
+    hoy = timezone.localdate()
+    estado_anterior = diarista.get_estado_display()
+    activo_anterior = diarista.activo
+    pagos_validos = diarista.pagos.exclude(estado=PagoDiarista.Estados.ANULADO).count()
+    jornadas = diarista.asistencias.count()
+
+    if accion == "finalizar":
+        diarista.estado = Diarista.Estados.FINALIZADO
+        diarista.activo = False
+        if not diarista.fecha_fin or diarista.fecha_fin > hoy:
+            diarista.fecha_fin = hoy
+        mensaje = "Diarista finalizado correctamente. Sus asistencias y pagos históricos se conservan."
+        accion_historial = "Finalizar"
+    elif accion == "cancelar":
+        diarista.estado = Diarista.Estados.CANCELADO
+        diarista.activo = False
+        if not diarista.fecha_fin or diarista.fecha_fin > hoy:
+            diarista.fecha_fin = hoy
+        mensaje = "Diarista cancelado correctamente. No se eliminaron asistencias ni pagos."
+        accion_historial = "Cancelar"
+    elif accion == "activar":
+        diarista.estado = Diarista.Estados.ACTIVO
+        diarista.activo = True
+        if diarista.fecha_fin and diarista.fecha_fin < hoy:
+            diarista.fecha_fin = hoy
+        mensaje = "Diarista activado correctamente."
+        accion_historial = "Activar"
+    elif accion == "pendiente":
+        diarista.estado = Diarista.Estados.PENDIENTE
+        diarista.activo = True
+        mensaje = "Diarista marcado como pendiente."
+        accion_historial = "Pendiente"
+    else:
+        messages.error(request, "Acción de estado no válida.")
+        return redirect("diarista_detalle", pk=diarista.pk)
+
+    diarista.save(update_fields=["estado", "activo", "fecha_fin", "actualizado_en"])
+    registrar_historial(
+        request,
+        "Diaristas",
+        accion_historial,
+        f"Diarista {diarista.nombre_completo} cambió de {estado_anterior} / activo={activo_anterior} "
+        f"a {diarista.get_estado_display()} / activo={diarista.activo}. "
+        f"Jornadas conservadas: {jornadas}. Pagos válidos conservados: {pagos_validos}."
+    )
+    messages.success(request, mensaje)
+    return redirect("diarista_detalle", pk=diarista.pk)
+
+
+@login_required
+def diarista_nuevo(request):
+    permiso = validar_permiso_o_redirigir(request, "diaristas", "puede_crear")
+    if permiso:
+        return permiso
+
+    empresa_usuario = obtener_empresa_activa(request)
+    admin_master = es_admin_master(request.user) and empresa_usuario is None
+
+    if request.method == "POST":
+        form = DiaristaForm(request.POST, empresa_activa=None if admin_master else empresa_usuario)
+        if form.is_valid():
+            diarista = form.save(commit=False)
+            if not admin_master:
+                if not empresa_usuario or diarista.empresa != empresa_usuario:
+                    messages.error(request, "No puedes crear diaristas fuera de tu empresa.")
+                    return redirect("diaristas_lista")
+            if diarista.sucursal and diarista.sucursal.empresa != diarista.empresa:
+                messages.error(request, "La sucursal no pertenece a la empresa seleccionada.")
+                return redirect("diaristas_lista")
+            if diarista.turno and diarista.turno.empresa != diarista.empresa:
+                messages.error(request, "El turno no pertenece a la empresa seleccionada.")
+                return redirect("diaristas_lista")
+            diarista.creado_por = request.user
+            diarista.save()
+            registrar_historial(
+                request,
+                "Diaristas",
+                "Crear",
+                f"Se creó diarista {diarista.nombre_completo} (CI: {diarista.cedula}) para {diarista.empresa.nombre}."
+            )
+            messages.success(request, "Diarista creado correctamente.")
+            return redirect("diarista_detalle", pk=diarista.pk)
+    else:
+        form = DiaristaForm(empresa_activa=None if admin_master else empresa_usuario)
+
+    return render(request, "core/diarista_form.html", {
+        "form": form,
+        "titulo_form": "Nuevo diarista",
+        "boton_texto": "Guardar diarista",
+        "empresa_usuario": empresa_usuario,
+        "es_admin_master": admin_master,
+    })
+
+
+@login_required
+def diarista_editar(request, pk):
+    permiso = validar_permiso_o_redirigir(request, "diaristas", "puede_editar")
+    if permiso:
+        return permiso
+
+    empresa_usuario = obtener_empresa_activa(request)
+    admin_master = es_admin_master(request.user) and empresa_usuario is None
+
+    diarista = get_object_or_404(Diarista.objects.select_related("empresa", "sucursal", "turno"), pk=pk)
+    if not admin_master:
+        if not empresa_usuario or diarista.empresa != empresa_usuario:
+            messages.error(request, "No puedes editar diaristas de otra empresa.")
+            return redirect("diaristas_lista")
+
+    if request.method == "POST":
+        form = DiaristaForm(request.POST, instance=diarista, empresa_activa=None if admin_master else empresa_usuario)
+        if form.is_valid():
+            diarista_editado = form.save(commit=False)
+            if not admin_master:
+                if not empresa_usuario or diarista_editado.empresa != empresa_usuario:
+                    messages.error(request, "No puedes mover diaristas a otra empresa.")
+                    return redirect("diaristas_lista")
+            if diarista_editado.sucursal and diarista_editado.sucursal.empresa != diarista_editado.empresa:
+                messages.error(request, "La sucursal no pertenece a la empresa seleccionada.")
+                return redirect("diarista_editar", pk=diarista.pk)
+            if diarista_editado.turno and diarista_editado.turno.empresa != diarista_editado.empresa:
+                messages.error(request, "El turno no pertenece a la empresa seleccionada.")
+                return redirect("diarista_editar", pk=diarista.pk)
+            diarista_editado.save()
+            registrar_historial(
+                request,
+                "Diaristas",
+                "Editar",
+                f"Se editó diarista {diarista_editado.nombre_completo} (CI: {diarista_editado.cedula})."
+            )
+            messages.success(request, "Diarista actualizado correctamente.")
+            return redirect("diarista_detalle", pk=diarista_editado.pk)
+    else:
+        form = DiaristaForm(instance=diarista, empresa_activa=None if admin_master else empresa_usuario)
+
+    return render(request, "core/diarista_form.html", {
+        "form": form,
+        "titulo_form": f"Editar diarista: {diarista.nombre_completo}",
+        "boton_texto": "Guardar cambios",
+        "diarista": diarista,
+        "empresa_usuario": empresa_usuario,
+        "es_admin_master": admin_master,
+    })
+
+
 @login_required
 def deudas_lista(request):
     permiso = validar_permiso_o_redirigir(request, "deudas", "puede_ver")
@@ -1334,7 +2398,7 @@ def deudas_lista(request):
         deudas = deudas.filter(
             Q(funcionario__nombre__icontains=q) |
             Q(funcionario__apellido__icontains=q) |
-            Q(funcionario__cedula__icontains=q) |
+            _documento_busqueda_q("funcionario__cedula", "funcionario__tipo_documento", q) |
             Q(descripcion__icontains=q) |
             Q(tipo__icontains=q)
         )
@@ -1530,7 +2594,7 @@ def funcionarios_lista(request):
         funcionarios = funcionarios.filter(
             Q(nombre__icontains=q) |
             Q(apellido__icontains=q) |
-            Q(cedula__icontains=q) |
+            _documento_busqueda_q("cedula", "tipo_documento", q) |
             Q(cargo__icontains=q) |
             Q(sector__icontains=q) |
             Q(sucursal__icontains=q) |
@@ -1837,7 +2901,7 @@ def funcionario_nuevo(request):
                 request,
                 "Funcionarios",
                 "Crear",
-                f"Se creó el funcionario {funcionario.nombre_completo} (CI: {funcionario.cedula})."
+                f"Se creó el funcionario {funcionario.nombre_completo} ({funcionario.documento_compacto})."
             )
             messages.success(request, "Funcionario creado correctamente.")
             return redirect("funcionarios_lista")
@@ -1892,7 +2956,7 @@ def funcionario_editar(request, pk):
                 request,
                 "Funcionarios",
                 "Editar",
-                f"Se editó el funcionario {funcionario_editado.nombre_completo} (CI: {funcionario_editado.cedula})."
+                f"Se editó el funcionario {funcionario_editado.nombre_completo} ({funcionario_editado.documento_compacto})."
             )
             messages.success(request, "Funcionario actualizado correctamente.")
             return redirect("funcionarios_lista")
@@ -2322,7 +3386,7 @@ def asistencia_marcar(request):
         asistencias_hoy = asistencias_hoy.filter(
             Q(funcionario__nombre__icontains=q) |
             Q(funcionario__apellido__icontains=q) |
-            Q(funcionario__cedula__icontains=q)
+            _documento_busqueda_q("funcionario__cedula", "funcionario__tipo_documento", q)
         )
 
     if admin_master:
@@ -2374,7 +3438,7 @@ def permisos_lista(request):
         permisos = permisos.filter(
             Q(funcionario__nombre__icontains=q) |
             Q(funcionario__apellido__icontains=q) |
-            Q(funcionario__cedula__icontains=q) |
+            _documento_busqueda_q("funcionario__cedula", "funcionario__tipo_documento", q) |
             Q(tipo__icontains=q) |
             Q(estado__icontains=q)
         )
@@ -2533,7 +3597,7 @@ def vacaciones_lista(request):
         vacaciones = vacaciones.filter(
             Q(funcionario__nombre__icontains=q) |
             Q(funcionario__apellido__icontains=q) |
-            Q(funcionario__cedula__icontains=q) |
+            _documento_busqueda_q("funcionario__cedula", "funcionario__tipo_documento", q) |
             Q(estado__icontains=q)
         )
 
@@ -2769,7 +3833,7 @@ def vacacion_notificacion_pdf(request, pk):
         ["Sucursal", sucursal_nombre],
         ["Fecha de emisión", fecha_emision.strftime("%d/%m/%Y")],
         ["Funcionario", funcionario.nombre_completo],
-        ["Cédula", funcionario.cedula],
+        ["Documento", funcionario.documento_compacto],
         ["Cargo", funcionario.cargo or "-"],
         ["Fecha desde", vacacion.fecha_desde.strftime("%d/%m/%Y")],
         ["Fecha hasta", vacacion.fecha_hasta.strftime("%d/%m/%Y")],
@@ -2792,7 +3856,7 @@ def vacacion_notificacion_pdf(request, pk):
 
     texto = f"""
     Por medio de la presente, se comunica formalmente al trabajador <b>{funcionario.nombre_completo}</b>,
-    con C.I. N° <b>{funcionario.cedula}</b>, que hará uso de sus vacaciones anuales remuneradas
+    identificado como <b>{funcionario.documento_compacto}</b>, que hará uso de sus vacaciones anuales remuneradas
     desde el día <b>{vacacion.fecha_desde.strftime("%d/%m/%Y")}</b> hasta el día
     <b>{vacacion.fecha_hasta.strftime("%d/%m/%Y")}</b>, por un total de
     <b>{vacacion.dias_solicitados}</b> día(s).
@@ -3067,7 +4131,7 @@ def reportes(request):
         funcionarios = funcionarios.filter(
             Q(nombre__icontains=q) |
             Q(apellido__icontains=q) |
-            Q(cedula__icontains=q)
+            _documento_busqueda_q("cedula", "tipo_documento", q)
         )
 
     funcionarios = funcionarios.select_related(
@@ -3100,7 +4164,7 @@ def reportes(request):
         asistencias_dia = asistencias_dia.filter(
             Q(funcionario__nombre__icontains=q) |
             Q(funcionario__apellido__icontains=q) |
-            Q(funcionario__cedula__icontains=q)
+            _documento_busqueda_q("funcionario__cedula", "funcionario__tipo_documento", q)
         )
 
     if funcionario_id:
@@ -3509,7 +4573,7 @@ def aguinaldo_lista(request):
         aguinaldos = aguinaldos.filter(
             Q(funcionario__nombre__icontains=q) |
             Q(funcionario__apellido__icontains=q) |
-            Q(funcionario__cedula__icontains=q)
+            _documento_busqueda_q("funcionario__cedula", "funcionario__tipo_documento", q)
         )
 
     total_general = aguinaldos.aggregate(
@@ -3694,7 +4758,7 @@ def aguinaldo_pdf(request, pk):
 
     datos = [
         ["Funcionario", funcionario.nombre_completo],
-        ["Cédula", funcionario.cedula],
+        ["Documento", funcionario.documento_compacto],
         ["Empresa", funcionario.empresa_mostrar],
         ["Sucursal", funcionario.sucursal_mostrar],
         ["Cargo", funcionario.cargo or "-"],
@@ -3971,7 +5035,7 @@ def planilla_bancaria_exportar(request, pk):
         funcionario = nomina.funcionario
 
         writer.writerow([
-            funcionario.cedula,
+            funcionario.documento_compacto,
             funcionario.nombre_completo,
             funcionario.banco or planilla.banco,
             funcionario.tipo_cuenta or "",
@@ -4110,7 +5174,7 @@ def banco_horas_lista(request):
         funcionarios = funcionarios.filter(
             Q(nombre__icontains=q) |
             Q(apellido__icontains=q) |
-            Q(cedula__icontains=q)
+            _documento_busqueda_q("cedula", "tipo_documento", q)
         )
 
     if admin_master:
@@ -4720,7 +5784,7 @@ def _pdf_nomina_sector_bytes(request, nominas, sector_nombre, mes, anio):
         modalidad = getattr(n.funcionario, "modalidad_salarial_display", "Salario base + bono")
         data.append([
             n.funcionario.nombre_completo,
-            n.funcionario.cedula,
+            n.funcionario.documento_compacto,
             n.funcionario.cargo or "-",
             modalidad,
             _gs(n.salario_bruto),
@@ -4801,7 +5865,7 @@ def nomina_extracto_pdf(request, pk):
 
     datos = [
         ["Funcionario", funcionario.nombre_completo],
-        ["Cédula", funcionario.cedula],
+        ["Documento", funcionario.documento_compacto],
         ["Empresa", funcionario.empresa_mostrar],
         ["Sucursal", funcionario.sucursal_mostrar],
         ["Cargo", funcionario.cargo or "-"],
@@ -4985,7 +6049,7 @@ def nomina_sucursal_pdf(request):
     for n in nominas:
         data.append([
             n.funcionario.nombre_completo,
-            n.funcionario.cedula,
+            n.funcionario.documento_compacto,
             _gs(n.salario_bruto),
             _gs(n.descuento_ips),
             _gs(n.descuento_deudas),
@@ -5083,7 +6147,7 @@ def _xlsx_nomina_sector_bytes(nominas, sector_nombre, mes, anio):
         ["Periodo", f"{mes:02d}/{anio}"],
         ["Fecha generacion", timezone.localtime().strftime("%d/%m/%Y %H:%M")],
         [],
-        ["Funcionario", "Cedula", "Cargo", "Modalidad salarial", "Total haberes", "IPS", "Otros descuentos", "Ajustes", "Salario neto"],
+        ["Funcionario", "Documento", "Cargo", "Modalidad salarial", "Total haberes", "IPS", "Otros descuentos", "Ajustes", "Salario neto"],
     ]
 
     for row in rows:
@@ -5093,7 +6157,7 @@ def _xlsx_nomina_sector_bytes(nominas, sector_nombre, mes, anio):
         modalidad = getattr(n.funcionario, "modalidad_salarial_display", "Salario base + bono")
         ws.append([
             n.funcionario.nombre_completo,
-            n.funcionario.cedula,
+            n.funcionario.documento_compacto,
             n.funcionario.cargo or "-",
             modalidad,
             float(n.salario_bruto or 0),
@@ -5653,7 +6717,7 @@ def liquidaciones_lista(request):
         liquidaciones = liquidaciones.filter(
             Q(funcionario__nombre__icontains=q) |
             Q(funcionario__apellido__icontains=q) |
-            Q(funcionario__cedula__icontains=q) |
+            _documento_busqueda_q("funcionario__cedula", "funcionario__tipo_documento", q) |
             Q(tipo_salida__icontains=q) |
             Q(estado__icontains=q)
         )
@@ -5970,6 +7034,9 @@ def liquidacion_preview(request):
         "ok": True,
         "funcionario": funcionario.nombre_completo,
         "cedula": funcionario.cedula,
+        "tipo_documento": funcionario.documento_etiqueta,
+        "documento_formateado": funcionario.documento_formateado,
+        "documento_compacto": funcionario.documento_compacto,
         "cargo": funcionario.cargo or "-",
         "sector": funcionario.sector or "-",
         "sucursal": funcionario.sucursal_mostrar,
@@ -6437,7 +7504,7 @@ def liquidacion_pdf(request, pk):
 
     datos_superiores = [
         ["Funcionario", funcionario.nombre_completo],
-        ["Cédula", funcionario.cedula],
+        ["Documento", funcionario.documento_compacto],
         ["Tipo de salida", liquidacion.get_tipo_salida_display()],
         ["Estado", liquidacion.get_estado_display()],
         ["Fecha de salida", liquidacion.fecha_salida.strftime("%d/%m/%Y") if liquidacion.fecha_salida else "-"],
@@ -6767,7 +7834,7 @@ def generar_texto_comunicacion_laboral(comunicacion):
     textos = {
         ComunicacionLaboral.Tipos.AMONESTACION: f"""
 Por medio de la presente, la empresa <b>{empresa_nombre}</b> comunica formalmente al trabajador
-<b>{funcionario.nombre_completo}</b>, con C.I. N° <b>{funcionario.cedula}</b>, que se deja constancia
+<b>{funcionario.nombre_completo}</b>, identificado como <b>{funcionario.documento_compacto}</b>, que se deja constancia
 de una <b>amonestación disciplinaria</b> vinculada a los siguientes hechos:
 <br/><br/>
 <b>{detalle}</b>
@@ -6782,7 +7849,7 @@ conforme a la gravedad del caso, los antecedentes existentes y la normativa labo
 
         ComunicacionLaboral.Tipos.PREAVISO: f"""
 Por medio de la presente, la empresa <b>{empresa_nombre}</b> comunica formalmente al trabajador
-<b>{funcionario.nombre_completo}</b>, con C.I. N° <b>{funcionario.cedula}</b>, el otorgamiento de
+<b>{funcionario.nombre_completo}</b>, identificado como <b>{funcionario.documento_compacto}</b>, el otorgamiento de
 <b>preaviso</b> conforme a la normativa laboral vigente.
 <br/><br/>
 La presente comunicación se emite en fecha <b>{fecha_emision}</b>, tomando como referencia
@@ -6799,7 +7866,7 @@ Detalle adicional:
 
         ComunicacionLaboral.Tipos.ABANDONO: f"""
 Por medio de la presente, la empresa <b>{empresa_nombre}</b> comunica formalmente al trabajador
-<b>{funcionario.nombre_completo}</b>, con C.I. N° <b>{funcionario.cedula}</b>, que se ha registrado una
+<b>{funcionario.nombre_completo}</b>, identificado como <b>{funcionario.documento_compacto}</b>, que se ha registrado una
 situación compatible con <b>abandono de trabajo</b> o inasistencia injustificada, según los antecedentes
 obrantes en la empresa.
 <br/><br/>
@@ -6817,7 +7884,7 @@ a formular aclaraciones o descargos.
 
         ComunicacionLaboral.Tipos.PERMISO: f"""
 Por medio de la presente, la empresa <b>{empresa_nombre}</b> comunica al trabajador
-<b>{funcionario.nombre_completo}</b>, con C.I. N° <b>{funcionario.cedula}</b>, la recepción, autorización,
+<b>{funcionario.nombre_completo}</b>, identificado como <b>{funcionario.documento_compacto}</b>, la recepción, autorización,
 rechazo o registro administrativo de un <b>permiso laboral</b>, conforme a los datos consignados por RRHH.
 <br/><br/>
 Detalle del permiso:
@@ -6831,7 +7898,7 @@ como ausencia injustificada.
 
         ComunicacionLaboral.Tipos.AUSENCIA: f"""
 Por medio de la presente, la empresa <b>{empresa_nombre}</b> comunica formalmente al trabajador
-<b>{funcionario.nombre_completo}</b>, con C.I. N° <b>{funcionario.cedula}</b>, que se ha registrado una
+<b>{funcionario.nombre_completo}</b>, identificado como <b>{funcionario.documento_compacto}</b>, que se ha registrado una
 <b>ausencia injustificada</b> o una falta de comunicación previa respecto a su inasistencia.
 <br/><br/>
 Detalle registrado:
@@ -6845,7 +7912,7 @@ laboral, conforme a la normativa vigente y a los reglamentos internos aplicables
 
         ComunicacionLaboral.Tipos.SUSPENSION: f"""
 Por medio de la presente, la empresa <b>{empresa_nombre}</b> comunica al trabajador
-<b>{funcionario.nombre_completo}</b>, con C.I. N° <b>{funcionario.cedula}</b>, la aplicación o inicio del
+<b>{funcionario.nombre_completo}</b>, identificado como <b>{funcionario.documento_compacto}</b>, la aplicación o inicio del
 procedimiento relacionado con una <b>suspensión disciplinaria</b>, según los hechos detallados.
 <br/><br/>
 Hechos:
@@ -6859,7 +7926,7 @@ ante RRHH dentro del plazo otorgado por la empresa.
 
         ComunicacionLaboral.Tipos.CITACION_DESCARGO: f"""
 Por medio de la presente, la empresa <b>{empresa_nombre}</b> cita formalmente al trabajador
-<b>{funcionario.nombre_completo}</b>, con C.I. N° <b>{funcionario.cedula}</b>, a presentar su
+<b>{funcionario.nombre_completo}</b>, identificado como <b>{funcionario.documento_compacto}</b>, a presentar su
 <b>descargo</b> respecto a los hechos comunicados.
 <br/><br/>
 Hechos objeto de descargo:
@@ -6873,7 +7940,7 @@ disciplinaria o administrativa definitiva.
 
         ComunicacionLaboral.Tipos.CAMBIO_CARGO_SECTOR: f"""
 Por medio de la presente, la empresa <b>{empresa_nombre}</b> comunica al trabajador
-<b>{funcionario.nombre_completo}</b>, con C.I. N° <b>{funcionario.cedula}</b>, una modificación,
+<b>{funcionario.nombre_completo}</b>, identificado como <b>{funcionario.documento_compacto}</b>, una modificación,
 reasignación o cambio administrativo relacionado con su cargo, sector, sucursal, funciones u organización
 interna del trabajo.
 <br/><br/>
@@ -6887,7 +7954,7 @@ de los derechos laborales que correspondan al trabajador conforme a la normativa
 
         ComunicacionLaboral.Tipos.MEMORANDUM: f"""
 Por medio de la presente, la empresa <b>{empresa_nombre}</b> emite memorándum interno dirigido al trabajador
-<b>{funcionario.nombre_completo}</b>, con C.I. N° <b>{funcionario.cedula}</b>.
+<b>{funcionario.nombre_completo}</b>, identificado como <b>{funcionario.documento_compacto}</b>.
 <br/><br/>
 Asunto:
 <br/>
@@ -6936,7 +8003,7 @@ def comunicaciones_lista(request):
         comunicaciones = comunicaciones.filter(
             Q(funcionario__nombre__icontains=q) |
             Q(funcionario__apellido__icontains=q) |
-            Q(funcionario__cedula__icontains=q) |
+            _documento_busqueda_q("funcionario__cedula", "funcionario__tipo_documento", q) |
             Q(titulo__icontains=q) |
             Q(asunto__icontains=q) |
             Q(detalle_hecho__icontains=q)
@@ -7195,7 +8262,7 @@ def comunicacion_pdf(request, pk):
 
     datos = [
         ["Funcionario", funcionario.nombre_completo],
-        ["Cédula", funcionario.cedula],
+        ["Documento", funcionario.documento_compacto],
         ["Cargo", funcionario.cargo or "-"],
         ["Sector", funcionario.sector or "-"],
         ["Sucursal", funcionario.sucursal_mostrar],
@@ -7330,7 +8397,7 @@ def dias_libres_lista(request):
         funcionarios_activos = funcionarios_activos.filter(
             Q(nombre__icontains=q) |
             Q(apellido__icontains=q) |
-            Q(cedula__icontains=q) |
+            _documento_busqueda_q("cedula", "tipo_documento", q) |
             Q(sector__icontains=q)
         )
 
@@ -7789,7 +8856,7 @@ def reporte_diario_pdf(request):
     for a in asistencias.order_by("funcionario__apellido", "funcionario__nombre"):
         data.append([
             a.funcionario.nombre_completo,
-            a.funcionario.cedula,
+            a.funcionario.documento_compacto,
             a.funcionario.sucursal_mostrar,
             a.funcionario.turno.nombre if a.funcionario.turno else "-",
             a.hora_entrada.strftime("%H:%M") if a.hora_entrada else "-",
@@ -7909,7 +8976,7 @@ def reporte_mensual_pdf(request):
 
         data.append([
             funcionario.nombre_completo,
-            funcionario.cedula,
+            funcionario.documento_compacto,
             funcionario.sucursal_mostrar,
             funcionario.cargo or "-",
             asistencias_count,
@@ -7940,4 +9007,5 @@ def reporte_mensual_pdf(request):
     response["Content-Disposition"] = f'inline; filename="reporte_mensual_{mes:02d}_{anio}.pdf"'
     response.write(pdf)
     return response
+
 

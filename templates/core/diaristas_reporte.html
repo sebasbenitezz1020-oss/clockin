@@ -1,0 +1,55 @@
+{% extends "base.html" %}
+{% block title %}Reporte de Diaristas{% endblock %}
+{% block content %}
+<style>
+.dr-page{padding:24px 0 42px;color:#e5eefb}.dr-hero{display:flex;justify-content:space-between;gap:16px;align-items:flex-end;margin-bottom:18px;padding:24px;border-radius:24px;background:radial-gradient(circle at 8% 0%,rgba(56,189,248,.16),transparent 34%),linear-gradient(180deg,rgba(15,23,42,.98),rgba(8,13,23,.98));border:1px solid rgba(148,163,184,.15);box-shadow:0 20px 55px rgba(0,0,0,.24)}.dr-hero h1{margin:0;color:#fff;font-size:clamp(30px,5vw,44px);font-weight:1000;letter-spacing:0}.dr-hero p{margin:8px 0 0;color:#9fb0c3;max-width:760px}.dr-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;padding:0 16px;border-radius:14px;text-decoration:none;border:1px solid rgba(148,163,184,.18);background:rgba(15,23,42,.72);color:#dbeafe;font-weight:950}.dr-btn.primary{border:0;color:#fff;background:linear-gradient(135deg,#2563eb,#38bdf8)}.dr-btn.success{border-color:rgba(34,197,94,.24);color:#bbf7d0;background:rgba(34,197,94,.12)}.dr-actions{display:flex;gap:8px;flex-wrap:wrap}.dr-stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:16px}.dr-stat{padding:18px;border-radius:18px;background:rgba(15,23,42,.82);border:1px solid rgba(148,163,184,.14);box-shadow:0 14px 34px rgba(0,0,0,.16)}.dr-stat span{display:block;color:#93a4b7;font-size:12px;font-weight:900;margin-bottom:8px}.dr-stat strong{color:#fff;font-size:28px;line-height:1}.dr-filters{display:grid;grid-template-columns:repeat(6,minmax(0,1fr)) auto;gap:10px;padding:14px;margin-bottom:16px;border-radius:20px;background:rgba(15,23,42,.78);border:1px solid rgba(148,163,184,.14)}.dr-field label{display:block;color:#9fb0c3;font-size:12px;font-weight:900;margin-bottom:6px}.dr-field input,.dr-field select{width:100%;min-height:42px;border-radius:13px;border:1px solid rgba(148,163,184,.20);background:rgba(2,6,23,.55);color:#f8fafc;padding:0 11px;font-weight:800}.dr-card{border-radius:22px;overflow:hidden;background:rgba(15,23,42,.84);border:1px solid rgba(148,163,184,.14);box-shadow:0 18px 50px rgba(0,0,0,.22)}.dr-table{width:100%;border-collapse:collapse}.dr-table th,.dr-table td{padding:13px;border-bottom:1px solid rgba(148,163,184,.10);text-align:left;vertical-align:top}.dr-table th{color:#93a4b7;font-size:12px;text-transform:uppercase}.dr-name{color:#fff;font-weight:1000}.dr-meta{color:#9fb0c3;font-size:12px;margin-top:4px}.dr-money{font-weight:1000;color:#dbeafe}.dr-warn{color:#fde68a;font-weight:1000}.dr-ok{color:#bbf7d0;font-weight:1000}.dr-empty{padding:28px;color:#cbd5e1;text-align:center}@media(max-width:1280px){.dr-filters{grid-template-columns:1fr 1fr 1fr}.dr-stats{grid-template-columns:repeat(2,1fr)}.dr-card{overflow:auto}.dr-table{min-width:1120px}}@media(max-width:680px){.dr-page{padding-top:12px}.dr-hero{display:grid;padding:18px;border-radius:18px}.dr-stats,.dr-filters{grid-template-columns:1fr}.dr-btn{width:100%}}
+</style>
+<div class="container-fluid dr-page">
+  <section class="dr-hero">
+    <div><a class="dr-btn" href="{% url 'diaristas_lista' %}">← Volver</a><h1>Reporte de Diaristas</h1><p>Control operativo por periodo: jornadas, ausencias, pagos generados y montos pendientes, separado de Nómina y Funcionarios.</p></div>
+    <div class="dr-actions"><a class="dr-btn success" href="?desde={{ desde }}&hasta={{ hasta }}&empresa={{ empresa_id }}&sucursal={{ sucursal_id }}&estado={{ estado_sel }}&q={{ q }}&export=csv">Exportar CSV</a><a class="dr-btn primary" href="{% url 'diarista_nuevo' %}">Nuevo diarista</a></div>
+  </section>
+
+  <section class="dr-stats">
+    <div class="dr-stat"><span>Diaristas filtrados</span><strong>{{ total_diaristas }}</strong></div>
+    <div class="dr-stat"><span>Jornadas trabajadas</span><strong>{{ jornadas_trabajadas }}</strong></div>
+    <div class="dr-stat"><span>Ausencias / incompletas</span><strong>{{ ausencias }} / {{ incompletas }}</strong></div>
+    <div class="dr-stat"><span>Horas registradas</span><strong>{{ horas_total }}</strong></div>
+    <div class="dr-stat"><span>Pendientes de pago</span><strong>{{ pendientes_pago }}</strong></div>
+    <div class="dr-stat"><span>Estimado pendiente</span><strong>Gs. {{ pendiente_estimado_total|floatformat:0 }}</strong></div>
+    <div class="dr-stat"><span>Total generado</span><strong>Gs. {{ total_generado|floatformat:0 }}</strong></div>
+    <div class="dr-stat"><span>Total pagado</span><strong>Gs. {{ total_pagado|floatformat:0 }}</strong></div>
+  </section>
+
+  <form class="dr-filters" method="get">
+    <div class="dr-field"><label>Desde</label><input type="date" name="desde" value="{{ desde }}"></div>
+    <div class="dr-field"><label>Hasta</label><input type="date" name="hasta" value="{{ hasta }}"></div>
+    <div class="dr-field"><label>Empresa</label><select name="empresa"><option value="">Todas</option>{% for e in empresas %}<option value="{{ e.id }}" {% if empresa_id == e.id|stringformat:'s' %}selected{% endif %}>{{ e.nombre_visible|default:e.nombre }}</option>{% endfor %}</select></div>
+    <div class="dr-field"><label>Sucursal</label><select name="sucursal"><option value="">Todas</option>{% for s in sucursales %}<option value="{{ s.id }}" {% if sucursal_id == s.id|stringformat:'s' %}selected{% endif %}>{{ s.nombre }}</option>{% endfor %}</select></div>
+    <div class="dr-field"><label>Estado</label><select name="estado"><option value="">Todos</option>{% for value,label in estados %}<option value="{{ value }}" {% if estado_sel == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+    <div class="dr-field"><label>Buscar</label><input name="q" value="{{ q }}" placeholder="Nombre, cédula, sector"></div>
+    <button class="dr-btn primary" type="submit">Filtrar</button>
+  </form>
+
+  <section class="dr-card">
+    {% if filas %}
+    <table class="dr-table">
+      <thead><tr><th>Diarista</th><th>Empresa / sucursal</th><th>Estado</th><th>Trabajadas</th><th>Ausencias</th><th>Incompletas</th><th>Pend. pago</th><th>Horas</th><th>Generado</th><th>Pendiente estimado</th><th>Acciones</th></tr></thead>
+      <tbody>{% for fila in filas %}<tr>
+        <td><div class="dr-name">{{ fila.diarista.nombre_completo }}</div><div class="dr-meta">CI {{ fila.diarista.cedula }}{% if fila.diarista.sector %} · {{ fila.diarista.sector }}{% endif %}</div></td>
+        <td>{{ fila.diarista.empresa.nombre_visible|default:fila.diarista.empresa.nombre }}<div class="dr-meta">{{ fila.diarista.sucursal.nombre|default:"Sin sucursal" }}</div></td>
+        <td>{{ fila.diarista.get_estado_display }}</td>
+        <td class="dr-ok">{{ fila.trabajadas }}</td>
+        <td>{{ fila.ausencias }}</td>
+        <td>{{ fila.incompletas }}</td>
+        <td class="dr-warn">{{ fila.pendientes_pago }}</td>
+        <td>{{ fila.horas }}</td>
+        <td class="dr-money">Gs. {{ fila.generado|floatformat:0 }}</td>
+        <td class="dr-money">Gs. {{ fila.pendiente_estimado|floatformat:0 }}</td>
+        <td><div class="dr-actions"><a class="dr-btn" href="{% url 'diarista_detalle' fila.diarista.id %}">Ver</a><a class="dr-btn" href="{% url 'diarista_asistencias' fila.diarista.id %}">Asist.</a><a class="dr-btn" href="{% url 'diarista_pagos' fila.diarista.id %}">Pagos</a></div></td>
+      </tr>{% endfor %}</tbody>
+    </table>
+    {% else %}<div class="dr-empty">No hay datos para los filtros seleccionados.</div>{% endif %}
+  </section>
+</div>
+{% endblock %}

@@ -421,7 +421,16 @@ class Funcionario(models.Model):
 
     nombre = models.CharField(max_length=100)
     apellido = models.CharField(max_length=100)
-    cedula = models.CharField(max_length=30, unique=True)
+    cedula = models.CharField(max_length=30)
+    tipo_documento = models.CharField(
+        max_length=10,
+        choices=[
+            ("CI", "Cédula de Identidad"),
+            ("CPF", "CPF"),
+            ("CNPJ", "CNPJ"),
+        ],
+        default="CI",
+    )
 
     face_encoding = models.BinaryField(null=True, blank=True)
 
@@ -503,13 +512,42 @@ class Funcionario(models.Model):
 
     class Meta:
         ordering = ["apellido", "nombre"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["tipo_documento", "cedula"],
+                name="uniq_funcionario_tipo_documento_cedula",
+            )
+        ]
 
     def __str__(self):
-        return f"{self.apellido}, {self.nombre} - CI: {self.cedula}"
+        return f"{self.apellido}, {self.nombre} - {self.documento_compacto}"
 
     @property
     def nombre_completo(self):
         return f"{self.nombre} {self.apellido}"
+
+    @property
+    def documento_numero(self):
+        return self.cedula or ""
+
+    @property
+    def documento_formateado(self):
+        valor = "".join(ch for ch in str(self.cedula or "") if ch.isdigit())
+        if self.tipo_documento == "CPF" and len(valor) == 11:
+            return f"{valor[:3]}.{valor[3:6]}.{valor[6:9]}-{valor[9:]}"
+        if self.tipo_documento == "CNPJ" and len(valor) == 14:
+            return f"{valor[:2]}.{valor[2:5]}.{valor[5:8]}/{valor[8:12]}-{valor[12:]}"
+        if self.tipo_documento == "CI" and valor and valor == str(self.cedula or ""):
+            return f"{int(valor):,}".replace(",", ".")
+        return self.cedula or "-"
+
+    @property
+    def documento_etiqueta(self):
+        return self.tipo_documento or "CI"
+
+    @property
+    def documento_compacto(self):
+        return f"{self.documento_etiqueta}: {self.documento_formateado}"
 
     @property
     def empresa(self):
@@ -1930,3 +1968,261 @@ class PagoSuscripcionSistema(models.Model):
 
     def __str__(self):
         return f"Pago {self.fecha_pago:%d/%m/%Y} - {self.get_meses_cubiertos_display()}"
+
+class Diarista(models.Model):
+    class Estados(models.TextChoices):
+        PENDIENTE = "pendiente", "Pendiente"
+        ACTIVO = "activo", "Activo"
+        FINALIZADO = "finalizado", "Finalizado"
+        CANCELADO = "cancelado", "Cancelado"
+
+    class FormasCalculo(models.TextChoices):
+        POR_DIA_TRABAJADO = "por_dia_trabajado", "Por día efectivamente trabajado"
+        POR_DIAS_CONTRATADOS = "por_dias_contratados", "Por días contratados"
+
+    empresa = models.ForeignKey(
+        Empresa,
+        on_delete=models.CASCADE,
+        related_name="diaristas"
+    )
+    sucursal = models.ForeignKey(
+        Sucursal,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="diaristas"
+    )
+    nombres = models.CharField(max_length=120)
+    apellidos = models.CharField(max_length=120)
+    cedula = models.CharField(max_length=30)
+    telefono = models.CharField(max_length=50, blank=True, default="")
+    direccion = models.CharField(max_length=255, blank=True, default="")
+    fecha_nacimiento = models.DateField(null=True, blank=True)
+    fecha_inicio = models.DateField()
+    fecha_fin = models.DateField(null=True, blank=True)
+    cantidad_dias_contratados = models.PositiveIntegerField(default=1)
+    monto_diario_acordado = models.DecimalField(max_digits=12, decimal_places=2)
+    forma_calculo = models.CharField(
+        max_length=30,
+        choices=FormasCalculo.choices,
+        default=FormasCalculo.POR_DIA_TRABAJADO
+    )
+    turno = models.ForeignKey(
+        Turno,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="diaristas"
+    )
+    sector = models.CharField(max_length=100, blank=True, default="")
+    funcion_temporal = models.CharField(max_length=150, blank=True, default="")
+    observaciones = models.TextField(blank=True, default="")
+    estado = models.CharField(max_length=20, choices=Estados.choices, default=Estados.PENDIENTE)
+    activo = models.BooleanField(default=True)
+    face_encoding = models.BinaryField(null=True, blank=True)
+    creado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="diaristas_creados"
+    )
+    creado_en = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-fecha_inicio", "apellidos", "nombres"]
+        indexes = [
+            models.Index(fields=["empresa", "estado", "fecha_inicio"]),
+            models.Index(fields=["empresa", "cedula"]),
+            models.Index(fields=["sucursal", "estado"]),
+        ]
+        verbose_name = "Diarista"
+        verbose_name_plural = "Diaristas"
+
+    def __str__(self):
+        return f"{self.nombre_completo} - CI: {self.cedula}"
+
+    @property
+    def nombre_completo(self):
+        return f"{self.nombres} {self.apellidos}".strip()
+
+    @property
+    def esta_vigente(self):
+        hoy = timezone.localdate()
+        if self.estado != self.Estados.ACTIVO:
+            return False
+        if self.fecha_inicio and hoy < self.fecha_inicio:
+            return False
+        if self.fecha_fin and hoy > self.fecha_fin:
+            return False
+        return True
+
+    @property
+    def total_estimado(self):
+        return (self.monto_diario_acordado or Decimal("0")) * Decimal(self.cantidad_dias_contratados or 0)
+
+
+class PagoDiarista(models.Model):
+    class Estados(models.TextChoices):
+        BORRADOR = "borrador", "Borrador"
+        GENERADO = "generado", "Generado"
+        PAGADO = "pagado", "Pagado"
+        ANULADO = "anulado", "Anulado"
+
+    empresa = models.ForeignKey(
+        Empresa,
+        on_delete=models.CASCADE,
+        related_name="pagos_diaristas"
+    )
+    sucursal = models.ForeignKey(
+        Sucursal,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="pagos_diaristas"
+    )
+    diarista = models.ForeignKey(
+        Diarista,
+        on_delete=models.CASCADE,
+        related_name="pagos"
+    )
+    fecha_pago = models.DateField(default=timezone.localdate)
+    periodo_desde = models.DateField()
+    periodo_hasta = models.DateField()
+    dias_calculados = models.DecimalField(max_digits=8, decimal_places=2, default=0)
+    monto_diario_aplicado = models.DecimalField(max_digits=12, decimal_places=2)
+    subtotal = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    adicionales = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    descuentos = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    total_pagado = models.DecimalField(max_digits=12, decimal_places=2, default=0)
+    observacion = models.TextField(blank=True, default="")
+    concepto_adicional = models.CharField(max_length=180, blank=True, default="")
+    motivo_ajuste = models.TextField(blank=True, default="")
+    estado = models.CharField(max_length=20, choices=Estados.choices, default=Estados.BORRADOR)
+    numero_comprobante = models.CharField(max_length=30, unique=True, null=True, blank=True)
+    generado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="pagos_diaristas_generados"
+    )
+    anulado_por = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="pagos_diaristas_anulados"
+    )
+    motivo_anulacion = models.TextField(blank=True, default="")
+    fecha_anulacion = models.DateTimeField(null=True, blank=True)
+    creado_en = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-fecha_pago", "-creado_en"]
+        indexes = [
+            models.Index(fields=["empresa", "estado", "fecha_pago"]),
+            models.Index(fields=["diarista", "estado"]),
+            models.Index(fields=["numero_comprobante"]),
+        ]
+        verbose_name = "Pago de diarista"
+        verbose_name_plural = "Pagos de diaristas"
+
+    def __str__(self):
+        numero = self.numero_comprobante or "Sin número"
+        return f"{numero} - {self.diarista.nombre_completo}"
+
+    def calcular_total(self):
+        self.subtotal = (self.dias_calculados or Decimal("0")) * (self.monto_diario_aplicado or Decimal("0"))
+        self.total_pagado = self.subtotal + (self.adicionales or Decimal("0")) - (self.descuentos or Decimal("0"))
+        return self.total_pagado
+
+
+class AsistenciaDiarista(models.Model):
+    class Estados(models.TextChoices):
+        PROGRAMADO = "programado", "Programado"
+        TRABAJADO = "trabajado", "Trabajado"
+        AUSENTE = "ausente", "Ausente"
+        INCOMPLETO = "incompleto", "Incompleto"
+
+    class EstadosPago(models.TextChoices):
+        PENDIENTE = "pendiente", "Pendiente de pago"
+        INCLUIDO = "incluido", "Incluido en pago"
+        PAGADO = "pagado", "Pagado"
+        REABIERTO = "reabierto", "Reabierto"
+
+    ORIGEN_CHOICES = [
+        ("manual", "Manual"),
+        ("biometrico_tablet", "Biométrico tablet"),
+        ("biometrico_celular", "Biométrico celular"),
+    ]
+
+    empresa = models.ForeignKey(
+        Empresa,
+        on_delete=models.CASCADE,
+        related_name="asistencias_diaristas"
+    )
+    sucursal = models.ForeignKey(
+        Sucursal,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="asistencias_diaristas"
+    )
+    diarista = models.ForeignKey(
+        Diarista,
+        on_delete=models.CASCADE,
+        related_name="asistencias"
+    )
+    fecha = models.DateField()
+    hora_entrada = models.DateTimeField(null=True, blank=True)
+    hora_salida = models.DateTimeField(null=True, blank=True)
+    minutos_trabajados = models.PositiveIntegerField(default=0)
+    minutos_atraso = models.PositiveIntegerField(default=0)
+    estado = models.CharField(max_length=20, choices=Estados.choices, default=Estados.PROGRAMADO)
+    pago_estado = models.CharField(max_length=20, choices=EstadosPago.choices, default=EstadosPago.PENDIENTE)
+    pago = models.ForeignKey(
+        PagoDiarista,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="jornadas"
+    )
+    origen_marcacion = models.CharField(max_length=20, choices=ORIGEN_CHOICES, default="manual")
+    observacion = models.TextField(blank=True, default="")
+    creado_en = models.DateTimeField(auto_now_add=True)
+    actualizado_en = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["-fecha", "diarista__apellidos", "diarista__nombres"]
+        constraints = [
+            models.UniqueConstraint(fields=["diarista", "fecha"], name="uniq_asistencia_diarista_fecha"),
+        ]
+        indexes = [
+            models.Index(fields=["empresa", "fecha", "estado"]),
+            models.Index(fields=["diarista", "fecha"]),
+            models.Index(fields=["pago_estado"]),
+        ]
+        verbose_name = "Asistencia de diarista"
+        verbose_name_plural = "Asistencias de diaristas"
+
+    def __str__(self):
+        return f"{self.diarista.nombre_completo} - {self.fecha:%d/%m/%Y}"
+
+    @property
+    def horas_trabajadas_display(self):
+        horas = int((self.minutos_trabajados or 0) // 60)
+        minutos = int((self.minutos_trabajados or 0) % 60)
+        return f"{horas}h {minutos:02d}m"
+
+    def recalcular_minutos_trabajados(self):
+        if self.hora_entrada and self.hora_salida and self.hora_salida >= self.hora_entrada:
+            delta = self.hora_salida - self.hora_entrada
+            self.minutos_trabajados = int(delta.total_seconds() // 60)
+            self.estado = self.Estados.TRABAJADO
+        elif self.hora_entrada or self.hora_salida:
+            self.estado = self.Estados.INCOMPLETO
+        return self.minutos_trabajados
+

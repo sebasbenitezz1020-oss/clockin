@@ -513,7 +513,7 @@
                 {% csrf_token %}
                 <div class="asis-form-grid">
                     <div>
-                        <label class="asis-label" for="{{ form.cedula.id_for_label }}">Cédula del funcionario</label>
+                        <label class="asis-label" for="{{ form.cedula.id_for_label }}">Documento del funcionario</label>
                         {{ form.cedula }}
                         {{ form.cedula.errors }}
                     </div>
@@ -622,7 +622,7 @@
             <table class="asis-table">
                 <thead>
                     <tr>
-                        <th>Cédula</th>
+                        <th>Documento</th>
                         <th>Funcionario</th>
                         <th>Turno</th>
                         <th>Entrada</th>
@@ -643,7 +643,7 @@
                 <tbody>
                     {% for a in asistencias_hoy %}
                     <tr>
-                        <td>{{ a.funcionario.cedula }}</td>
+                        <td>{{ a.funcionario.documento_compacto }}</td>
 
                         <td>
                             <div class="nombre-box">

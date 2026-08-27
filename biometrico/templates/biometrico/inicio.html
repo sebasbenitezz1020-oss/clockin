@@ -430,16 +430,17 @@
                         </div>
                     </a>
 
-                    <a href="{% url 'funcionarios_lista' %}" class="bio-action-box">
+                    <a href="{% url 'biometrico_rostros_pendientes' %}{% if empresa_seleccionada %}?empresa={{ empresa_seleccionada.id }}{% endif %}" class="bio-action-box">
                         <div class="bio-action-icon" aria-hidden="true">
                             <svg width="30" height="30" viewBox="0 0 24 24" fill="none">
-                                <path d="M4 8.5A2.5 2.5 0 0 1 6.5 6H9l1.2-1.6A2 2 0 0 1 11.8 3.6h.4a2 2 0 0 1 1.6.8L15 6h2.5A2.5 2.5 0 0 1 20 8.5v8A2.5 2.5 0 0 1 17.5 19h-11A2.5 2.5 0 0 1 4 16.5v-8Z" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/>
-                                <circle cx="12" cy="12.5" r="3.2" stroke="currentColor" stroke-width="2"/>
+                                <path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Z" stroke="currentColor" stroke-width="2"/>
+                                <path d="M4.5 21a7.5 7.5 0 0 1 15 0" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+                                <path d="M18 5.5h3M19.5 4v3" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
                             </svg>
                         </div>
-                        <div class="bio-action-title">Actualizar rostros</div>
+                        <div class="bio-action-title">Rostros Pendientes</div>
                         <div class="bio-action-text">
-                            Revisa quiénes necesitan registrar o actualizar su rostro facial.
+                            Registra los rostros de funcionarios que todavía no cuentan con biometría facial.
                         </div>
                     </a>
                 </div>
@@ -467,7 +468,7 @@
                                 <div>
                                     <div class="bio-pending-name">{{ funcionario.nombre_completo }}</div>
                                     <div class="bio-pending-meta">
-                                        CI: {{ funcionario.cedula }}
+                                        {{ funcionario.documento_compacto }}
                                         {% if funcionario.turno %}
                                             | {{ funcionario.turno.nombre }}
                                         {% endif %}
@@ -477,7 +478,7 @@
                                     </div>
                                 </div>
 
-                                <a href="{% url 'registrar_rostro' funcionario.id %}" class="bio-btn bio-btn-secondary">
+                                <a href="{% url 'registrar_rostro' funcionario.id %}?next=/biometrico/rostros-pendientes/{% if empresa_seleccionada %}%3Fempresa%3D{{ empresa_seleccionada.id }}{% endif %}" class="bio-btn bio-btn-secondary">
                                     📸 Registrar rostro
                                 </a>
                             </div>

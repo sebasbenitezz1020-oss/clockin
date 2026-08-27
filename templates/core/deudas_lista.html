@@ -363,7 +363,7 @@
                         <div class="tabla-row">
                             <div class="funcionario-box">
                                 <strong>{{ deuda.funcionario.nombre_completo }}</strong>
-                                <span>CI: {{ deuda.funcionario.cedula|millares }}</span>
+                                <span>{{ deuda.funcionario.documento_compacto }}</span>
                                 {% if deuda.descripcion %}
                                     <span>{{ deuda.descripcion }}</span>
                                 {% endif %}

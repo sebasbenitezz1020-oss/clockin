@@ -58,7 +58,7 @@
             <tbody>
                 {% for p in permisos %}
                     <tr>
-                        <td>{{ p.funcionario.nombre_completo }}<br><small>CI: {{ p.funcionario.cedula }}</small></td>
+                        <td>{{ p.funcionario.nombre_completo }}<br><small>{{ p.funcionario.documento_compacto }}</small></td>
                         <td>{{ p.get_tipo_display }}</td>
                         <td>{{ p.fecha_desde|date:"d/m/Y" }}</td>
                         <td>{{ p.fecha_hasta|date:"d/m/Y" }}</td>

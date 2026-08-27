@@ -10,14 +10,18 @@ import numpy as np
 from PIL import Image
 
 from django.conf import settings
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.db.models import Q
 from django.http import HttpResponse, JsonResponse
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 
-from core.models import Asistencia, Funcionario
+from core.models import Asistencia, Empresa, Funcionario, Sucursal
 from core.views import registrar_historial
+from usuarios.multiempresa import es_admin_master, obtener_empresa_activa, obtener_empresa_usuario
+from usuarios.utils import tiene_permiso
 
 
 # =====================================================
@@ -167,6 +171,129 @@ def _permitir_laboratorio_offline(request):
 def _token_laboratorio_funcionario(funcionario_id):
     texto = f"fase0:{settings.SECRET_KEY}:{funcionario_id}".encode("utf-8")
     return hashlib.sha256(texto).hexdigest()[:16]
+
+
+def _tiene_permiso_biometrico(request, accion="puede_ver"):
+    return tiene_permiso(request.user, "biometrico", accion)
+
+
+def _empresas_biometricas_permitidas(request):
+    if es_admin_master(request.user):
+        return Empresa.objects.filter(activo=True).order_by("nombre")
+
+    empresa = obtener_empresa_usuario(request.user)
+    if not empresa:
+        return Empresa.objects.none()
+    return Empresa.objects.filter(pk=empresa.pk, activo=True)
+
+
+def _empresa_biometrica_seleccionada(request):
+    empresas = _empresas_biometricas_permitidas(request)
+    empresa_id = request.GET.get("empresa") or request.POST.get("empresa")
+
+    if empresa_id:
+        empresa = empresas.filter(pk=empresa_id).first()
+        if empresa:
+            return empresa, empresas
+        return None, empresas
+
+    empresa_activa = obtener_empresa_activa(request)
+    if empresa_activa and empresas.filter(pk=empresa_activa.pk).exists():
+        return empresa_activa, empresas
+
+    if empresas.count() == 1:
+        return empresas.first(), empresas
+
+    return empresas.first(), empresas
+
+
+def _funcionarios_biometricos_base(empresa):
+    if not empresa:
+        return Funcionario.objects.none()
+    return Funcionario.objects.filter(
+        activo=True,
+        sucursal_rel__empresa=empresa,
+    ).select_related("sucursal_rel", "turno")
+
+
+def _descriptor_facial_valido(funcionario):
+    encoding = funcionario.face_encoding
+    if not encoding:
+        return False
+    try:
+        return np.frombuffer(encoding, dtype=np.float64).shape[0] == 128
+    except Exception:
+        return False
+
+
+def _validar_borrosidad(image_np):
+    try:
+        gris = cv2.cvtColor(image_np, cv2.COLOR_RGB2GRAY)
+        varianza = cv2.Laplacian(gris, cv2.CV_64F).var()
+        if varianza < 35:
+            return False, "imagen_borrosa", "La imagen está borrosa. Intente con una foto más nítida."
+    except Exception:
+        pass
+    return True, "nitidez_ok", "Imagen nítida."
+
+
+def _procesar_registro_rostro(funcionario, data, origen="CAMARA", guardar=True):
+    if not data:
+        return {"ok": False, "tipo": "sin_imagen", "error": "No se recibió imagen."}
+
+    if len(data) > 8_500_000:
+        return {"ok": False, "tipo": "archivo_grande", "error": "La imagen es demasiado pesada. Seleccione una foto más liviana."}
+
+    image_np = _base64_a_rgb_np(data)
+    if image_np is None:
+        return {"ok": False, "tipo": "error_imagen", "error": "No se pudo procesar la imagen. Use JPG, PNG o WEBP."}
+
+    alto, ancho = image_np.shape[:2]
+    if ancho < 360 or alto < 360:
+        return {"ok": False, "tipo": "resolucion_baja", "error": "La imagen tiene poca resolución. Use una foto más clara y cercana."}
+
+    ok_luz, tipo_luz, mensaje_luz = _validar_iluminacion(image_np)
+    if not ok_luz:
+        return {"ok": False, "tipo": tipo_luz, "error": mensaje_luz or "Mejore la iluminación."}
+
+    ok_blur, tipo_blur, mensaje_blur = _validar_borrosidad(image_np)
+    if not ok_blur:
+        return {"ok": False, "tipo": tipo_blur, "error": mensaje_blur}
+
+    small = cv2.resize(image_np, (0, 0), fx=0.65, fy=0.65)
+    face_locations_small = face_recognition.face_locations(small, model="hog")
+
+    if not face_locations_small:
+        return {"ok": False, "tipo": "sin_rostro", "error": "No se detectó un rostro. Colóquese de frente a la cámara."}
+
+    if len(face_locations_small) > 1:
+        return {"ok": False, "tipo": "multiples_rostros", "error": "Se detectó más de una persona. Debe aparecer una sola persona."}
+
+    scale = 1 / 0.65
+    top, right, bottom, left = face_locations_small[0]
+    face_location = (int(top * scale), int(right * scale), int(bottom * scale), int(left * scale))
+    ok_posicion, tipo_posicion, mensaje_posicion = _validar_rostro_centrado(image_np, face_location)
+    if not ok_posicion:
+        return {"ok": False, "tipo": tipo_posicion, "error": mensaje_posicion or "Ajuste el rostro dentro del marco."}
+
+    encodings = face_recognition.face_encodings(small, face_locations_small)
+    if not encodings:
+        return {"ok": False, "tipo": "sin_descriptor", "error": "No se pudo generar el registro facial. Intente nuevamente."}
+
+    era_actualizacion = bool(funcionario.face_encoding)
+    if guardar:
+        funcionario.face_encoding = encodings[0].tobytes()
+        funcionario.save(update_fields=["face_encoding", "actualizado_en"])
+        _limpiar_cache_rostros()
+
+    return {
+        "ok": True,
+        "tipo": "actualizacion" if era_actualizacion else "registro",
+        "mensaje": f"Rostro guardado para {funcionario.nombre_completo}" if guardar else "Rostro detectado correctamente.",
+        "origen": origen if origen in ["CAMARA", "ARCHIVO"] else "CAMARA",
+        "era_actualizacion": era_actualizacion,
+        "guardado": guardar,
+    }
 
 
 def _validar_iluminacion(image_np):
@@ -645,21 +772,90 @@ def _marcar_asistencia_biometrica(request, funcionario, modo, origen="biometrico
 # =====================================================
 # VISTAS
 # =====================================================
+@login_required
 def biometrico_inicio(request):
-    total_funcionarios = Funcionario.objects.filter(activo=True).count()
-    con_rostro = Funcionario.objects.filter(activo=True, face_encoding__isnull=False).count()
-    pendientes = Funcionario.objects.filter(activo=True, face_encoding__isnull=True).count()
+    if not _tiene_permiso_biometrico(request, "puede_ver"):
+        messages.error(request, "No tienes permiso para acceder al módulo biométrico.")
+        return redirect("dashboard")
 
-    funcionarios_pendientes = Funcionario.objects.filter(
-        activo=True,
+    empresa, empresas = _empresa_biometrica_seleccionada(request)
+    funcionarios_base = _funcionarios_biometricos_base(empresa)
+    total_funcionarios = funcionarios_base.count()
+    con_rostro = funcionarios_base.filter(face_encoding__isnull=False).count()
+    pendientes = funcionarios_base.filter(face_encoding__isnull=True).count()
+
+    funcionarios_pendientes = funcionarios_base.filter(
         face_encoding__isnull=True
-    ).select_related("turno").order_by("apellido", "nombre")[:10]
+    ).order_by("apellido", "nombre")[:10]
 
     return render(request, "biometrico/inicio.html", {
         "total_funcionarios": total_funcionarios,
         "con_rostro": con_rostro,
         "pendientes": pendientes,
         "funcionarios_pendientes": funcionarios_pendientes,
+        "empresa_seleccionada": empresa,
+        "empresas_permitidas": empresas,
+    })
+
+
+@login_required
+def rostros_pendientes(request):
+    if not _tiene_permiso_biometrico(request, "puede_ver"):
+        messages.error(request, "No tienes permiso para ver rostros pendientes.")
+        return redirect("dashboard")
+
+    empresa, empresas = _empresa_biometrica_seleccionada(request)
+    if not empresa:
+        messages.error(request, "No tienes acceso a la empresa solicitada.")
+        return redirect("biometrico_inicio")
+
+    sucursal_id = request.GET.get("sucursal") or ""
+    sector = (request.GET.get("sector") or "").strip()
+    busqueda = (request.GET.get("q") or "").strip()
+
+    funcionarios_base = _funcionarios_biometricos_base(empresa)
+    total_funcionarios = funcionarios_base.count()
+    registrados = funcionarios_base.filter(face_encoding__isnull=False).count()
+    pendientes_total = funcionarios_base.filter(face_encoding__isnull=True).count()
+    cobertura = round((registrados / total_funcionarios) * 100) if total_funcionarios else 0
+
+    pendientes_qs = funcionarios_base.filter(face_encoding__isnull=True)
+
+    if sucursal_id:
+        pendientes_qs = pendientes_qs.filter(sucursal_rel_id=sucursal_id)
+
+    if sector:
+        pendientes_qs = pendientes_qs.filter(sector=sector)
+
+    if busqueda:
+        pendientes_qs = pendientes_qs.filter(
+            Q(nombre__icontains=busqueda)
+            | Q(apellido__icontains=busqueda)
+            | Q(cedula__icontains=busqueda)
+        )
+
+    funcionarios_pendientes = pendientes_qs.order_by("apellido", "nombre")[:250]
+    pendientes_filtrados = pendientes_qs.count()
+    sucursales = Sucursal.objects.filter(empresa=empresa, activo=True).order_by("nombre")
+    sectores = funcionarios_base.exclude(sector="").values_list("sector", flat=True).distinct().order_by("sector")
+
+    query_retorno = request.GET.urlencode()
+
+    return render(request, "biometrico/rostros_pendientes.html", {
+        "empresa_seleccionada": empresa,
+        "empresas_permitidas": empresas,
+        "sucursales": sucursales,
+        "sectores": sectores,
+        "funcionarios_pendientes": funcionarios_pendientes,
+        "total_funcionarios": total_funcionarios,
+        "registrados": registrados,
+        "pendientes_total": pendientes_total,
+        "pendientes_filtrados": pendientes_filtrados,
+        "cobertura": cobertura,
+        "sucursal_id": str(sucursal_id),
+        "sector_sel": sector,
+        "busqueda": busqueda,
+        "query_retorno": query_retorno,
     })
 
 
@@ -815,84 +1011,91 @@ self.addEventListener("fetch", (event) => {{
     return HttpResponse(contenido, content_type="application/javascript")
 
 
+@login_required
 @csrf_exempt
 def registrar_rostro(request, funcionario_id):
-    funcionario = get_object_or_404(Funcionario, id=funcionario_id)
+    if not _tiene_permiso_biometrico(request, "puede_editar"):
+        if request.method == "POST":
+            return JsonResponse({"ok": False, "error": "No tienes permiso para registrar rostros."}, status=403)
+        messages.error(request, "No tienes permiso para registrar rostros.")
+        return redirect("biometrico_inicio")
+
+    funcionario = get_object_or_404(
+        Funcionario.objects.select_related("sucursal_rel", "sucursal_rel__empresa", "turno"),
+        id=funcionario_id,
+    )
+    empresa_funcionario = funcionario.empresa
+    empresas_permitidas = _empresas_biometricas_permitidas(request)
+    if not empresa_funcionario or not empresas_permitidas.filter(pk=empresa_funcionario.pk).exists():
+        if request.method == "POST":
+            return JsonResponse({"ok": False, "error": "No puedes registrar rostros de otra empresa."}, status=403)
+        messages.error(request, "No puedes registrar rostros de otra empresa.")
+        return redirect("biometrico_inicio")
+
+    retorno = request.GET.get("next") or request.POST.get("next") or ""
+    if not retorno.startswith("/biometrico/rostros-pendientes/"):
+        retorno = f"/biometrico/rostros-pendientes/?empresa={empresa_funcionario.pk}"
+
+    rostro_existente = _descriptor_facial_valido(funcionario)
+    actualizar = request.GET.get("actualizar") == "1" or request.POST.get("actualizar") == "1"
 
     if request.method == "GET":
         return render(request, "biometrico/registrar_rostro.html", {
-            "funcionario": funcionario
+            "funcionario": funcionario,
+            "empresa": empresa_funcionario,
+            "retorno": retorno,
+            "rostro_existente": rostro_existente,
+            "actualizar": actualizar,
         })
 
     if request.method == "POST":
-        data = request.POST.get("imagen")
+        if rostro_existente and not actualizar:
+            return JsonResponse({
+                "ok": False,
+                "tipo": "ya_registrado",
+                "error": "Este funcionario ya tiene rostro registrado. Use Actualizar rostro para reemplazarlo.",
+            })
 
-        if not data:
-            return JsonResponse({"ok": False, "error": "No se recibió imagen"})
+        data = request.POST.get("imagen")
+        origen = request.POST.get("origen", "CAMARA").strip().upper()
+        accion = request.POST.get("accion", "guardar").strip().lower()
 
         try:
-            image_np = _base64_a_rgb_np(data)
+            resultado = _procesar_registro_rostro(funcionario, data, origen=origen, guardar=accion != "validar")
+            if not resultado.get("ok"):
+                return JsonResponse(resultado)
 
-            if image_np is None:
+            if accion == "validar":
                 return JsonResponse({
-                    "ok": False,
-                    "error": "No se pudo procesar la imagen."
+                    "ok": True,
+                    "tipo": "rostro_valido",
+                    "mensaje": "Rostro detectado correctamente.",
                 })
-
-            ok_luz, tipo_luz, mensaje_luz = _validar_iluminacion(image_np)
-            if not ok_luz:
-                return JsonResponse({
-                    "ok": False,
-                    "error": mensaje_luz,
-                    "tipo": tipo_luz,
-                })
-
-            small = cv2.resize(image_np, (0, 0), fx=0.65, fy=0.65)
-
-            face_locations = face_recognition.face_locations(small, model="hog")
-
-            if not face_locations:
-                return JsonResponse({
-                    "ok": False,
-                    "error": "No se detectó rostro. Colóquese de frente a la cámara."
-                })
-
-            if len(face_locations) > 1:
-                return JsonResponse({
-                    "ok": False,
-                    "error": "Se detectaron varios rostros. Debe registrarse una sola persona."
-                })
-
-            encodings = face_recognition.face_encodings(small, face_locations)
-
-            if not encodings:
-                return JsonResponse({
-                    "ok": False,
-                    "error": "No se pudo generar el registro facial. Intente con mejor iluminación."
-                })
-
-            encoding = encodings[0]
-            funcionario.face_encoding = encoding.tobytes()
-            funcionario.save()
-
-            _limpiar_cache_rostros()
 
             registrar_historial(
                 request,
                 "Biométrico",
-                "Registrar rostro",
-                f"Se registró/actualizó el rostro de {funcionario.nombre_completo}."
+                "Actualizar rostro" if resultado.get("era_actualizacion") else "Registrar rostro",
+                (
+                    f"Se {'actualizó' if resultado.get('era_actualizacion') else 'registró'} el rostro de "
+                    f"{funcionario.nombre_completo}. Empresa: {empresa_funcionario.nombre}. "
+                    f"Sucursal: {funcionario.sucursal_rel.nombre if funcionario.sucursal_rel else '-'}. "
+                    f"Origen: {resultado.get('origen')}."
+                )
             )
 
             return JsonResponse({
                 "ok": True,
-                "mensaje": f"Rostro guardado para {funcionario.nombre_completo}"
+                "mensaje": resultado.get("mensaje"),
+                "funcionario": funcionario.nombre_completo,
+                "retorno": retorno,
+                "tipo": resultado.get("tipo"),
             })
 
         except Exception as e:
-            return JsonResponse({"ok": False, "error": _mensaje_error_amigable(str(e))})
+            return JsonResponse({"ok": False, "tipo": "error", "error": _mensaje_error_amigable(str(e))})
 
-    return JsonResponse({"ok": False, "error": "Método no permitido"})
+    return JsonResponse({"ok": False, "error": "Método no permitido"}, status=405)
 
 
 @csrf_exempt

@@ -32,7 +32,7 @@
             {% for item in alertas_vacaciones %}
                 <div class="mini-list-item mini-list-item-column">
                     <strong>{{ item.funcionario.nombre_completo }}</strong>
-                    <p>CI: {{ item.funcionario.cedula }}</p>
+                    <p>{{ item.funcionario.documento_compacto }}</p>
                     <p>{{ item.alerta.texto }}</p>
                     <p>Saldo disponible: {{ item.funcionario.saldo_vacaciones }} día(s)</p>
                 </div>
@@ -96,7 +96,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 <tbody>
                     {% for v in vacaciones %}
                         <tr>
-                            <td>{{ v.funcionario.nombre_completo }}<br><small>CI: {{ v.funcionario.cedula }}</small></td>
+                            <td>{{ v.funcionario.nombre_completo }}<br><small>{{ v.funcionario.documento_compacto }}</small></td>
                             <td>{{ v.fecha_desde|date:"d/m/Y" }}</td>
                             <td>{{ v.fecha_hasta|date:"d/m/Y" }}</td>
                             <td>{{ v.dias_solicitados }}</td>
@@ -135,7 +135,7 @@ document.addEventListener("DOMContentLoaded", function () {
                 <div class="mini-list-item mini-list-item-column">
                     <div>
                         <strong>{{ f.nombre_completo }}</strong>
-                        <p>CI: {{ f.cedula }}</p>
+                        <p>{{ f.documento_compacto }}</p>
                         <p>Antigüedad: {{ f.antiguedad_anios }} año(s)</p>
                         <p>Días que corresponden: {{ f.dias_vacaciones_corresponden }}</p>
                         <p>Días usados: {{ f.dias_vacaciones_usados }}</p>

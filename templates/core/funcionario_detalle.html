@@ -276,7 +276,7 @@
                 <h2>{{ funcionario.nombre_completo }}</h2>
 
                 <div class="ficha-meta">
-                    <span class="ficha-pill">🪪 CI {{ funcionario.cedula|millares }}</span>
+                    <span class="ficha-pill">🪪 {{ funcionario.documento_compacto }}</span>
                     <span class="ficha-pill">💼 {{ funcionario.cargo|default:"Sin cargo" }}</span>
                     <span class="ficha-pill">🏬 {{ funcionario.sucursal_mostrar }}</span>
 
@@ -334,8 +334,8 @@
             <h3>👤 Datos personales</h3>
 
             <div class="ficha-info-row">
-                <span>Cédula</span>
-                <strong>{{ funcionario.cedula|millares }}</strong>
+                <span>Documento</span>
+                <strong>{{ funcionario.documento_compacto }}</strong>
             </div>
 
             <div class="ficha-info-row">

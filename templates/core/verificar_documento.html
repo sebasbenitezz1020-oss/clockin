@@ -116,7 +116,7 @@
                 <td>Funcionario</td>
                 <td>
                     {% if documento.funcionario %}
-                        {{ documento.funcionario.nombre_completo }} - CI {{ documento.funcionario.cedula }}
+                        {{ documento.funcionario.nombre_completo }} - {{ documento.funcionario.documento_compacto }}
                     {% else %}
                         -
                     {% endif %}

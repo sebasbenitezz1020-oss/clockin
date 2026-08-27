@@ -1214,6 +1214,10 @@
             <a href="{% url 'biometrico_inicio' %}"><span class="sidebar-icon"><svg><use href="#ci-camera"></use></svg></span><span class="sidebar-label">Biom&eacute;trico</span></a>
             {% endif %}
 
+            {% if puede_ver_diaristas %}
+            <a href="{% url 'diaristas_lista' %}"><span class="sidebar-icon"><svg><use href="#ci-users"></use></svg></span><span class="sidebar-label">Diaristas</span></a>
+            {% endif %}
+
             {% if puede_ver_permisos %}
             <a href="{% url 'permisos_lista' %}"><span class="sidebar-icon"><svg><use href="#ci-file"></use></svg></span><span class="sidebar-label">Permisos / Licencias</span></a>
             {% endif %}

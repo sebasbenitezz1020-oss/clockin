@@ -7,6 +7,7 @@ from .views import (
     laboratorio_offline_descriptores,
     laboratorio_offline_sw,
     registrar_rostro,
+    rostros_pendientes,
     reconocimiento,
 )
 
@@ -17,6 +18,7 @@ urlpatterns = [
     path("laboratorio-offline/", laboratorio_offline, name="biometrico_laboratorio_offline"),
     path("laboratorio-offline/descriptores/", laboratorio_offline_descriptores, name="biometrico_laboratorio_descriptores"),
     path("laboratorio-offline/sw.js", laboratorio_offline_sw, name="biometrico_laboratorio_sw"),
+    path("rostros-pendientes/", rostros_pendientes, name="biometrico_rostros_pendientes"),
     path("registrar/<int:funcionario_id>/", registrar_rostro, name="registrar_rostro"),
     path("reconocer/", reconocimiento, name="biometrico_reconocer"),
 ]

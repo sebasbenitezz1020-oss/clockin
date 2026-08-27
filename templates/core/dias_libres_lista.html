@@ -328,7 +328,7 @@
                 <thead>
                     <tr>
                         <th>Funcionario</th>
-                        <th>Cédula</th>
+                        <th>Documento</th>
                         <th>Sector</th>
                         <th>Sucursal</th>
                         <th>Lunes</th>
@@ -348,7 +348,7 @@
                             <div class="dl-func">{{ item.funcionario.nombre_completo }}</div>
                             <div class="dl-mini">Turno base: {{ item.funcionario.turno.nombre|default:"Sin turno" }}</div>
                         </td>
-                        <td>{{ item.funcionario.cedula }}</td>
+                        <td>{{ item.funcionario.documento_compacto }}</td>
                         <td>{{ item.funcionario.sector|default:"-" }}</td>
                         <td>{{ item.funcionario.sucursal_mostrar }}</td>
 

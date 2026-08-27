@@ -559,7 +559,7 @@
                 </div>
 
                 <div class="form-field">
-                    <label>Buscar por nombre o C.I.</label>
+                    <label>Buscar por nombre o documento</label>
                     <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Ej: Juan, Pérez o 123456">
                 </div>
 
@@ -629,7 +629,7 @@
                     </div>
 
                     <div class="form-field">
-                        <label>Buscar nombre o C.I.</label>
+                        <label>Buscar nombre o documento</label>
                         <input type="text" name="q" value="{{ q }}" class="form-control" placeholder="Buscar funcionario">
                     </div>
                 </div>
@@ -745,7 +745,7 @@
                 {% for f in ausentes_dia %}
                     <div class="mini-item">
                         <strong>{{ f.nombre_completo }}</strong>
-                        <span>CI: {{ f.cedula }}</span>
+                        <span>{{ f.documento_compacto }}</span>
                         <span>Turno: {{ f.turno.nombre|default:"-" }}</span>
                         <span>Sucursal: {{ f.sucursal_mostrar }}</span>
                         <div class="quick-actions">
@@ -811,7 +811,7 @@
                 {% for a in jornadas_incompletas %}
                     <div class="mini-item">
                         <strong>{{ a.funcionario.nombre_completo }}</strong>
-                        <span>CI: {{ a.funcionario.cedula }}</span>
+                        <span>{{ a.funcionario.documento_compacto }}</span>
                         <span>Sucursal: {{ a.funcionario.sucursal_mostrar }}</span>
                         <span>Sector: {{ a.funcionario.sector|default:"-" }}</span>
                         <span>Total trabajado: {{ a.horas_trabajadas_texto }}</span>
@@ -855,7 +855,7 @@
                 {% for item in vacaciones_reporte_dia %}
                     <div class="mini-item">
                         <strong>{{ item.funcionario.nombre_completo }}</strong>
-                        <span>CI: {{ item.funcionario.cedula }}</span>
+                        <span>{{ item.funcionario.documento_compacto }}</span>
                         <span>Desde: {{ item.fecha_desde|date:"d/m/Y" }} · Hasta: {{ item.fecha_hasta|date:"d/m/Y" }}</span>
                         <span>Días: {{ item.dias_solicitados }}</span>
                         <span>Sucursal: {{ item.funcionario.sucursal_mostrar }}</span>
@@ -877,7 +877,7 @@
                 {% for f in dias_libres_reporte_dia %}
                     <div class="mini-item">
                         <strong>{{ f.nombre_completo }}</strong>
-                        <span>CI: {{ f.cedula }}</span>
+                        <span>{{ f.documento_compacto }}</span>
                         <span>Sector: {{ f.sector|default:"-" }}</span>
                         <span>Sucursal: {{ f.sucursal_mostrar }}</span>
                         <div class="quick-actions"><a href="{% url 'funcionario_detalle' f.id %}" class="quick-btn gray">👤 Ficha</a></div>

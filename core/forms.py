@@ -21,6 +21,9 @@ from .models import (
     HistorialSalarialFuncionario,
     SuscripcionSistema,
     PagoSuscripcionSistema,
+    Diarista,
+    AsistenciaDiarista,
+    PagoDiarista,
 )
 
 from django import forms
@@ -31,7 +34,7 @@ from .models import Asistencia
 def _label_funcionario_buscable(funcionario):
     partes = [funcionario.nombre_completo]
     if funcionario.cedula:
-        partes.append(f"CI {funcionario.cedula}")
+        partes.append(funcionario.documento_compacto)
     if funcionario.cargo:
         partes.append(funcionario.cargo)
     if funcionario.sector:
@@ -39,6 +42,62 @@ def _label_funcionario_buscable(funcionario):
     if funcionario.sucursal_rel:
         partes.append(funcionario.sucursal_rel.nombre)
     return " · ".join(partes)
+
+
+def _solo_digitos(valor):
+    return "".join(ch for ch in str(valor or "") if ch.isdigit())
+
+
+def _normalizar_documento(tipo_documento, numero):
+    tipo = (tipo_documento or "CI").strip().upper()
+    numero = (numero or "").strip()
+    if tipo in ["CPF", "CNPJ"]:
+        return _solo_digitos(numero)
+    return numero.replace(" ", "").replace(".", "").replace("-", "")
+
+
+def _digitos_repetidos(numero):
+    return bool(numero) and len(set(numero)) == 1
+
+
+def _cpf_valido(numero):
+    cpf = _solo_digitos(numero)
+    if len(cpf) != 11 or _digitos_repetidos(cpf):
+        return False
+    suma = sum(int(cpf[i]) * (10 - i) for i in range(9))
+    d1 = (suma * 10) % 11
+    d1 = 0 if d1 == 10 else d1
+    suma = sum(int(cpf[i]) * (11 - i) for i in range(10))
+    d2 = (suma * 10) % 11
+    d2 = 0 if d2 == 10 else d2
+    return int(cpf[9]) == d1 and int(cpf[10]) == d2
+
+
+def _cnpj_valido(numero):
+    cnpj = _solo_digitos(numero)
+    if len(cnpj) != 14 or _digitos_repetidos(cnpj):
+        return False
+    pesos_1 = [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+    pesos_2 = [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+    suma = sum(int(cnpj[i]) * pesos_1[i] for i in range(12))
+    resto = suma % 11
+    d1 = 0 if resto < 2 else 11 - resto
+    suma = sum(int(cnpj[i]) * pesos_2[i] for i in range(13))
+    resto = suma % 11
+    d2 = 0 if resto < 2 else 11 - resto
+    return int(cnpj[12]) == d1 and int(cnpj[13]) == d2
+
+
+def _validar_documento_identidad(tipo_documento, numero):
+    tipo = (tipo_documento or "CI").strip().upper()
+    normalizado = _normalizar_documento(tipo, numero)
+    if not normalizado:
+        raise forms.ValidationError("Debes ingresar el número de documento.")
+    if tipo == "CPF" and not _cpf_valido(normalizado):
+        raise forms.ValidationError("CPF inválido.")
+    if tipo == "CNPJ" and not _cnpj_valido(normalizado):
+        raise forms.ValidationError("CNPJ inválido.")
+    return normalizado
 
 
 class MarcacionManualForm(forms.Form):
@@ -429,6 +488,283 @@ class ConfiguracionGeneralForm(forms.ModelForm):
         )
 
 
+class AsistenciaDiaristaForm(forms.ModelForm):
+    hora_entrada_simple = forms.TimeField(
+        required=False,
+        label="Hora de entrada",
+        input_formats=["%H:%M"],
+        widget=forms.TimeInput(format="%H:%M", attrs={"type": "time", "class": "form-control"})
+    )
+    hora_salida_simple = forms.TimeField(
+        required=False,
+        label="Hora de salida",
+        input_formats=["%H:%M"],
+        widget=forms.TimeInput(format="%H:%M", attrs={"type": "time", "class": "form-control"})
+    )
+
+    class Meta:
+        model = AsistenciaDiarista
+        fields = ["fecha", "hora_entrada_simple", "hora_salida_simple", "estado", "observacion"]
+        widgets = {
+            "fecha": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date", "class": "form-control"}),
+            "estado": forms.Select(attrs={"class": "form-control"}),
+            "observacion": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["fecha"].input_formats = ["%Y-%m-%d"]
+        self.fields["fecha"].widget.format = "%Y-%m-%d"
+        self.fields["estado"].choices = [
+            (AsistenciaDiarista.Estados.PROGRAMADO, "Programado"),
+            (AsistenciaDiarista.Estados.TRABAJADO, "Trabajado"),
+            (AsistenciaDiarista.Estados.AUSENTE, "Ausente"),
+            (AsistenciaDiarista.Estados.INCOMPLETO, "Incompleto"),
+        ]
+        if self.instance and self.instance.pk:
+            if self.instance.hora_entrada:
+                self.fields["hora_entrada_simple"].initial = timezone.localtime(self.instance.hora_entrada).strftime("%H:%M")
+            if self.instance.hora_salida:
+                self.fields["hora_salida_simple"].initial = timezone.localtime(self.instance.hora_salida).strftime("%H:%M")
+
+    def clean(self):
+        cleaned_data = super().clean()
+        estado = cleaned_data.get("estado")
+        entrada = cleaned_data.get("hora_entrada_simple")
+        salida = cleaned_data.get("hora_salida_simple")
+
+        if estado == AsistenciaDiarista.Estados.TRABAJADO and (not entrada or not salida):
+            raise forms.ValidationError("Para marcar como trabajado debes cargar entrada y salida.")
+
+        if estado == AsistenciaDiarista.Estados.AUSENTE and (entrada or salida):
+            raise forms.ValidationError("Una ausencia no debe tener hora de entrada o salida.")
+
+        if entrada and salida and salida <= entrada:
+            raise forms.ValidationError("La salida debe ser posterior a la entrada para esta primera versión.")
+
+        return cleaned_data
+
+
+class PagoDiaristaForm(forms.ModelForm):
+    marcar_pagado = forms.BooleanField(
+        required=False,
+        label="Marcar como pagado al generar",
+        widget=forms.CheckboxInput(attrs={"class": "form-check-input"})
+    )
+
+    class Meta:
+        model = PagoDiarista
+        fields = [
+            "fecha_pago",
+            "periodo_desde",
+            "periodo_hasta",
+            "monto_diario_aplicado",
+            "adicionales",
+            "descuentos",
+            "concepto_adicional",
+            "motivo_ajuste",
+            "observacion",
+        ]
+        widgets = {
+            "fecha_pago": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date", "class": "form-control"}),
+            "periodo_desde": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date", "class": "form-control"}),
+            "periodo_hasta": forms.DateInput(format="%Y-%m-%d", attrs={"type": "date", "class": "form-control"}),
+            "monto_diario_aplicado": forms.NumberInput(attrs={"class": "form-control", "min": "0", "step": "1"}),
+            "adicionales": forms.NumberInput(attrs={"class": "form-control", "min": "0", "step": "1"}),
+            "descuentos": forms.NumberInput(attrs={"class": "form-control", "min": "0", "step": "1"}),
+            "concepto_adicional": forms.TextInput(attrs={"class": "form-control", "placeholder": "Ej: movilidad, tarea extra"}),
+            "motivo_ajuste": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+            "observacion": forms.Textarea(attrs={"class": "form-control", "rows": 3}),
+        }
+        labels = {
+            "fecha_pago": "Fecha de pago",
+            "periodo_desde": "Periodo desde",
+            "periodo_hasta": "Periodo hasta",
+            "monto_diario_aplicado": "Monto diario aplicado",
+            "concepto_adicional": "Concepto adicional",
+            "motivo_ajuste": "Motivo de ajuste",
+        }
+
+    def __init__(self, *args, **kwargs):
+        self.diarista = kwargs.pop("diarista", None)
+        super().__init__(*args, **kwargs)
+        for field in ["fecha_pago", "periodo_desde", "periodo_hasta"]:
+            self.fields[field].input_formats = ["%Y-%m-%d"]
+            self.fields[field].widget.format = "%Y-%m-%d"
+        if self.diarista and not self.is_bound:
+            self.fields["monto_diario_aplicado"].initial = self.diarista.monto_diario_acordado
+            self.fields["periodo_desde"].initial = self.diarista.fecha_inicio
+            self.fields["periodo_hasta"].initial = self.diarista.fecha_fin or timezone.localdate()
+
+    def clean(self):
+        cleaned_data = super().clean()
+        desde = cleaned_data.get("periodo_desde")
+        hasta = cleaned_data.get("periodo_hasta")
+        monto = cleaned_data.get("monto_diario_aplicado") or Decimal("0")
+        adicionales = cleaned_data.get("adicionales") or Decimal("0")
+        descuentos = cleaned_data.get("descuentos") or Decimal("0")
+
+        if desde and hasta and hasta < desde:
+            self.add_error("periodo_hasta", "La fecha hasta no puede ser anterior a la fecha desde.")
+
+        if monto <= 0:
+            self.add_error("monto_diario_aplicado", "El monto diario debe ser mayor a cero.")
+
+        if adicionales < 0:
+            self.add_error("adicionales", "Los adicionales no pueden ser negativos.")
+
+        if descuentos < 0:
+            self.add_error("descuentos", "Los descuentos no pueden ser negativos.")
+
+        return cleaned_data
+
+
+class DiaristaForm(forms.ModelForm):
+    empresa = forms.ModelChoiceField(
+        queryset=Empresa.objects.filter(activo=True).order_by("nombre"),
+        required=False,
+        widget=forms.Select(attrs={"class": "form-control"})
+    )
+
+    fecha_inicio = forms.DateField(
+        input_formats=["%Y-%m-%d"],
+        widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date", "class": "form-control"})
+    )
+    fecha_fin = forms.DateField(
+        required=False,
+        input_formats=["%Y-%m-%d"],
+        widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date", "class": "form-control"})
+    )
+    fecha_nacimiento = forms.DateField(
+        required=False,
+        input_formats=["%Y-%m-%d"],
+        widget=forms.DateInput(format="%Y-%m-%d", attrs={"type": "date", "class": "form-control"})
+    )
+
+    class Meta:
+        model = Diarista
+        fields = [
+            "empresa",
+            "sucursal",
+            "nombres",
+            "apellidos",
+            "cedula",
+            "telefono",
+            "direccion",
+            "fecha_nacimiento",
+            "fecha_inicio",
+            "fecha_fin",
+            "cantidad_dias_contratados",
+            "monto_diario_acordado",
+            "forma_calculo",
+            "turno",
+            "sector",
+            "funcion_temporal",
+            "observaciones",
+            "estado",
+            "activo",
+        ]
+        widgets = {
+            "sucursal": forms.Select(attrs={"class": "form-control"}),
+            "nombres": forms.TextInput(attrs={"class": "form-control", "placeholder": "Ej: Juan Carlos"}),
+            "apellidos": forms.TextInput(attrs={"class": "form-control", "placeholder": "Ej: López Duarte"}),
+            "cedula": forms.TextInput(attrs={"class": "form-control", "placeholder": "Número de cédula"}),
+            "telefono": forms.TextInput(attrs={"class": "form-control", "placeholder": "Teléfono"}),
+            "direccion": forms.TextInput(attrs={"class": "form-control", "placeholder": "Dirección opcional"}),
+            "cantidad_dias_contratados": forms.NumberInput(attrs={"class": "form-control", "min": "1"}),
+            "monto_diario_acordado": forms.NumberInput(attrs={"class": "form-control", "min": "0", "step": "1", "placeholder": "Ej: 150000"}),
+            "forma_calculo": forms.Select(attrs={"class": "form-control"}),
+            "turno": forms.Select(attrs={"class": "form-control"}),
+            "sector": forms.Select(attrs={"class": "form-control"}),
+            "funcion_temporal": forms.TextInput(attrs={"class": "form-control", "placeholder": "Ej: Ayudante de depósito"}),
+            "observaciones": forms.Textarea(attrs={"class": "form-control", "rows": 4}),
+            "estado": forms.Select(attrs={"class": "form-control"}),
+            "activo": forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        }
+        labels = {
+            "cantidad_dias_contratados": "Cantidad de días contratados",
+            "monto_diario_acordado": "Monto diario acordado",
+            "forma_calculo": "Forma de cálculo",
+            "funcion_temporal": "Función / tarea temporal",
+        }
+
+    def __init__(self, *args, **kwargs):
+        self.empresa_activa = kwargs.pop("empresa_activa", None)
+        super().__init__(*args, **kwargs)
+
+        config = ConfiguracionGeneral.obtener()
+        self.fields["sector"].choices = [("", "Seleccionar sector")] + list(config.sectores_choices)
+        self.fields["empresa"].empty_label = "Seleccionar empresa"
+        self.fields["sucursal"].empty_label = "Seleccionar sucursal"
+        self.fields["turno"].empty_label = "Seleccionar turno"
+        self.fields["sucursal"].queryset = Sucursal.objects.filter(activo=True).order_by("empresa__nombre", "nombre")
+        self.fields["turno"].queryset = Turno.objects.filter(activo=True).order_by("empresa__nombre", "nombre")
+
+        empresa_id = None
+        if self.is_bound:
+            empresa_id = self.data.get("empresa")
+        elif self.instance.pk:
+            empresa_id = self.instance.empresa_id
+            self.fields["empresa"].initial = self.instance.empresa
+        elif self.empresa_activa:
+            empresa_id = self.empresa_activa.id
+            self.fields["empresa"].initial = self.empresa_activa
+
+        self.fields["empresa"].queryset = Empresa.objects.filter(activo=True).order_by("nombre")
+        if self.empresa_activa:
+            self.fields["empresa"].queryset = Empresa.objects.filter(pk=self.empresa_activa.pk)
+            self.fields["empresa"].initial = self.empresa_activa
+
+        if empresa_id:
+            try:
+                self.fields["sucursal"].queryset = Sucursal.objects.filter(
+                    Q(empresa_id=empresa_id, activo=True) | Q(pk=getattr(self.instance, "sucursal_id", None), empresa_id=empresa_id)
+                ).order_by("nombre")
+                self.fields["turno"].queryset = Turno.objects.filter(
+                    Q(empresa_id=empresa_id, activo=True) | Q(pk=getattr(self.instance, "turno_id", None), empresa_id=empresa_id)
+                ).order_by("nombre")
+            except (TypeError, ValueError):
+                pass
+
+    def clean_cedula(self):
+        return (self.cleaned_data.get("cedula") or "").strip()
+
+    def clean(self):
+        cleaned_data = super().clean()
+        empresa = cleaned_data.get("empresa")
+        sucursal = cleaned_data.get("sucursal")
+        turno = cleaned_data.get("turno")
+        fecha_inicio = cleaned_data.get("fecha_inicio")
+        fecha_fin = cleaned_data.get("fecha_fin")
+        cantidad = cleaned_data.get("cantidad_dias_contratados") or 0
+        monto = cleaned_data.get("monto_diario_acordado") or Decimal("0")
+
+        if not empresa:
+            self.add_error("empresa", "Debes seleccionar una empresa.")
+
+        if sucursal and empresa and sucursal.empresa_id != empresa.id:
+            self.add_error("sucursal", "La sucursal seleccionada no pertenece a la empresa.")
+
+        if turno and empresa and turno.empresa_id != empresa.id:
+            self.add_error("turno", "El turno seleccionado no pertenece a la empresa.")
+
+        if fecha_inicio and fecha_fin and fecha_fin < fecha_inicio:
+            self.add_error("fecha_fin", "La fecha final no puede ser anterior al inicio.")
+
+        if fecha_inicio and not fecha_fin and cantidad:
+            cleaned_data["fecha_fin"] = fecha_inicio + timezone.timedelta(days=int(cantidad) - 1)
+        elif fecha_inicio and fecha_fin:
+            cleaned_data["cantidad_dias_contratados"] = (fecha_fin - fecha_inicio).days + 1
+
+        if int(cantidad or 0) < 1:
+            self.add_error("cantidad_dias_contratados", "Debe ser al menos 1 día.")
+
+        if monto <= 0:
+            self.add_error("monto_diario_acordado", "El monto diario debe ser mayor a cero.")
+
+        return cleaned_data
+
+
 class FuncionarioForm(forms.ModelForm):
     empresa = forms.ModelChoiceField(
         queryset=Empresa.objects.filter(activo=True).order_by("nombre"),
@@ -468,6 +804,7 @@ class FuncionarioForm(forms.ModelForm):
         fields = [
             "nombre",
             "apellido",
+            "tipo_documento",
             "cedula",
             "turno",
             "empresa",
@@ -505,7 +842,8 @@ class FuncionarioForm(forms.ModelForm):
         widgets = {
             "nombre": forms.TextInput(attrs={"class": "form-control"}),
             "apellido": forms.TextInput(attrs={"class": "form-control"}),
-            "cedula": forms.TextInput(attrs={"class": "form-control"}),
+            "tipo_documento": forms.Select(attrs={"class": "form-control", "data-document-type": "true"}),
+            "cedula": forms.TextInput(attrs={"class": "form-control", "data-document-number": "true", "placeholder": "Número de documento"}),
             "turno": forms.Select(attrs={"class": "form-control"}),
             "sucursal_rel": forms.Select(attrs={"class": "form-control"}),
             "cargo": forms.Select(attrs={"class": "form-control"}),
@@ -543,6 +881,8 @@ class FuncionarioForm(forms.ModelForm):
             "activo": forms.CheckboxInput(attrs={"class": "form-check-input"}),
         }
         labels = {
+            "tipo_documento": "Tipo de documento",
+            "cedula": "Número de documento",
             "sucursal_rel": "Sucursal",
             "usa_salario_diferenciado": "Utilizar salario diferenciado",
             "salario_diferenciado": "Salario diferenciado mensual",
@@ -651,15 +991,20 @@ class FuncionarioForm(forms.ModelForm):
 
         return choices
     def clean_cedula(self):
-        cedula = self.cleaned_data["cedula"].strip()
-        qs = Funcionario.objects.filter(cedula=cedula)
+        tipo_documento = self.cleaned_data.get("tipo_documento") or "CI"
+        documento = _validar_documento_identidad(tipo_documento, self.cleaned_data.get("cedula"))
+        qs = Funcionario.objects.filter(tipo_documento=tipo_documento, cedula=documento)
 
         if self.instance.pk:
             qs = qs.exclude(pk=self.instance.pk)
 
-        if qs.exists():
-            raise forms.ValidationError("Ya existe un funcionario con esa cédula.")
-        return cedula
+        existente = qs.first()
+        if existente:
+            if not existente.activo:
+                raise forms.ValidationError("Ya existe un funcionario inactivo con este documento. Revisa su ficha para reincorporarlo.")
+            raise forms.ValidationError("Ya existe un funcionario con este documento.")
+
+        return documento
 
     def clean(self):
         cleaned_data = super().clean()
@@ -798,11 +1143,11 @@ class DeudaForm(forms.ModelForm):
 
 class MarcacionForm(forms.Form):
     cedula = forms.CharField(
-        label="Cédula",
+        label="Documento",
         max_length=30,
         widget=forms.TextInput(attrs={
             "class": "form-control form-control-lg",
-            "placeholder": "Ingresa la cédula del funcionario"
+            "placeholder": "Ingresa el documento del funcionario"
         })
     )
 

@@ -44,7 +44,7 @@
         <thead>
             <tr>
                 <th>Funcionario</th>
-                <th>Cédula</th>
+                <th>Documento</th>
                 <th>Sucursal</th>
                 <th>Saldo banco</th>
                 <th>Acciones</th>
@@ -55,7 +55,7 @@
             {% for item in datos %}
             <tr>
                 <td>{{ item.funcionario.nombre_completo }}</td>
-                <td>{{ item.funcionario.cedula }}</td>
+                <td>{{ item.funcionario.documento_compacto }}</td>
                 <td>{{ item.funcionario.sucursal_mostrar }}</td>
 
                 <td>

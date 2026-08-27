@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}{{ titulo_form }}{% endblock %}
+{% block content %}
+<style>
+.dia-form-page{padding:24px 0 42px;color:#e5eefb}.dia-form-hero{display:flex;justify-content:space-between;gap:16px;align-items:flex-end;margin-bottom:18px;padding:24px;border-radius:24px;background:radial-gradient(circle at 8% 0%,rgba(56,189,248,.16),transparent 34%),linear-gradient(180deg,rgba(15,23,42,.98),rgba(8,13,23,.98));border:1px solid rgba(148,163,184,.15)}.dia-form-hero h1{margin:0;color:#fff;font-size:clamp(28px,5vw,40px);font-weight:1000;letter-spacing:0}.dia-form-hero p{margin:8px 0 0;color:#9fb0c3}.dia-btn{display:inline-flex;align-items:center;justify-content:center;min-height:42px;padding:0 16px;border-radius:14px;text-decoration:none;border:1px solid rgba(148,163,184,.18);background:rgba(15,23,42,.72);color:#dbeafe;font-weight:950}.dia-btn.primary{border:0;color:#fff;background:linear-gradient(135deg,#2563eb,#38bdf8)}.dia-form-card{padding:22px;border-radius:24px;background:rgba(15,23,42,.84);border:1px solid rgba(148,163,184,.14);box-shadow:0 18px 50px rgba(0,0,0,.22)}.dia-section{margin-bottom:22px}.dia-section h3{margin:0 0 14px;color:#fff;font-size:18px;font-weight:1000}.dia-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}.dia-grid.two{grid-template-columns:repeat(2,minmax(0,1fr))}.dia-field label{display:block;color:#9fb0c3;font-size:12px;font-weight:900;margin-bottom:6px}.dia-field input,.dia-field select,.dia-field textarea{width:100%;border-radius:14px;border:1px solid rgba(148,163,184,.20);background:rgba(2,6,23,.55);color:#f8fafc;padding:11px 12px;font-weight:800}.dia-field textarea{min-height:110px}.dia-errors{margin-top:6px;color:#fecaca;font-size:12px}.dia-actions{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-top:18px}.dia-check{display:flex;gap:10px;align-items:center;color:#cbd5e1;font-weight:850}.dia-check input{width:auto}@media(max-width:900px){.dia-grid,.dia-grid.two{grid-template-columns:1fr}.dia-form-hero{display:grid;padding:18px;border-radius:18px}.dia-actions .dia-btn{width:100%}}
+</style>
+<div class="container-fluid dia-form-page">
+  <section class="dia-form-hero"><div><a class="dia-btn" href="{% url 'diaristas_lista' %}">← Volver</a><h1>{{ titulo_form }}</h1><p>Alta rápida para contratación temporal por día, separada de funcionarios permanentes.</p></div></section>
+  <form method="post" class="dia-form-card" novalidate>{% csrf_token %}
+    {% if form.non_field_errors %}<div class="dia-errors">{{ form.non_field_errors }}</div>{% endif %}
+    <section class="dia-section"><h3>Datos personales</h3><div class="dia-grid">
+      {% for field in form %}{% if field.name in "nombres,apellidos,cedula,telefono,direccion,fecha_nacimiento" %}<div class="dia-field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.errors %}<div class="dia-errors">{{ field.errors }}</div>{% endif %}</div>{% endif %}{% endfor %}
+    </div></section>
+    <section class="dia-section"><h3>Empresa y tarea</h3><div class="dia-grid">
+      {% for field in form %}{% if field.name in "empresa,sucursal,sector,funcion_temporal,turno" %}<div class="dia-field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.errors %}<div class="dia-errors">{{ field.errors }}</div>{% endif %}</div>{% endif %}{% endfor %}
+    </div></section>
+    <section class="dia-section"><h3>Contratación y pago</h3><div class="dia-grid">
+      {% for field in form %}{% if field.name in "fecha_inicio,fecha_fin,cantidad_dias_contratados,monto_diario_acordado,forma_calculo,estado" %}<div class="dia-field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.errors %}<div class="dia-errors">{{ field.errors }}</div>{% endif %}</div>{% endif %}{% endfor %}
+    </div></section>
+    <section class="dia-section"><h3>Observaciones</h3><div class="dia-grid two"><div class="dia-field"><label for="{{ form.observaciones.id_for_label }}">{{ form.observaciones.label }}</label>{{ form.observaciones }}{% if form.observaciones.errors %}<div class="dia-errors">{{ form.observaciones.errors }}</div>{% endif %}</div><label class="dia-check">{{ form.activo }} Registro activo</label></div></section>
+    <div class="dia-actions"><a class="dia-btn" href="{% url 'diaristas_lista' %}">Cancelar</a><button class="dia-btn primary" type="submit">{{ boton_texto }}</button></div>
+  </form>
+</div>
+{% endblock %}

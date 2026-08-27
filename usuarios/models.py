@@ -56,6 +56,7 @@ class PermisoUsuario(models.Model):
         DIAS_LIBRES = "dias_libres", "Días Libres"
         ASISTENCIA = "asistencia", "Asistencia"
         BIOMETRICO = "biometrico", "Biométrico"
+        DIARISTAS = "diaristas", "Diaristas"
         BANCO_HORAS = "banco_horas", "Banco de Horas"
 
         PERMISOS = "permisos", "Permisos / Licencias"

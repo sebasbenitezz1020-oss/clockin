@@ -514,7 +514,7 @@
                         type="text"
                         name="q"
                         value="{{ q }}"
-                        placeholder="Buscar por nombre, apellido, cédula, cargo, sector, empresa o sucursal"
+                        placeholder="Buscar por nombre, apellido, documento, cargo, sector, empresa o sucursal"
                     >
                 </div>
 
@@ -554,7 +554,7 @@
             <table class="func-table">
                 <thead>
                     <tr>
-                        <th>CI</th>
+                        <th>Documento</th>
                         <th>Nombre completo</th>
                         <th>Cargo</th>
                         <th>Sucursal</th>
@@ -566,7 +566,7 @@
                 <tbody>
                     {% for funcionario in funcionarios %}
                     <tr>
-                        <td class="func-data">{{ funcionario.cedula|millares }}</td>
+                        <td class="func-data">{{ funcionario.documento_compacto }}</td>
 
                         <td>
                             <div class="func-main">
