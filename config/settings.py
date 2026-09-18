@@ -1,5 +1,6 @@
 from pathlib import Path
 from dotenv import load_dotenv
+from django.core.exceptions import ImproperlyConfigured
 import os
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -59,16 +60,43 @@ TEMPLATES = [
 
 WSGI_APPLICATION = "config.wsgi.application"
 
-DATABASES = {
-    'default': {
-        'ENGINE': os.getenv('DB_ENGINE', 'django.db.backends.sqlite3'),
-        'NAME': os.getenv('DB_NAME', BASE_DIR / 'db.sqlite3'),
-        'USER': os.getenv('DB_USER', ''),
-        'PASSWORD': os.getenv('DB_PASSWORD', ''),
-        'HOST': os.getenv('DB_HOST', ''),
-        'PORT': os.getenv('DB_PORT', ''),
+CLOCKIN_ENV = os.getenv("CLOCKIN_ENV", "production").strip().lower()
+if CLOCKIN_ENV not in {"production", "development"}:
+    raise ImproperlyConfigured("CLOCKIN_ENV must be production or development.")
+
+_database_engine = os.getenv("DB_ENGINE", "").strip()
+if CLOCKIN_ENV == "development" and not _database_engine:
+    _database_engine = "django.db.backends.sqlite3"
+
+if CLOCKIN_ENV == "production" and _database_engine != "django.db.backends.postgresql":
+    raise ImproperlyConfigured("Production requires an explicit PostgreSQL DB_ENGINE.")
+
+if _database_engine == "django.db.backends.postgresql":
+    _database_fields = ("NAME", "USER", "PASSWORD", "HOST", "PORT")
+    _database_values = {
+        field: os.getenv("DB_" + field, "") for field in _database_fields
     }
-}
+    _missing_database_fields = [
+        "DB_" + field
+        for field, value in _database_values.items()
+        if not value.strip()
+    ]
+    if _missing_database_fields:
+        raise ImproperlyConfigured(
+            "Missing PostgreSQL configuration: " + ", ".join(_missing_database_fields)
+        )
+    DATABASES = {
+        "default": {"ENGINE": _database_engine, **_database_values}
+    }
+elif CLOCKIN_ENV == "development" and _database_engine == "django.db.backends.sqlite3":
+    DATABASES = {
+        "default": {
+            "ENGINE": _database_engine,
+            "NAME": os.getenv("DB_NAME") or BASE_DIR / "db.sqlite3",
+        }
+    }
+else:
+    raise ImproperlyConfigured("Unsupported database engine for CLOCKIN_ENV.")
 
 AUTH_PASSWORD_VALIDATORS = [
     {"NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator"},
